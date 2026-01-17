@@ -311,14 +311,14 @@ def main():
     pages = discover_pages(args.docs_dir)
     print(f"Discovered {len(pages)} documentation pages")
 
-    # Report pages missing frontmatter
+    # Report pages missing frontmatter (to stderr to avoid MkDocs strict mode issues)
     missing_frontmatter = [p for p in pages if not p.description]
     if missing_frontmatter:
-        print(f"\nWarning: {len(missing_frontmatter)} pages missing description:")
+        print(f"\nNote: {len(missing_frontmatter)} pages missing description:", file=sys.stderr)
         for p in missing_frontmatter[:10]:
-            print(f"  - {p.path.relative_to(args.docs_dir)}")
+            print(f"  - {p.path.relative_to(args.docs_dir)}", file=sys.stderr)
         if len(missing_frontmatter) > 10:
-            print(f"  ... and {len(missing_frontmatter) - 10} more")
+            print(f"  ... and {len(missing_frontmatter) - 10} more", file=sys.stderr)
 
     if args.validate_only:
         # Validation mode - just report stats
@@ -349,10 +349,10 @@ def main():
     llms_full_txt_path.write_text(llms_full_txt, encoding='utf-8')
     print(f"Generated: {llms_full_txt_path} ({len(llms_full_txt)} bytes)")
 
-    # Warn if llms-full.txt is too large for most LLM contexts
+    # Note if llms-full.txt is large (informational, not a warning to avoid MkDocs strict mode issues)
     if len(llms_full_txt) > 102400:
-        print(f"\nWarning: llms-full.txt exceeds 100KB ({len(llms_full_txt)} bytes)")
-        print("  This may not fit in some LLM context windows")
+        print(f"\nNote: llms-full.txt is {len(llms_full_txt)} bytes ({len(llms_full_txt) // 1024}KB)", file=sys.stderr)
+        print("  Consider using llms.txt for smaller context windows", file=sys.stderr)
 
 
 if __name__ == '__main__':
