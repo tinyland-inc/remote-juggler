@@ -10,7 +10,7 @@ stages:
   - release
 
 variables:
-  CHAPEL_VERSION: "2.8.0"
+  CHAPEL_VERSION: "2.7.0"
   PROJECT_NAME: "remote-juggler"
   # Disable shallow clones for better caching
   GIT_DEPTH: 0
