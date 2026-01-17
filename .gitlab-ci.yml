@@ -89,27 +89,6 @@ build:darwin-arm64:
       - ${PROJECT_NAME}-darwin-arm64
     expire_in: 1 week
 
-build:darwin-amd64:
-  stage: build
-  tags:
-    - macos
-    - amd64
-    - shell  # Force native shell executor (Chapel/Homebrew not available in Docker)
-  <<: *mason_cache
-  script:
-    - export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-    - which chpl || brew install chapel
-    # Use Makefile instead of Mason to work around Mason 0.2.0 linking bug
-    # (Mason can't handle "-framework Security" - splits on space)
-    - make release
-    - mv target/release/remote_juggler ${PROJECT_NAME}-darwin-amd64
-    - chmod +x ${PROJECT_NAME}-darwin-amd64
-  artifacts:
-    name: "${PROJECT_NAME}-darwin-amd64-${CI_COMMIT_SHORT_SHA}"
-    paths:
-      - ${PROJECT_NAME}-darwin-amd64
-    expire_in: 1 week
-  allow_failure: true  # Intel Mac runners may not be available
 
 # =============================================================================
 # Tray App Build Stage
@@ -358,7 +337,6 @@ release:gitlab:
       - [Linux AMD64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-amd64)
       - [Linux ARM64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-arm64)
       - [macOS ARM64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-arm64)
-      - [macOS AMD64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-amd64)
 
       **Packages:**
       - [RPM (RHEL/Fedora/CentOS)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler-${CI_COMMIT_TAG}-1.x86_64.rpm)
