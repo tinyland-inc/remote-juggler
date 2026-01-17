@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "remote-juggler": {
+      "command": "remote-juggler",
+      "args": ["--mode=mcp"],
+      "env": {}
+    }
+  }
+}

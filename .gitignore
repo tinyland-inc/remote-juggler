@@ -1,0 +1,72 @@
+# Build artifacts
+build/
+target/
+*.o
+*.so
+*.dylib
+
+# Mason (Chapel package manager)
+.mason/
+
+# MkDocs output
+site/
+
+# macOS build artifacts
+*.app/
+*.dmg
+*.pkg
+*.pkg.tar.zst
+*.rpm
+*.deb
+
+# Certificate files (NEVER commit)
+*.p12
+*.cer
+*.pem
+*.key
+!DeveloperIDG2CA.cer
+
+# Tray build artifacts
+tray/darwin/.build/
+tray/linux/remote-juggler-tray
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test output
+test-results.xml
+chplcheck-report.txt
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Chapel linting cache
+.chplcheck/
+.chplcheck
+
+# Python artifacts (from old project)
+uv.lock
+__pycache__/
+*.pyc
+
+# Internal planning docs
+PLAN.md
+IMPLEMENTATION_PLAN.md
+
+# GitHub workflow (this is a GitLab project)
+.github/

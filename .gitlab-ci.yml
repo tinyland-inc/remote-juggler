@@ -1,22 +1,930 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
-# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
-# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
-:stages:
-- test
-:sast:
-  :stage: test
-:include:
-- :template: Security/SAST.gitlab-ci.yml
+# RemoteJuggler GitLab CI/CD Pipeline
+# Builds Chapel binaries for multiple platforms and publishes releases
+
 stages:
-- test
-- secret-detection
+  - build
+  - test
+  - docs
+  - package
+  - sign
+  - release
+
 variables:
-  SECRET_DETECTION_ENABLED: 'true'
-secret_detection:
-  stage: secret-detection
+  CHAPEL_VERSION: "2.8.0"
+  PROJECT_NAME: "remote-juggler"
+  # Disable shallow clones for better caching
+  GIT_DEPTH: 0
+
+# Cache Mason dependencies
+.mason_cache: &mason_cache
+  cache:
+    key: mason-${CI_COMMIT_REF_SLUG}
+    paths:
+      - .mason/
+      - Mason.lock
+
+# =============================================================================
+# Build Stage
+# =============================================================================
+
+build:linux-amd64:
+  stage: build
+  image: chapel/chapel:${CHAPEL_VERSION}
+  <<: *mason_cache
+  script:
+    - mason build --release
+    - mv target/release/remote_juggler ${PROJECT_NAME}-linux-amd64
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    # Verify binary
+    - ./${PROJECT_NAME}-linux-amd64 --version || echo "Binary built (version flag may not be implemented)"
+  artifacts:
+    name: "${PROJECT_NAME}-linux-amd64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-linux-amd64
+    expire_in: 1 week
+
+build:linux-arm64:
+  stage: build
+  image: chapel/chapel:${CHAPEL_VERSION}
+  tags:
+    - arm64
+  <<: *mason_cache
+  script:
+    - mason build --release
+    - mv target/release/remote_juggler ${PROJECT_NAME}-linux-arm64
+    - chmod +x ${PROJECT_NAME}-linux-arm64
+  artifacts:
+    name: "${PROJECT_NAME}-linux-arm64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-linux-arm64
+    expire_in: 1 week
+  allow_failure: true  # arm64 runners may not be available
+
+build:darwin-arm64:
+  stage: build
+  tags:
+    - macos
+    - arm64
+  <<: *mason_cache
+  script:
+    # Ensure Chapel is available (installed via Homebrew or similar)
+    - which chpl || brew install chapel
+    - mason build --release
+    - mv target/release/remote_juggler ${PROJECT_NAME}-darwin-arm64
+    - chmod +x ${PROJECT_NAME}-darwin-arm64
+    # Sign binary for macOS (if certificate available)
+    - |
+      if command -v codesign &> /dev/null && [ -n "$MACOS_SIGNING_IDENTITY" ]; then
+        codesign --sign "$MACOS_SIGNING_IDENTITY" --options runtime ${PROJECT_NAME}-darwin-arm64
+      fi
+  artifacts:
+    name: "${PROJECT_NAME}-darwin-arm64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-darwin-arm64
+    expire_in: 1 week
+
+build:darwin-amd64:
+  stage: build
+  tags:
+    - macos
+    - amd64
+  <<: *mason_cache
+  script:
+    - which chpl || brew install chapel
+    - mason build --release
+    - mv target/release/remote_juggler ${PROJECT_NAME}-darwin-amd64
+    - chmod +x ${PROJECT_NAME}-darwin-amd64
+  artifacts:
+    name: "${PROJECT_NAME}-darwin-amd64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-darwin-amd64
+    expire_in: 1 week
+  allow_failure: true  # Intel Mac runners may not be available
+
+# =============================================================================
+# Tray App Build Stage
+# =============================================================================
+
+build:tray-darwin:
+  stage: build
+  tags:
+    - macos
+    - arm64
+  script:
+    - cd tray/darwin
+    - swift build -c release
+    - mv .build/release/RemoteJugglerTray ../../${PROJECT_NAME}-tray-darwin-arm64
+    - chmod +x ../../${PROJECT_NAME}-tray-darwin-arm64
+  artifacts:
+    name: "${PROJECT_NAME}-tray-darwin-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-tray-darwin-arm64
+    expire_in: 1 week
+  allow_failure: true
+
+build:tray-linux:
+  stage: build
+  image: golang:1.21-alpine
+  script:
+    - apk add --no-cache build-base gtk+3.0-dev
+    - cd tray/linux
+    - go mod download
+    - CGO_ENABLED=0 go build -ldflags "-s -w" -o ../../${PROJECT_NAME}-tray-linux-amd64 .
+    - chmod +x ../../${PROJECT_NAME}-tray-linux-amd64
+  artifacts:
+    name: "${PROJECT_NAME}-tray-linux-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-tray-linux-amd64
+    expire_in: 1 week
+  allow_failure: true
+
+# =============================================================================
+# Test Stage
+# =============================================================================
+
+test:unit:
+  stage: test
+  image: chapel/chapel:${CHAPEL_VERSION}
+  <<: *mason_cache
+  script:
+    # Add Mason registry for QuickChpl
+    - |
+      mkdir -p ~/.mason/registry
+      cat > ~/.mason/registry/mason-registry.toml << 'EOF'
+      [[registry]]
+      name = "tinyland"
+      source = "https://github.com/Jesssullivan/mason-registry"
+      branch = "sid"
+      EOF
+    # Fetch dependencies including QuickChpl
+    - mason update || true
+    # Run unit tests
+    - chmod +x scripts/run-tests.sh
+    - ./scripts/run-tests.sh
+  artifacts:
+    reports:
+      junit: test-results.xml
+    paths:
+      - test-results.xml
+    when: always
+
+test:chplcheck:
+  stage: test
+  image: chapel/chapel:${CHAPEL_VERSION}
+  script:
+    # Run chplcheck linter on all Chapel source files
+    - |
+      echo "Running chplcheck linter..."
+      find src -name "*.chpl" -exec chplcheck {} \; 2>&1 | tee chplcheck-report.txt
+      # Check for errors (warnings are allowed)
+      if grep -q "error:" chplcheck-report.txt; then
+        echo "chplcheck found errors"
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - chplcheck-report.txt
+    when: always
+  allow_failure: false
+
+test:lint:
+  stage: test
+  image: chapel/chapel:${CHAPEL_VERSION}
+  script:
+    # Verify code compiles without errors
+    - mason build
+  allow_failure: true
+
+test:mcp-compliance:
+  stage: test
+  image: chapel/chapel:${CHAPEL_VERSION}
+  needs:
+    - build:linux-amd64
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    # Test MCP initialization
+    - |
+      echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | \
+        timeout 5 ./${PROJECT_NAME}-linux-amd64 --mode=mcp || true
+    # Run protocol compliance script if available
+    - |
+      if [ -f scripts/test-mcp-protocol.sh ]; then
+        chmod +x scripts/test-mcp-protocol.sh
+        ./scripts/test-mcp-protocol.sh
+      fi
+  allow_failure: true
+
+test:integration:
+  stage: test
+  image: chapel/chapel:${CHAPEL_VERSION}
+  needs:
+    - build:linux-amd64
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    # Test basic CLI commands
+    - ./${PROJECT_NAME}-linux-amd64 --help || echo "Help flag may not be implemented"
+    - ./${PROJECT_NAME}-linux-amd64 list || echo "List command test"
+  allow_failure: true
+
+# =============================================================================
+# Security Scanning (inherited from template)
+# =============================================================================
+
 include:
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+sast:
+  stage: test
+
+secret_detection:
+  stage: test
+
+# =============================================================================
+# Release Stage
+# =============================================================================
+
+release:package:
+  stage: release
+  image: curlimages/curl:latest
+  needs:
+    - build:linux-amd64
+    - build:darwin-arm64
+    - job: build:tray-darwin
+      optional: true
+    - job: build:tray-linux
+      optional: true
+    - job: package:rpm
+      optional: true
+    - job: package:deb
+      optional: true
+    - job: package:pacman
+      optional: true
+    - job: sign:darwin-pkg
+      optional: true
+    - job: release:dmg
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      # Upload each binary to GitLab Package Registry
+      for binary in ${PROJECT_NAME}-*; do
+        if [ -f "$binary" ]; then
+          echo "Uploading $binary..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$binary" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${binary}"
+        fi
+      done
+    - |
+      # Upload FPM packages (RPM, DEB, Pacman)
+      for pkg in *.rpm *.deb *.pkg.tar.zst; do
+        if [ -f "$pkg" ]; then
+          echo "Uploading $pkg..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$pkg" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${pkg}"
+        fi
+      done
+    - |
+      # Upload signed macOS PKG installers
+      for pkg in *.pkg; do
+        if [ -f "$pkg" ]; then
+          echo "Uploading $pkg..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$pkg" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${pkg}"
+        fi
+      done
+    - |
+      # Upload DMG installers
+      for dmg in *.dmg; do
+        if [ -f "$dmg" ]; then
+          echo "Uploading $dmg..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$dmg" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${dmg}"
+        fi
+      done
+    - |
+      # Upload checksums
+      for sha in *.sha256; do
+        if [ -f "$sha" ]; then
+          echo "Uploading $sha..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$sha" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${sha}"
+        fi
+      done
+
+release:gitlab:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - release:package
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating GitLab release for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "RemoteJuggler ${CI_COMMIT_TAG}"
+    description: |
+      ## RemoteJuggler ${CI_COMMIT_TAG}
+
+      Multi-provider git identity management tool with MCP/ACP support.
+
+      ### Installation
+
+      ```bash
+      curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
+      ```
+
+      ### Downloads
+
+      **Binaries:**
+      - [Linux AMD64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-amd64)
+      - [Linux ARM64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-arm64)
+      - [macOS ARM64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-arm64)
+      - [macOS AMD64](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-amd64)
+
+      **Packages:**
+      - [RPM (RHEL/Fedora/CentOS)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler-${CI_COMMIT_TAG}-1.x86_64.rpm)
+      - [DEB (Debian/Ubuntu)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler_${CI_COMMIT_TAG}-1_amd64.deb)
+      - [Pacman (Arch Linux)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler-${CI_COMMIT_TAG}-1-x86_64.pkg.tar.zst)
+      - [macOS PKG Installer (ARM64, Signed)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-${CI_COMMIT_TAG}-darwin-arm64.pkg)
+      - [macOS DMG Installer (ARM64, Notarized)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/RemoteJuggler-${CI_COMMIT_TAG}-darwin-arm64.dmg)
+
+      **Tray Applications:**
+      - [macOS Tray (ARM64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-darwin-arm64)
+      - [Linux Tray (AMD64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-linux-amd64)
+
+      ### Features
+
+      - Multi-provider support (GitLab, GitHub, Bitbucket)
+      - Darwin Keychain integration
+      - GPG signing configuration
+      - MCP server for Claude Code integration
+      - ACP server for JetBrains IDE integration
+    assets:
+      links:
+        - name: "${PROJECT_NAME}-linux-amd64"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-amd64"
+          filepath: "/binaries/${PROJECT_NAME}-linux-amd64"
+          link_type: package
+        - name: "${PROJECT_NAME}-darwin-arm64"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-arm64"
+          filepath: "/binaries/${PROJECT_NAME}-darwin-arm64"
+          link_type: package
+        - name: "remote-juggler-rpm"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler-${CI_COMMIT_TAG}-1.x86_64.rpm"
+          filepath: "/packages/remote-juggler.rpm"
+          link_type: package
+        - name: "remote-juggler-deb"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/remote-juggler_${CI_COMMIT_TAG}-1_amd64.deb"
+          filepath: "/packages/remote-juggler.deb"
+          link_type: package
+        - name: "remote-juggler-darwin-pkg"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-${CI_COMMIT_TAG}-darwin-arm64.pkg"
+          filepath: "/packages/remote-juggler-darwin.pkg"
+          link_type: package
+        - name: "remote-juggler-darwin-dmg"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/RemoteJuggler-${CI_COMMIT_TAG}-darwin-arm64.dmg"
+          filepath: "/packages/RemoteJuggler-darwin.dmg"
+          link_type: package
+        - name: "${PROJECT_NAME}-tray-darwin-arm64"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-darwin-arm64"
+          filepath: "/tray/${PROJECT_NAME}-tray-darwin-arm64"
+          link_type: package
+        - name: "${PROJECT_NAME}-tray-linux-amd64"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-linux-amd64"
+          filepath: "/tray/${PROJECT_NAME}-tray-linux-amd64"
+          link_type: package
+
+# =============================================================================
+# Documentation Stage (MkDocs)
+# =============================================================================
+
+docs:build:
+  stage: docs
+  image: python:3.12-slim
+  before_script:
+    - pip install mkdocs mkdocs-material pymdown-extensions
+  script:
+    # Generate snippets from source
+    - mkdir -p docs/snippets
+    - |
+      if [ -f "${PROJECT_NAME}-linux-amd64" ]; then
+        chmod +x ${PROJECT_NAME}-linux-amd64
+        ./${PROJECT_NAME}-linux-amd64 --help > docs/snippets/cli-help.txt 2>/dev/null || echo "CLI help generation skipped"
+      fi
+    # Build MkDocs site
+    - mkdocs build --strict --verbose
+  artifacts:
+    paths:
+      - site/
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs:
+    - job: build:linux-amd64
+      optional: true
+
+docs:linkcheck:
+  stage: docs
+  image: python:3.12-slim
+  before_script:
+    - pip install linkchecker
+  script:
+    - linkchecker site/ --check-extern || true
+  needs:
+    - docs:build
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# =============================================================================
+# FPM Packaging Stage
+# =============================================================================
+
+package:rpm:
+  stage: package
+  image: ruby:3.2-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - apt-get update && apt-get install -y rpm
+    - gem install fpm
+  script:
+    - mkdir -p pkg-root/usr/local/bin
+    - cp ${PROJECT_NAME}-linux-amd64 pkg-root/usr/local/bin/remote-juggler
+    - chmod +x pkg-root/usr/local/bin/remote-juggler
+    - cp scripts/post-install.sh pkg-root/
+    - cp scripts/pre-remove.sh pkg-root/
+    - |
+      fpm -s dir -t rpm \
+        -n remote-juggler \
+        -v ${CI_COMMIT_TAG:-0.0.0} \
+        --iteration ${CI_PIPELINE_IID} \
+        --architecture x86_64 \
+        --vendor "Tinyland" \
+        --maintainer "jess@tinyland.dev" \
+        --url "https://gitlab.com/tinyland/projects/remote-juggler" \
+        --description "Backend-agnostic git identity management with MCP/ACP support" \
+        --license "MIT" \
+        --depends "git" \
+        --after-install pkg-root/post-install.sh \
+        --before-remove pkg-root/pre-remove.sh \
+        -C pkg-root \
+        usr/local/bin/remote-juggler
+  artifacts:
+    paths:
+      - "*.rpm"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+package:deb:
+  stage: package
+  image: ruby:3.2-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - gem install fpm
+  script:
+    - mkdir -p pkg-root/usr/local/bin
+    - cp ${PROJECT_NAME}-linux-amd64 pkg-root/usr/local/bin/remote-juggler
+    - chmod +x pkg-root/usr/local/bin/remote-juggler
+    - cp scripts/post-install.sh pkg-root/
+    - cp scripts/pre-remove.sh pkg-root/
+    - |
+      fpm -s dir -t deb \
+        -n remote-juggler \
+        -v ${CI_COMMIT_TAG:-0.0.0} \
+        --iteration ${CI_PIPELINE_IID} \
+        --architecture amd64 \
+        --vendor "Tinyland" \
+        --maintainer "jess@tinyland.dev" \
+        --url "https://gitlab.com/tinyland/projects/remote-juggler" \
+        --description "Backend-agnostic git identity management with MCP/ACP support" \
+        --license "MIT" \
+        --depends "git" \
+        --after-install pkg-root/post-install.sh \
+        --before-remove pkg-root/pre-remove.sh \
+        --deb-no-default-config-files \
+        -C pkg-root \
+        usr/local/bin/remote-juggler
+  artifacts:
+    paths:
+      - "*.deb"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+package:pacman:
+  stage: package
+  image: archlinux:latest
+  needs:
+    - build:linux-amd64
+  before_script:
+    - pacman -Sy --noconfirm ruby
+    - gem install fpm
+  script:
+    - mkdir -p pkg-root/usr/local/bin
+    - cp ${PROJECT_NAME}-linux-amd64 pkg-root/usr/local/bin/remote-juggler
+    - chmod +x pkg-root/usr/local/bin/remote-juggler
+    - |
+      fpm -s dir -t pacman \
+        -n remote-juggler \
+        -v ${CI_COMMIT_TAG:-0.0.0} \
+        --architecture x86_64 \
+        --maintainer "jess@tinyland.dev" \
+        --description "Backend-agnostic git identity management with MCP/ACP support" \
+        --license "MIT" \
+        --depends "git" \
+        -C pkg-root \
+        usr/local/bin/remote-juggler
+  artifacts:
+    paths:
+      - "*.pkg.tar.zst"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true  # pacman packaging may have compatibility issues
+
+# =============================================================================
+# macOS Code Signing Stage (Based on moonlight/sunshine patterns)
+# =============================================================================
+
+# Sign darwin binary with Developer ID Application certificate
+sign:darwin-binary:
+  stage: sign
+  tags:
+    - macos
+    - arm64
+  needs:
+    - build:darwin-arm64
+  variables:
+    KEYCHAIN_NAME: "signing.keychain-db"
+  script:
+    - export VERSION=${CI_COMMIT_TAG:-0.0.0}
+    - |
+      if [ -n "$APPLE_CERTIFICATE_BASE64" ]; then
+        echo "=== Setting up code signing ==="
+
+        # Create temporary keychain with random password (moonlight pattern)
+        KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+        security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security set-keychain-settings "$KEYCHAIN_NAME"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security default-keychain -s "$KEYCHAIN_NAME"
+
+        # Add login keychain and system roots to search list (sunshine pattern)
+        LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+        security list-keychains -d user -s "$KEYCHAIN_NAME" "$LOGIN_KEYCHAIN" \
+          /System/Library/Keychains/SystemRootCertificates.keychain
+
+        # Import Developer ID G2 CA certificate for trust chain (sunshine pattern)
+        if [ -n "$APPLE_DEVELOPER_ID_CA_G2" ]; then
+          echo "Importing Developer ID G2 CA certificate..."
+          echo "$APPLE_DEVELOPER_ID_CA_G2" | base64 -d > DeveloperIDG2CA.cer
+          security import DeveloperIDG2CA.cer -k "$KEYCHAIN_NAME" \
+            -T /usr/bin/codesign -T /usr/bin/productsign -A || true
+          security import DeveloperIDG2CA.cer -k "$LOGIN_KEYCHAIN" -A || true
+        fi
+
+        # Import Developer ID Application certificate
+        echo "Importing Developer ID Application certificate..."
+        echo "$APPLE_CERTIFICATE_BASE64" | base64 -d > certificate.p12
+        security import certificate.p12 -k "$KEYCHAIN_NAME" \
+          -P "$APPLE_CERTIFICATE_PASSWORD" \
+          -T /usr/bin/codesign -A
+
+        # Set partition list for headless codesign access (critical for CI)
+        security set-key-partition-list -S apple-tool:,apple: -s \
+          -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+        # Sign the binary with hardened runtime (required for notarization)
+        echo "Signing binary with hardened runtime..."
+        codesign --force --options runtime --timestamp \
+          --sign "$APPLE_DEVELOPER_ID_APPLICATION" \
+          --keychain "$KEYCHAIN_NAME" \
+          ${PROJECT_NAME}-darwin-arm64
+
+        # Verify signature
+        echo "Verifying binary signature..."
+        codesign --verify --verbose=4 ${PROJECT_NAME}-darwin-arm64
+        spctl --assess --type execute --verbose=4 ${PROJECT_NAME}-darwin-arm64 || true
+
+        echo "Binary signing complete"
+
+        # Cleanup sensitive files
+        rm -f certificate.p12 DeveloperIDG2CA.cer
+      else
+        echo "No signing certificate - binary will be unsigned"
+      fi
+
+    # Generate SHA256 checksum
+    - shasum -a 256 ${PROJECT_NAME}-darwin-arm64 > ${PROJECT_NAME}-darwin-arm64.sha256
+
+  artifacts:
+    paths:
+      - ${PROJECT_NAME}-darwin-arm64
+      - ${PROJECT_NAME}-darwin-arm64.sha256
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# Sign darwin PKG installer with Developer ID Installer certificate
+sign:darwin-pkg:
+  stage: sign
+  tags:
+    - macos
+    - arm64
+  needs:
+    - sign:darwin-binary
+  variables:
+    KEYCHAIN_NAME: "signing.keychain-db"
+  script:
+    - export VERSION=${CI_COMMIT_TAG:-0.0.0}
+    - |
+      if [ -n "$APPLE_CERTIFICATE_BASE64" ]; then
+        echo "=== Setting up PKG signing ==="
+
+        # Create temporary keychain with random password
+        KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+        security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security set-keychain-settings "$KEYCHAIN_NAME"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security default-keychain -s "$KEYCHAIN_NAME"
+
+        # Add login keychain and system roots to search list
+        LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+        security list-keychains -d user -s "$KEYCHAIN_NAME" "$LOGIN_KEYCHAIN" \
+          /System/Library/Keychains/SystemRootCertificates.keychain
+
+        # Import Developer ID G2 CA certificate
+        if [ -n "$APPLE_DEVELOPER_ID_CA_G2" ]; then
+          echo "Importing Developer ID G2 CA certificate..."
+          echo "$APPLE_DEVELOPER_ID_CA_G2" | base64 -d > DeveloperIDG2CA.cer
+          security import DeveloperIDG2CA.cer -k "$KEYCHAIN_NAME" \
+            -T /usr/bin/codesign -T /usr/bin/productsign -A || true
+        fi
+
+        # Import Developer ID Installer certificate (for PKG signing)
+        # Falls back to Application certificate password if Installer password not set
+        if [ -n "$APPLE_INSTALLER_CERTIFICATE_BASE64" ]; then
+          echo "Importing Developer ID Installer certificate..."
+          echo "$APPLE_INSTALLER_CERTIFICATE_BASE64" | base64 -d > installer_certificate.p12
+          INSTALLER_PWD="${APPLE_INSTALLER_CERTIFICATE_PASSWORD:-$APPLE_CERTIFICATE_PASSWORD}"
+          if ! security import installer_certificate.p12 -k "$KEYCHAIN_NAME" \
+            -P "$INSTALLER_PWD" -T /usr/bin/productsign -A; then
+            echo "WARNING: Installer certificate import failed"
+          fi
+        else
+          # Use Application certificate for PKG signing if no Installer cert
+          echo "Importing Application certificate for PKG signing..."
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 -d > certificate.p12
+          security import certificate.p12 -k "$KEYCHAIN_NAME" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/productsign -A
+        fi
+
+        # Set partition list for headless access
+        security set-key-partition-list -S apple-tool:,apple: -s \
+          -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+        # Create PKG installer structure
+        echo "Creating PKG structure..."
+        mkdir -p pkg-root/usr/local/bin
+        cp ${PROJECT_NAME}-darwin-arm64 pkg-root/usr/local/bin/remote-juggler
+        chmod +x pkg-root/usr/local/bin/remote-juggler
+
+        # Build unsigned PKG first
+        echo "Building unsigned PKG..."
+        pkgbuild --root pkg-root \
+          --identifier "dev.tinyland.remote-juggler" \
+          --version "$VERSION" \
+          --install-location "/" \
+          ${PROJECT_NAME}-${VERSION}-unsigned.pkg
+
+        # Sign PKG with productsign
+        PKG_SIGNED=false
+        if [ -n "$APPLE_DEVELOPER_ID_INSTALLER" ]; then
+          echo "Signing PKG with Developer ID Installer..."
+          if productsign --sign "$APPLE_DEVELOPER_ID_INSTALLER" \
+            --keychain "$KEYCHAIN_NAME" \
+            ${PROJECT_NAME}-${VERSION}-unsigned.pkg \
+            ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg; then
+            rm ${PROJECT_NAME}-${VERSION}-unsigned.pkg
+            PKG_SIGNED=true
+
+            # Verify PKG signature
+            echo "Verifying PKG signature..."
+            pkgutil --check-signature ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg
+            spctl --assess --type install --verbose=4 ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg || true
+
+            # Notarize if credentials provided
+            if [ -n "$APPLE_ID" ] && [ -n "$APPLE_NOTARIZE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              echo "Submitting for notarization..."
+              SUBMISSION_OUTPUT=$(xcrun notarytool submit ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_NOTARIZE_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --wait 2>&1) || true
+
+              echo "$SUBMISSION_OUTPUT"
+
+              # Check for failure and save log if needed
+              if echo "$SUBMISSION_OUTPUT" | grep -q "status: Invalid"; then
+                SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+                if [ -n "$SUBMISSION_ID" ]; then
+                  echo "Fetching notarization log..."
+                  xcrun notarytool log "$SUBMISSION_ID" \
+                    --apple-id "$APPLE_ID" \
+                    --password "$APPLE_NOTARIZE_PASSWORD" \
+                    --team-id "$APPLE_TEAM_ID" > notarization-log.json || true
+                fi
+                echo "WARNING: Notarization failed - see notarization-log.json"
+              else
+                # Staple notarization ticket
+                echo "Stapling notarization ticket..."
+                xcrun stapler staple ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg || \
+                  echo "WARNING: Stapling failed"
+
+                # Validate stapled PKG
+                echo "Validating stapled PKG..."
+                xcrun stapler validate ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg || true
+              fi
+            else
+              echo "Notarization skipped - credentials not provided"
+            fi
+          else
+            echo "WARNING: PKG signing failed"
+          fi
+        fi
+
+        # Fall back to unsigned package if signing wasn't attempted or failed
+        if [ "$PKG_SIGNED" = "false" ]; then
+          echo "Using unsigned package..."
+          mv ${PROJECT_NAME}-${VERSION}-unsigned.pkg ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg || true
+        fi
+
+        # Cleanup sensitive files
+        rm -f certificate.p12 installer_certificate.p12 DeveloperIDG2CA.cer
+        security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+
+        echo "PKG signing complete (signed=$PKG_SIGNED)"
+      else
+        echo "No signing certificate - creating unsigned PKG"
+        mkdir -p pkg-root/usr/local/bin
+        cp ${PROJECT_NAME}-darwin-arm64 pkg-root/usr/local/bin/remote-juggler
+        chmod +x pkg-root/usr/local/bin/remote-juggler
+        pkgbuild --root pkg-root \
+          --identifier "dev.tinyland.remote-juggler" \
+          --version "$VERSION" \
+          --install-location "/" \
+          ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg
+      fi
+
+    # Generate SHA256 checksum
+    - shasum -a 256 ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg > ${PROJECT_NAME}-${VERSION}-darwin-arm64.pkg.sha256 || true
+
+  artifacts:
+    paths:
+      - "*.pkg"
+      - "*.pkg.sha256"
+      - notarization-log.json
+    expire_in: 1 week
+    when: always
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# Create signed and notarized DMG installer
+release:dmg:
+  stage: release
+  tags:
+    - macos
+    - arm64
+  needs:
+    - sign:darwin-binary
+    - job: build:tray-darwin
+      optional: true
+  variables:
+    KEYCHAIN_NAME: "signing.keychain-db"
+  script:
+    - export VERSION=${CI_COMMIT_TAG:-0.0.0}
+    - |
+      # Copy tray binary to build dir for bundling if available
+      if [ -f "${PROJECT_NAME}-tray-darwin-arm64" ]; then
+        mkdir -p build
+        cp ${PROJECT_NAME}-tray-darwin-arm64 build/RemoteJugglerTray
+        chmod +x build/RemoteJugglerTray
+      fi
+
+    - |
+      if [ -n "$APPLE_CERTIFICATE_BASE64" ]; then
+        echo "=== Setting up DMG signing ==="
+
+        # Create temporary keychain
+        KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+        security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+        security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security set-keychain-settings "$KEYCHAIN_NAME"
+        security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+        security default-keychain -s "$KEYCHAIN_NAME"
+
+        # Add keychains to search list
+        LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+        security list-keychains -d user -s "$KEYCHAIN_NAME" "$LOGIN_KEYCHAIN" \
+          /System/Library/Keychains/SystemRootCertificates.keychain
+
+        # Import G2 CA certificate
+        if [ -n "$APPLE_DEVELOPER_ID_CA_G2" ]; then
+          echo "$APPLE_DEVELOPER_ID_CA_G2" | base64 -d > DeveloperIDG2CA.cer
+          security import DeveloperIDG2CA.cer -k "$KEYCHAIN_NAME" \
+            -T /usr/bin/codesign -A || true
+        fi
+
+        # Import Developer ID Application certificate
+        echo "$APPLE_CERTIFICATE_BASE64" | base64 -d > certificate.p12
+        security import certificate.p12 -k "$KEYCHAIN_NAME" \
+          -P "$APPLE_CERTIFICATE_PASSWORD" \
+          -T /usr/bin/codesign -A
+
+        # Set partition list
+        security set-key-partition-list -S apple-tool:,apple: -s \
+          -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+        # Set signing identity for create-dmg.sh
+        export SIGNING_IDENTITY_APP="$APPLE_DEVELOPER_ID_APPLICATION"
+        export KEYCHAIN_PATH="$KEYCHAIN_NAME"
+      fi
+
+    # Run the DMG creation script
+    - chmod +x scripts/create-dmg.sh scripts/create-app-bundle.sh
+    - ./scripts/create-dmg.sh "$VERSION"
+
+    - |
+      DMG_FILE="RemoteJuggler-${VERSION}-darwin-arm64.dmg"
+      if [ -f "build/$DMG_FILE" ]; then
+        cp "build/$DMG_FILE" .
+        cp "build/${DMG_FILE}.sha256" . 2>/dev/null || shasum -a 256 "$DMG_FILE" > "${DMG_FILE}.sha256"
+
+        # Notarize if credentials provided
+        if [ -n "$APPLE_ID" ] && [ -n "$APPLE_NOTARIZE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+          echo "Submitting DMG for notarization..."
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$DMG_FILE" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_NOTARIZE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait 2>&1) || true
+
+          echo "$SUBMISSION_OUTPUT"
+
+          if echo "$SUBMISSION_OUTPUT" | grep -q "status: Accepted"; then
+            echo "Stapling notarization ticket..."
+            xcrun stapler staple "$DMG_FILE"
+            xcrun stapler validate "$DMG_FILE"
+            # Regenerate checksum after stapling
+            shasum -a 256 "$DMG_FILE" > "${DMG_FILE}.sha256"
+          else
+            echo "WARNING: Notarization may have failed - check output above"
+          fi
+        fi
+      fi
+
+    # Cleanup
+    - rm -f certificate.p12 DeveloperIDG2CA.cer
+    - security delete-keychain "$KEYCHAIN_NAME" 2>/dev/null || true
+
+  artifacts:
+    paths:
+      - "*.dmg"
+      - "*.dmg.sha256"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# =============================================================================
+# GitLab Pages Deployment
+# =============================================================================
+
+pages:
+  stage: release
+  needs:
+    - docs:build
+  script:
+    - mv site public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  RemoteJuggler LaunchAgent
+
+  Installation:
+    cp packaging/LaunchAgent.plist ~/Library/LaunchAgents/dev.tinyland.remote-juggler.plist
+    launchctl load ~/Library/LaunchAgents/dev.tinyland.remote-juggler.plist
+
+  Uninstallation:
+    launchctl unload ~/Library/LaunchAgents/dev.tinyland.remote-juggler.plist
+    rm ~/Library/LaunchAgents/dev.tinyland.remote-juggler.plist
+-->
+<plist version="1.0">
+<dict>
+    <!-- Unique identifier for this launch agent -->
+    <key>Label</key>
+    <string>dev.tinyland.remote-juggler</string>
+
+    <!-- Program to execute -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/RemoteJuggler.app/Contents/MacOS/RemoteJuggler</string>
+    </array>
+
+    <!-- Start at login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep running (restart if crashes) -->
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Only keep alive if app crashed, not if user quit -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Process type: Background (menu bar app) -->
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <!-- Limit CPU and memory usage -->
+    <key>LowPriorityIO</key>
+    <true/>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/tmp/remote-juggler.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/remote-juggler.stderr.log</string>
+
+    <!-- Throttle restarts (wait 10 seconds between restarts) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Nice level (lower priority than foreground apps) -->
+    <key>Nice</key>
+    <integer>5</integer>
+</dict>
+</plist>

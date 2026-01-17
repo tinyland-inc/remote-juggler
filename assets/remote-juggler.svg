@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#bgGradient)" />
+
+  <!-- Person icon (centered) -->
+  <g transform="translate(128, 100)">
+    <!-- Head -->
+    <circle cx="0" cy="-20" r="32" fill="white" />
+    <!-- Body -->
+    <path d="M -50,35 Q -50,5 -20,5 L 20,5 Q 50,5 50,35 L 50,70 Q 50,80 40,80 L -40,80 Q -50,80 -50,70 Z" fill="white" />
+  </g>
+
+  <!-- Git branch lines (stylized) -->
+  <g stroke="white" stroke-width="4" fill="none" stroke-linecap="round">
+    <!-- Left branch -->
+    <path d="M 45,180 Q 65,160 85,180" />
+    <circle cx="45" cy="180" r="6" fill="white" />
+
+    <!-- Right branch -->
+    <path d="M 171,180 Q 191,160 211,180" />
+    <circle cx="211" cy="180" r="6" fill="white" />
+  </g>
+
+  <!-- Connection dots representing identity switching -->
+  <circle cx="128" cy="200" r="8" fill="#fbbf24" />
+  <circle cx="108" cy="210" r="5" fill="#fbbf24" opacity="0.7" />
+  <circle cx="148" cy="210" r="5" fill="#fbbf24" opacity="0.7" />
+</svg>

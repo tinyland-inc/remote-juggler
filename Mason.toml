@@ -1,0 +1,62 @@
+[brick]
+name = "remote_juggler"
+version = "2.0.0"
+type = "application"
+chplVersion = "2.6.0..2.8.0"
+license = "MIT"
+authors = ["Jess Sullivan <jess@sulliwood.org>"]
+repository = "https://gitlab.com/tinyland/projects/remote-juggler"
+source = "https://gitlab.com/tinyland/projects/remote-juggler"
+description = "Backend-agnostic git identity management with MCP/ACP agent protocol support"
+keywords = ["git", "identity", "mcp", "acp", "gitlab", "github", "keychain", "gpg"]
+
+[dependencies]
+# No external dependencies - pure Chapel with C FFI for keychain
+
+[dev-dependencies]
+quickchpl = "1.0.2"
+
+# Mason registry for quickchpl:
+# Add to ~/.mason/registry/mason-registry.toml:
+#   [[registry]]
+#   name = "tinyland"
+#   source = "https://github.com/Jesssullivan/mason-registry"
+#   branch = "sid"
+#
+# Or use local quickchpl:
+#   mason external --path /Users/jsullivan2/git/quickchpl
+
+# C source files for keychain integration
+# The Chapel compiler handles these via 'require' statements in Keychain.chpl
+# Platform-specific selection:
+#   - Darwin (macOS): c_src/keychain_darwin.c with -framework Security
+#   - Other platforms: c_src/keychain_stub.c (no-op implementation)
+#
+# Build commands:
+#   Darwin:  chpl -o remote-juggler src/remote_juggler.chpl -M src/remote_juggler
+#   Linux:   chpl -o remote-juggler src/remote_juggler.chpl -M src/remote_juggler
+#
+# The require statements in Keychain.chpl handle platform-specific compilation:
+#   require "keychain_darwin.c" if CHPL_TARGET_PLATFORM == "darwin";
+#   require "-framework", "Security" if CHPL_TARGET_PLATFORM == "darwin";
+#   require "keychain_stub.c" if CHPL_TARGET_PLATFORM != "darwin";
+
+[build]
+# Chapel module paths
+# The -M flag tells Chapel where to find submodules
+# --permit-unhandled-module-errors allows prototype-style error handling
+# -framework Security for macOS keychain integration
+compopts = ["-M", "src/remote_juggler", "-I", "c_src", "--permit-unhandled-module-errors", "--ldflags", "-framework Security"]
+
+# Main entry point
+main = "src/remote_juggler.chpl"
+
+# Binary output name
+execname = "remote-juggler"
+
+# C source include path for the keychain FFI
+# Chapel's require statement handles the actual C file inclusion
+# The C source directory is included via -I flag above
+# Platform-specific C files are selected in Keychain.chpl:
+#   - Darwin: keychain_darwin.c + Security.framework
+#   - Linux:  keychain_stub.c (no-op)

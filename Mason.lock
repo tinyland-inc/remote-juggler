@@ -1,0 +1,14 @@
+
+[root]
+authors = ["Jess Sullivan <jess@sulliwood.org>"]
+chplVersion = "2.7.0..2.7.0"
+description = "Backend-agnostic git identity management with MCP/ACP agent protocol support"
+keywords = ["git", "identity", "mcp", "acp", "gitlab", "github", "keychain", "gpg"]
+license = "MIT"
+name = "remote_juggler"
+repository = "https://gitlab.com/tinyland/projects/remote-juggler"
+source = "https://gitlab.com/tinyland/projects/remote-juggler"
+type = "application"
+version = "2.0.0"
+
+
