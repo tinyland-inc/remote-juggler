@@ -110,6 +110,7 @@ build:tray-darwin:
   tags:
     - macos
     - arm64
+    - shell  # Force native shell executor (Swift not available in Docker)
   script:
     - cd tray/darwin
     - swift build -c release
@@ -998,6 +999,111 @@ release:dmg:
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# =============================================================================
+# GitLab Pages Deployment
+# =============================================================================
+
+# =============================================================================
+# Homebrew Tap Update
+# =============================================================================
+
+release:homebrew-tap:
+  stage: release
+  image: alpine:3.19
+  needs:
+    - release:package
+  variables:
+    HOMEBREW_TAP_REPO: "https://gitlab.com/tinyland/homebrew-tools.git"
+    FORMULA_PATH: "Formula/remote-juggler.rb"
+  before_script:
+    - apk add --no-cache git curl bash openssh-client
+  script:
+    - export VERSION="${CI_COMMIT_TAG#v}"
+    - |
+      echo "=== Updating Homebrew tap for version ${VERSION} ==="
+
+      # Configure git
+      git config --global user.email "ci@tinyland.dev"
+      git config --global user.name "Tinyland CI"
+
+      # Clone tap repo
+      git clone "https://oauth2:${HOMEBREW_TAP_TOKEN}@gitlab.com/tinyland/homebrew-tools.git" homebrew-tap
+      cd homebrew-tap
+
+      # Download binaries and compute checksums
+      echo "Computing checksums..."
+      DARWIN_ARM64_SHA=""
+      DARWIN_AMD64_SHA=""
+      LINUX_AMD64_SHA=""
+      LINUX_ARM64_SHA=""
+
+      # Darwin ARM64
+      if curl -fsSL -o /tmp/darwin-arm64.tar.gz \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-arm64"; then
+        DARWIN_ARM64_SHA=$(sha256sum /tmp/darwin-arm64.tar.gz | cut -d' ' -f1)
+        echo "Darwin ARM64: ${DARWIN_ARM64_SHA}"
+      fi
+
+      # Darwin AMD64
+      if curl -fsSL -o /tmp/darwin-amd64.tar.gz \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-darwin-amd64"; then
+        DARWIN_AMD64_SHA=$(sha256sum /tmp/darwin-amd64.tar.gz | cut -d' ' -f1)
+        echo "Darwin AMD64: ${DARWIN_AMD64_SHA}"
+      fi
+
+      # Linux AMD64
+      if curl -fsSL -o /tmp/linux-amd64.tar.gz \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-amd64"; then
+        LINUX_AMD64_SHA=$(sha256sum /tmp/linux-amd64.tar.gz | cut -d' ' -f1)
+        echo "Linux AMD64: ${LINUX_AMD64_SHA}"
+      fi
+
+      # Linux ARM64
+      if curl -fsSL -o /tmp/linux-arm64.tar.gz \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-linux-arm64"; then
+        LINUX_ARM64_SHA=$(sha256sum /tmp/linux-arm64.tar.gz | cut -d' ' -f1)
+        echo "Linux ARM64: ${LINUX_ARM64_SHA}"
+      fi
+
+      # Update formula
+      echo "Updating formula..."
+
+      # Update version
+      sed -i "s/version \"[^\"]*\"/version \"${VERSION}\"/" "${FORMULA_PATH}"
+
+      # Update URLs (from v1.0.0 to current tag)
+      sed -i "s|/releases/v[^/]*/downloads/|/releases/${CI_COMMIT_TAG}/downloads/|g" "${FORMULA_PATH}"
+
+      # Update checksums
+      if [ -n "$DARWIN_ARM64_SHA" ]; then
+        sed -i "s/sha256 \"[^\"]*\" # darwin-arm64/sha256 \"${DARWIN_ARM64_SHA}\" # darwin-arm64/" "${FORMULA_PATH}"
+      fi
+      if [ -n "$DARWIN_AMD64_SHA" ]; then
+        sed -i "s/sha256 \"[^\"]*\" # darwin-amd64/sha256 \"${DARWIN_AMD64_SHA}\" # darwin-amd64/" "${FORMULA_PATH}"
+      fi
+      if [ -n "$LINUX_AMD64_SHA" ]; then
+        sed -i "s/sha256 \"[^\"]*\" # linux-amd64/sha256 \"${LINUX_AMD64_SHA}\" # linux-amd64/" "${FORMULA_PATH}"
+      fi
+      if [ -n "$LINUX_ARM64_SHA" ]; then
+        sed -i "s/sha256 \"[^\"]*\" # linux-arm64/sha256 \"${LINUX_ARM64_SHA}\" # linux-arm64/" "${FORMULA_PATH}"
+      fi
+
+      # Show diff
+      git diff "${FORMULA_PATH}"
+
+      # Commit and push
+      git add "${FORMULA_PATH}"
+      if git diff --staged --quiet; then
+        echo "No changes to commit"
+      else
+        git commit -m "Bump remote-juggler to ${VERSION}"
+        git push origin main
+        echo "Homebrew tap updated successfully"
+      fi
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   allow_failure: true
 
 # =============================================================================
