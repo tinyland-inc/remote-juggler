@@ -1,0 +1,47 @@
+[Desktop Entry]
+# RemoteJuggler XDG Autostart Entry
+#
+# Installation:
+#   cp packaging/autostart.desktop ~/.config/autostart/remote-juggler.desktop
+#
+# Uninstallation:
+#   rm ~/.config/autostart/remote-juggler.desktop
+
+Type=Application
+Name=RemoteJuggler
+GenericName=Git Identity Manager
+Comment=Backend-agnostic git identity management with tray icon
+Icon=remote-juggler
+Exec=/usr/local/bin/remote-juggler-tray
+Terminal=false
+Categories=Development;Utility;VersionControl;
+Keywords=git;identity;gitlab;github;ssh;
+
+# Autostart settings
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=5
+X-KDE-autostart-after=panel
+
+# Only show in supported desktop environments
+OnlyShowIn=GNOME;KDE;XFCE;MATE;Cinnamon;LXQt;Budgie;
+
+# Don't show in application menu (tray-only app)
+NoDisplay=true
+
+# Startup notification
+StartupNotify=false
+
+# Actions for right-click menu (if supported)
+Actions=switch-work;switch-personal;status;
+
+[Desktop Action switch-work]
+Name=Switch to Work Identity
+Exec=/usr/local/bin/remote-juggler switch work
+
+[Desktop Action switch-personal]
+Name=Switch to Personal Identity
+Exec=/usr/local/bin/remote-juggler switch personal
+
+[Desktop Action status]
+Name=Show Status
+Exec=/usr/local/bin/remote-juggler status

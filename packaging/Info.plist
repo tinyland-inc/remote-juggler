@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Bundle Identification -->
+    <key>CFBundleName</key>
+    <string>RemoteJuggler</string>
+    <key>CFBundleDisplayName</key>
+    <string>RemoteJuggler</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.tinyland.remote-juggler</string>
+
+    <!-- Version Information -->
+    <key>CFBundleVersion</key>
+    <string>2.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.0.0</string>
+
+    <!-- Executable -->
+    <key>CFBundleExecutable</key>
+    <string>RemoteJuggler</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <!-- Icons -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
+
+    <!-- System Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+        <string>x86_64</string>
+    </array>
+
+    <!-- UI Configuration -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticTermination</key>
+    <true/>
+    <key>NSSupportsSuddenTermination</key>
+    <true/>
+
+    <!-- App Category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+
+    <!-- Copyright -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2024-2026 Tinyland. MIT License.</string>
+
+    <!-- Privacy Descriptions (required for macOS 10.14+) -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>RemoteJuggler needs to control other applications to manage git identities.</string>
+
+    <!-- Launch Services -->
+    <key>LSBackgroundOnly</key>
+    <false/>
+
+    <!-- Supported Document Types (none for menu bar app) -->
+
+    <!-- URL Schemes (for CLI integration) -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>RemoteJuggler URL</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>remote-juggler</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Principal Class for SwiftUI -->
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

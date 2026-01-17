@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://remote-juggler.dev/schemas/global-state.json",
+  "title": "RemoteJuggler Global State",
+  "description": "Machine-wide state for RemoteJuggler singleton tray application",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version",
+      "const": "1.0.0"
+    },
+    "currentIdentity": {
+      "type": "string",
+      "description": "Currently active global identity name"
+    },
+    "forceMode": {
+      "type": "boolean",
+      "description": "When true, always use currentIdentity regardless of per-repo settings",
+      "default": false
+    },
+    "lastSwitch": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last identity switch"
+    },
+    "tray": {
+      "type": "object",
+      "description": "Tray application settings",
+      "properties": {
+        "showNotifications": {
+          "type": "boolean",
+          "description": "Show desktop notifications on identity switch",
+          "default": true
+        },
+        "autoStartEnabled": {
+          "type": "boolean",
+          "description": "Whether autostart is configured",
+          "default": false
+        },
+        "iconStyle": {
+          "type": "string",
+          "enum": ["default", "monochrome", "colored"],
+          "description": "Tray icon style preference",
+          "default": "default"
+        }
+      }
+    },
+    "recentIdentities": {
+      "type": "array",
+      "description": "Recently used identities (most recent first)",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5
+    }
+  },
+  "required": ["version", "currentIdentity"]
+}

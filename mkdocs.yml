@@ -1,0 +1,122 @@
+site_name: RemoteJuggler
+site_url: https://tinyland.gitlab.io/projects/remote-juggler
+site_description: Backend-agnostic git identity management with MCP/ACP agent protocol support
+site_author: Jess Sullivan
+
+repo_url: https://gitlab.com/tinyland/projects/remote-juggler
+repo_name: tinyland/projects/remote-juggler
+edit_uri: -/edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: slate
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+    - toc.integrate
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      check_paths: true
+      base_path:
+        - docs/snippets
+        - src
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Configuration: getting-started/configuration.md
+  - CLI Reference:
+    - cli/index.md
+    - Commands: cli/commands.md
+    - Shell Completions: cli/completions.md
+  - Integrations:
+    - integrations/index.md
+    - MCP Server: integrations/mcp.md
+    - ACP Server: integrations/acp.md
+    - Editor Setup: integrations/editors.md
+  - Architecture:
+    - architecture/index.md
+    - Chapel Modules: architecture/modules.md
+    - Keychain Integration: architecture/keychain.md
+    - Protocol Specifications: architecture/protocols.md
+  - Operations:
+    - operations/index.md
+    - Identity Switching: operations/identity-switching.md
+    - SSH Configuration: operations/ssh-config.md
+    - GPG Signing: operations/gpg-signing.md
+    - Troubleshooting: operations/troubleshooting.md
+  - Development:
+    - development/index.md
+    - Building from Source: development/building.md
+    - Running Tests: development/testing.md
+    - Release Process: development/releasing.md
+  - Reference:
+    - reference/index.md
+    - MCP Tool Schemas: reference/tools-schema.md
+    - Configuration Schema: reference/config-schema.md
+    - Environment Variables: reference/environment.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/gitlab
+      link: https://gitlab.com/tinyland/projects/remote-juggler
+    - icon: fontawesome/brands/github
+      link: https://github.com/Jesssullivan/remote-juggler

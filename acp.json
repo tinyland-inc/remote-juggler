@@ -1,0 +1,11 @@
+{
+  "agent_servers": {
+    "RemoteJuggler": {
+      "command": "remote-juggler",
+      "args": ["--mode=acp"],
+      "env": {},
+      "use_idea_mcp": false,
+      "use_custom_mcp": false
+    }
+  }
+}
