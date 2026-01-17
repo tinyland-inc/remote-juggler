@@ -141,6 +141,10 @@ prototype module MCP {
    *
    * This is the first message in the MCP protocol handshake.
    * The server responds with its capabilities and version info.
+   *
+   * NOTE: We auto-transition to Ready state after initialize because some
+   * MCP clients (like Claude Code) may not send the initialized notification.
+   * This is safe because initialize is always the first request.
    */
   proc handleInitialize(ref server: MCPServer, req: JsonRpcRequest): string {
     stderr.writeln("MCP: Handling initialize request");
@@ -158,6 +162,11 @@ prototype module MCP {
       stderr.writeln("MCP: Client requested protocol version: ", requestedVersion);
       // We support 2025-11-25, which is backwards compatible
     }
+
+    // Auto-transition to Ready state after initialize
+    // Some clients don't send the initialized notification
+    server.state = MCPState.Ready;
+    stderr.writeln("MCP: Server is now ready (auto-transition after initialize)");
 
     // Build and return response
     const result = buildInitializeResult(server);

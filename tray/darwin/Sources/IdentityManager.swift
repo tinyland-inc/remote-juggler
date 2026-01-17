@@ -37,14 +37,24 @@ struct TraySettings: Codable {
 }
 
 struct Config: Codable {
+    var version: String?
     var identities: [String: IdentityConfig]
+    var settings: ConfigSettings?
 
     struct IdentityConfig: Codable {
         var provider: String
         var host: String
-        var hostname: String
         var user: String
         var email: String
+        var sshKey: String?
+        var gpgKey: String?
+    }
+
+    struct ConfigSettings: Codable {
+        var defaultProvider: String?
+        var autoDetect: Bool?
+        var useKeychain: Bool?
+        var gpgSign: Bool?
     }
 }
 
