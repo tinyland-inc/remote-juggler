@@ -1,3 +1,16 @@
+---
+title: "Identity Switching"
+description: "How identity switching works including workflow diagrams, remote URL transformation, authentication flow, and automation examples."
+category: "operations"
+llm_priority: 3
+keywords:
+  - switch
+  - identity
+  - remote
+  - authentication
+  - workflow
+---
+
 # Identity Switching
 
 Detailed guide for switching between git identities.

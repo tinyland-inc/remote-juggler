@@ -1,3 +1,16 @@
+---
+title: "Apple Code Signing Setup"
+description: "Setting up Apple Developer certificates for signing macOS binaries, PKG installers, and DMGs with notarization."
+category: "reference"
+llm_priority: 5
+keywords:
+  - apple
+  - signing
+  - notarization
+  - certificate
+  - macos
+---
+
 # Apple Code Signing Setup
 
 This guide covers setting up Apple Developer certificates for signing RemoteJuggler macOS binaries and PKG installers.

@@ -1,3 +1,16 @@
+---
+title: "Release Process"
+description: "Guide for releasing new versions including versioning, CI/CD pipeline, macOS code signing, and Homebrew formula updates."
+category: "reference"
+llm_priority: 5
+keywords:
+  - release
+  - signing
+  - notarization
+  - ci-cd
+  - homebrew
+---
+
 # Release Process
 
 Guide for releasing new versions of RemoteJuggler.

@@ -1,3 +1,16 @@
+---
+title: "Environment Variables"
+description: "Environment variables for configuration, token management, and credential resolution order."
+category: "config"
+llm_priority: 3
+keywords:
+  - environment
+  - variables
+  - tokens
+  - credentials
+  - config
+---
+
 # Environment Variables
 
 Environment variables for configuring RemoteJuggler.

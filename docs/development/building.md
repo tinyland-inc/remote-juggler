@@ -1,3 +1,16 @@
+---
+title: "Building from Source"
+description: "Build RemoteJuggler from Chapel source code. Covers compiler requirements, Makefile targets, and cross-compilation."
+category: "reference"
+llm_priority: 5
+keywords:
+  - build
+  - chapel
+  - compiler
+  - makefile
+  - source
+---
+
 # Building from Source
 
 Build RemoteJuggler from source code.

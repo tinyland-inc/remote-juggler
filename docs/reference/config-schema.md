@@ -1,3 +1,16 @@
+---
+title: "Configuration Schema"
+description: "Full config.json schema reference with identity definitions, GPG settings, credential sources, and global settings."
+category: "config"
+llm_priority: 1
+keywords:
+  - config
+  - json
+  - schema
+  - identities
+  - settings
+---
+
 # Configuration Schema
 
 Reference for the RemoteJuggler configuration file format.

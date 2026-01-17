@@ -1,3 +1,15 @@
+---
+title: "Running Tests"
+description: "Test suite structure, running tests, writing tests, and CI integration for RemoteJuggler."
+category: "reference"
+llm_priority: 5
+keywords:
+  - testing
+  - unit-tests
+  - ci
+  - junit
+---
+
 # Running Tests
 
 Test suite for RemoteJuggler.

@@ -1,3 +1,17 @@
+---
+title: "Installation"
+description: "Multi-platform installation instructions for RemoteJuggler including automated install, binary download, building from source, and IDE integration setup."
+category: "operations"
+llm_priority: 3
+keywords:
+  - install
+  - download
+  - binary
+  - build
+  - macos
+  - linux
+---
+
 # Installation
 
 RemoteJuggler provides multiple installation methods for different platforms and use cases.

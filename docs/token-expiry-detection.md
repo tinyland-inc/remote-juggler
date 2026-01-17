@@ -54,11 +54,11 @@ Token Health Summary
 ════════════════════════════════════════════════════════════
 
 personal (gitlab):
-  Status: ✓ Token is healthy (expires in 45 days)
+  Status: [OK] Token is healthy (expires in 45 days)
   Scopes: api
 
 work (gitlab):
-  Status: ⚠️  Token expires in 15 days - renewal recommended
+  Status: [WARNING]  Token expires in 15 days - renewal recommended
   Scopes: api
 ```
 
@@ -67,9 +67,9 @@ work (gitlab):
 Test credential availability for all identities.
 
 Now includes expiry warnings for each identity:
-- ✓ Token found and valid
-- ⚠️  Token found but expiring soon (< 30 days)
-- ❌ Token expired
+- [OK] Token found and valid
+- [WARNING]  Token found but expiring soon (< 30 days)
+- [FAILED] Token expired
 - (yellow) Token not found (SSH-only mode)
 
 ### `token renew <identity>`
@@ -89,7 +89,7 @@ $ remote-juggler token renew personal
 
 Current Token Status:
 
-  Status: ⚠️  Token expires in 15 days - renewal recommended
+  Status: [WARNING]  Token expires in 15 days - renewal recommended
 
 Token Renewal for: personal
 Provider: gitlab
@@ -118,7 +118,7 @@ $ remote-juggler switch work
   Auth:     Keychain authenticated
   Remote:   Updated for identity
 
-⚠️  WARNING: Token for work expires in 15 days
+[WARNING]  WARNING: Token for work expires in 15 days
    Consider renewing soon.
    Run: remote-juggler token renew work
 ```
@@ -311,7 +311,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ## See Also
 
-- [Token Management](token-management.md)
-- [Keychain Integration](keychain-integration.md)
-- [Provider Configuration](provider-configuration.md)
-- [CLI Reference](cli-reference.md)
+- [Configuration Guide](getting-started/configuration.md)
+- [Keychain Integration](architecture/keychain.md)
+- [CLI Commands](cli/commands.md)
+- [Troubleshooting](operations/troubleshooting.md)

@@ -1,3 +1,16 @@
+---
+title: "Quick Start"
+description: "Get started with RemoteJuggler: import identities from SSH config, switch between them, store credentials, and integrate with AI assistants."
+category: "operations"
+llm_priority: 2
+keywords:
+  - quickstart
+  - tutorial
+  - setup
+  - import
+  - switch
+---
+
 # Quick Start
 
 Configure your first identity in 5 minutes.

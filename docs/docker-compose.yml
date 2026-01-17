@@ -1,0 +1,53 @@
+# RemoteJuggler Documentation - Local Development
+#
+# Usage:
+#   docker compose -f docs/docker-compose.yml up          # Start dev server
+#   docker compose -f docs/docker-compose.yml --profile test run linkcheck  # Run link checker
+#
+# Podman users:
+#   podman-compose -f docs/docker-compose.yml up
+
+services:
+  docs:
+    build:
+      context: ..
+      dockerfile: docs/Containerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ..:/docs:ro
+      - docs-site:/docs/site
+    command: serve --dev-addr=0.0.0.0:8000 --livereload
+
+  # Build documentation (for CI or local testing)
+  build:
+    build:
+      context: ..
+      dockerfile: docs/Containerfile
+    volumes:
+      - ..:/docs:ro
+      - docs-site:/docs/site
+    command: build --strict --verbose
+    profiles:
+      - build
+
+  # Run link checker on built site
+  linkcheck:
+    build:
+      context: ..
+      dockerfile: docs/Containerfile
+    volumes:
+      - ..:/docs:ro
+      - docs-site:/docs/site
+    entrypoint: /bin/bash
+    command: >
+      -c "mkdocs build --strict &&
+          echo '=== Running htmltest ===' &&
+          htmltest site/ -c docs/.htmltest.yml &&
+          echo '=== Running linkchecker ===' &&
+          linkchecker site/ --check-extern --ignore-url='localhost' --ignore-url='127.0.0.1' || true"
+    profiles:
+      - test
+
+volumes:
+  docs-site:

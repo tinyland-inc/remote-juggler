@@ -76,6 +76,9 @@ markdown_extensions:
 plugins:
   - search
 
+hooks:
+  - scripts/mkdocs_hooks.py
+
 nav:
   - Home: index.md
   - Getting Started:

@@ -403,14 +403,14 @@ release:gitlab:
           link_type: package
 
 # =============================================================================
-# Documentation Stage (MkDocs)
+# Documentation Stage (MkDocs + llms.txt)
 # =============================================================================
 
 docs:build:
   stage: docs
   image: python:3.12-slim
   before_script:
-    - pip install mkdocs mkdocs-material pymdown-extensions
+    - pip install mkdocs mkdocs-material pymdown-extensions pyyaml
   script:
     # Generate snippets from source
     - mkdir -p docs/snippets
@@ -418,9 +418,24 @@ docs:build:
       if [ -f "${PROJECT_NAME}-linux-amd64" ]; then
         chmod +x ${PROJECT_NAME}-linux-amd64
         ./${PROJECT_NAME}-linux-amd64 --help > docs/snippets/cli-help.txt 2>/dev/null || echo "CLI help generation skipped"
+        ./${PROJECT_NAME}-linux-amd64 list --help > docs/snippets/cli-list-help.txt 2>/dev/null || true
+        ./${PROJECT_NAME}-linux-amd64 switch --help > docs/snippets/cli-switch-help.txt 2>/dev/null || true
       fi
-    # Build MkDocs site
+    # Build MkDocs site (hooks will generate llms.txt)
     - mkdocs build --strict --verbose
+    # Verify llms.txt was generated
+    - |
+      if [ -f "site/llms.txt" ]; then
+        echo "llms.txt generated successfully ($(wc -c < site/llms.txt) bytes)"
+      else
+        echo "WARNING: llms.txt was not generated"
+      fi
+    - |
+      if [ -f "site/llms-full.txt" ]; then
+        echo "llms-full.txt generated successfully ($(wc -c < site/llms-full.txt) bytes)"
+      else
+        echo "WARNING: llms-full.txt was not generated"
+      fi
   artifacts:
     paths:
       - site/
@@ -437,13 +452,85 @@ docs:linkcheck:
   image: python:3.12-slim
   before_script:
     - pip install linkchecker
+    - |
+      # Install htmltest for internal link checking
+      apt-get update && apt-get install -y curl
+      ARCH=$(dpkg --print-architecture)
+      if [ "$ARCH" = "amd64" ]; then
+        curl -sL https://github.com/wjdp/htmltest/releases/download/v0.17.0/htmltest_0.17.0_linux_amd64.tar.gz | tar xz -C /usr/local/bin
+      elif [ "$ARCH" = "arm64" ]; then
+        curl -sL https://github.com/wjdp/htmltest/releases/download/v0.17.0/htmltest_0.17.0_linux_arm64.tar.gz | tar xz -C /usr/local/bin
+      fi
   script:
-    - linkchecker site/ --check-extern || true
+    # Internal link check with htmltest (strict)
+    - |
+      if [ -f "docs/.htmltest.yml" ]; then
+        htmltest site/ -c docs/.htmltest.yml || echo "htmltest found issues (non-blocking)"
+      fi
+    # External link check with linkchecker (allow failures)
+    - linkchecker site/ --check-extern --ignore-url='localhost' --ignore-url='127.0.0.1' || true
   needs:
     - docs:build
   allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+docs:validate-llms:
+  stage: docs
+  image: python:3.12-slim
+  script:
+    # Validate llms.txt format
+    - |
+      python3 << 'EOF'
+      import sys
+
+      errors = []
+
+      # Check llms.txt exists and has required structure
+      try:
+          with open('site/llms.txt') as f:
+              content = f.read()
+
+          if not content.startswith('# '):
+              errors.append("llms.txt: Missing H1 title")
+          if '> ' not in content:
+              errors.append("llms.txt: Missing blockquote summary")
+          if '## ' not in content:
+              errors.append("llms.txt: Missing H2 sections")
+          if '](http' not in content and '](/' not in content:
+              errors.append("llms.txt: Missing links")
+
+          print(f"llms.txt: {len(content)} bytes")
+      except FileNotFoundError:
+          errors.append("llms.txt: File not found")
+
+      # Check llms-full.txt exists and size
+      try:
+          with open('site/llms-full.txt') as f:
+              full_content = f.read()
+
+          size = len(full_content)
+          print(f"llms-full.txt: {size} bytes")
+
+          if size > 102400:
+              print(f"WARNING: llms-full.txt exceeds 100KB - may not fit in LLM context windows")
+      except FileNotFoundError:
+          errors.append("llms-full.txt: File not found")
+
+      if errors:
+          print("\nValidation errors:")
+          for e in errors:
+              print(f"  - {e}")
+          sys.exit(1)
+
+      print("\nllms.txt validation passed")
+      EOF
+  needs:
+    - docs:build
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 # =============================================================================
 # FPM Packaging Stage

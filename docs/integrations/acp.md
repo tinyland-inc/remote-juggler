@@ -1,3 +1,16 @@
+---
+title: "ACP Server Integration"
+description: "How to use RemoteJuggler as an ACP server for JetBrains IDEs. Covers configuration, tool invocation, and debugging."
+category: "api"
+llm_priority: 3
+keywords:
+  - acp
+  - jetbrains
+  - intellij
+  - ide
+  - agent
+---
+
 # ACP Server
 
 RemoteJuggler implements an Agent Communication Protocol (ACP) server for integration with JetBrains IDEs.

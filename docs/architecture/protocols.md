@@ -1,3 +1,16 @@
+---
+title: "Protocol Specifications"
+description: "JSON-RPC 2.0 protocol details for MCP and ACP including message formats, error codes, and transport layer implementation."
+category: "reference"
+llm_priority: 4
+keywords:
+  - protocol
+  - json-rpc
+  - mcp
+  - acp
+  - transport
+---
+
 # Protocol Specifications
 
 RemoteJuggler implements two agent communication protocols: MCP and ACP.

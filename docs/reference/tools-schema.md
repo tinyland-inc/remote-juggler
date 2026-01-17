@@ -1,3 +1,16 @@
+---
+title: "MCP Tool Schemas"
+description: "Complete JSON Schema definitions for all RemoteJuggler MCP tools including juggler_switch, juggler_status, juggler_validate, juggler_list_identities, and more."
+category: "api"
+llm_priority: 1
+keywords:
+  - mcp
+  - tools
+  - api
+  - json-rpc
+  - schema
+---
+
 # MCP Tool Schemas
 
 JSON schemas for RemoteJuggler MCP tools.

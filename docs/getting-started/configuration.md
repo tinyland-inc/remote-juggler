@@ -1,3 +1,16 @@
+---
+title: "Configuration"
+description: "Configuration file format, identity settings, GPG configuration, and managed configuration blocks."
+category: "config"
+llm_priority: 2
+keywords:
+  - config
+  - settings
+  - identities
+  - json
+  - gpg
+---
+
 # Configuration
 
 RemoteJuggler stores configuration in JSON format at `~/.config/remote-juggler/config.json`.

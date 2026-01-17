@@ -1,3 +1,16 @@
+---
+title: "Shell Completions"
+description: "Shell completion scripts for bash, zsh, and fish with command and identity auto-completion."
+category: "cli"
+llm_priority: 4
+keywords:
+  - completions
+  - bash
+  - zsh
+  - fish
+  - shell
+---
+
 # Shell Completions
 
 RemoteJuggler supports shell completion for bash, zsh, and fish.

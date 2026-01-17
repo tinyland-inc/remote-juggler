@@ -1,3 +1,16 @@
+---
+title: "Keychain Integration"
+description: "macOS Security.framework integration for secure token storage. Covers C FFI implementation, API reference, and security considerations."
+category: "reference"
+llm_priority: 4
+keywords:
+  - keychain
+  - macos
+  - security
+  - token
+  - ffi
+---
+
 # Keychain Integration
 
 RemoteJuggler integrates with macOS Keychain via the Security.framework.

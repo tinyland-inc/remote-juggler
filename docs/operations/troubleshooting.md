@@ -1,3 +1,16 @@
+---
+title: "Troubleshooting"
+description: "Solutions for common RemoteJuggler issues including installation, SSH, Keychain, GPG, and MCP/ACP problems."
+category: "operations"
+llm_priority: 4
+keywords:
+  - troubleshooting
+  - errors
+  - debug
+  - fix
+  - problems
+---
+
 # Troubleshooting
 
 Common issues and their solutions.

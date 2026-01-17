@@ -1,3 +1,15 @@
+---
+title: "Chapel Modules"
+description: "Internal module architecture including dependency graph, type definitions, and function references for all 14 Chapel modules."
+category: "reference"
+llm_priority: 4
+keywords:
+  - chapel
+  - modules
+  - architecture
+  - internals
+---
+
 # Chapel Modules
 
 RemoteJuggler consists of 14 Chapel modules in `src/remote_juggler/`.

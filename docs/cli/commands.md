@@ -1,3 +1,17 @@
+---
+title: "CLI Commands"
+description: "Complete command reference including switch, detect, validate, list, token management, and GPG configuration commands."
+category: "cli"
+llm_priority: 2
+keywords:
+  - cli
+  - commands
+  - switch
+  - detect
+  - validate
+  - token
+---
+
 # CLI Commands
 
 Detailed reference for all RemoteJuggler commands.

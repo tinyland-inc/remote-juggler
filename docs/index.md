@@ -1,3 +1,17 @@
+---
+title: "RemoteJuggler"
+description: "Backend-agnostic git identity management with MCP/ACP agent protocol support for GitLab, GitHub, and Bitbucket."
+category: "reference"
+llm_priority: 1
+keywords:
+  - git
+  - identity
+  - mcp
+  - acp
+  - gitlab
+  - github
+---
+
 # RemoteJuggler
 
 Backend-agnostic git identity management with MCP/ACP agent protocol support.

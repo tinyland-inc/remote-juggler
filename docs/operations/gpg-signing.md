@@ -1,3 +1,16 @@
+---
+title: "GPG Signing"
+description: "Configure GPG commit and tag signing per identity. Covers key generation, provider registration, and troubleshooting."
+category: "operations"
+llm_priority: 3
+keywords:
+  - gpg
+  - signing
+  - commits
+  - tags
+  - keys
+---
+
 # GPG Signing
 
 Configure GPG commit and tag signing per identity.

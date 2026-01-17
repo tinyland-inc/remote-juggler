@@ -1,0 +1,50 @@
+# htmltest configuration for RemoteJuggler documentation
+# https://github.com/wjdp/htmltest
+
+DirectoryPath: "site"
+
+# Check both internal and external links
+CheckExternal: true
+CheckInternal: true
+
+# Ignore common patterns
+IgnoreURLs:
+  - "localhost"
+  - "127.0.0.1"
+  - "example.com"
+  - "your-gitlab.com"
+  - "company.com"
+  # Schema/validation URLs that don't resolve
+  - "remote-juggler.dev/schema"
+
+# Skip asset directories
+IgnoreDirectories:
+  - "assets"
+  - "search"
+  - "stylesheets"
+  - "javascripts"
+
+# Be polite to external servers
+HTTPHeaders:
+  User-Agent: "htmltest link checker (+https://gitlab.com/tinyland/projects/remote-juggler)"
+
+# Concurrency for external checks
+ExternalConcurrency: 3
+
+# Timeout for external requests (seconds)
+ExternalTimeout: 15
+
+# Ignore specific status codes (some sites block HEAD requests)
+IgnoreHTTPStatuses:
+  - 403
+  - 405
+
+# Don't fail on missing alt text (we'll validate separately)
+CheckImages: true
+CheckImageAlt: false
+
+# Check anchor references
+CheckAnchors: true
+
+# Ignore mailto links
+IgnoreMailto: true

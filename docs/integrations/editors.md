@@ -1,3 +1,16 @@
+---
+title: "Editor Setup"
+description: "Configure RemoteJuggler MCP/ACP integration for VS Code, Cursor, Windsurf, JetBrains, Neovim, and other editors."
+category: "operations"
+llm_priority: 3
+keywords:
+  - editor
+  - vscode
+  - jetbrains
+  - cursor
+  - neovim
+---
+
 # Editor Setup
 
 Configure RemoteJuggler for various editors and AI assistants.

@@ -1,3 +1,16 @@
+---
+title: "SSH Configuration"
+description: "Setting up SSH host aliases for identity-based routing. Covers key generation, config structure, provider registration, and troubleshooting."
+category: "config"
+llm_priority: 3
+keywords:
+  - ssh
+  - config
+  - keys
+  - host-alias
+  - identity-file
+---
+
 # SSH Configuration
 
 Managing SSH host aliases for git identity separation.
