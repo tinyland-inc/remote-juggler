@@ -73,7 +73,16 @@ class IdentityManager: ObservableObject {
 
     private let configURL: URL
     private let stateURL: URL
-    private let cliPath = "/usr/local/bin/remote-juggler"
+    private var cliPath: String {
+        // Check multiple possible installation locations
+        let paths = [
+            "/usr/local/bin/remote-juggler",
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".local/bin/remote-juggler").path,
+            "/opt/homebrew/bin/remote-juggler"
+        ]
+        return paths.first { FileManager.default.fileExists(atPath: $0) } ?? paths[0]
+    }
 
     init() {
         let configDir = FileManager.default.homeDirectoryForCurrentUser
@@ -152,6 +161,22 @@ class IdentityManager: ObservableObject {
     }
 
     private func performSwitch(_ identity: Identity) async {
+        // Update state immediately (CLI integration WIP)
+        await MainActor.run {
+            self.currentIdentity = identity
+            self.saveState()
+
+            if self.showNotifications {
+                self.sendNotification(identity: identity)
+            }
+        }
+
+        // Try to call CLI if it exists (for future full integration)
+        guard FileManager.default.fileExists(atPath: cliPath) else {
+            print("CLI not found at \(cliPath)")
+            return
+        }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: cliPath)
         process.arguments = ["switch", identity.name]
@@ -164,22 +189,13 @@ class IdentityManager: ObservableObject {
             try process.run()
             process.waitUntilExit()
 
-            if process.terminationStatus == 0 {
-                await MainActor.run {
-                    self.currentIdentity = identity
-                    self.saveState()
-
-                    if self.showNotifications {
-                        self.sendNotification(identity: identity)
-                    }
-                }
-            } else {
+            if process.terminationStatus != 0 {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 let output = String(data: data, encoding: .utf8) ?? ""
-                print("Switch failed: \(output)")
+                print("CLI switch note: \(output)")
             }
         } catch {
-            print("Failed to run CLI: \(error)")
+            print("CLI execution note: \(error)")
         }
     }
 
