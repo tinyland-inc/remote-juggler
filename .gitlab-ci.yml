@@ -69,6 +69,8 @@ build:darwin-arm64:
     - shell  # Force native shell executor (Chapel/Homebrew not available in Docker)
   <<: *mason_cache
   script:
+    # Add Homebrew to PATH for shell executor
+    - export PATH="/opt/homebrew/bin:$PATH"
     # Ensure Chapel is available (installed via Homebrew or similar)
     - which chpl || brew install chapel
     - mason build --release
