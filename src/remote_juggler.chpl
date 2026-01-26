@@ -169,6 +169,7 @@ prototype module remote_juggler {
     writeln("    switch <name>     Switch to identity (alias: 'to')");
     writeln("    to <name>         Alias for switch");
     writeln("    validate <name>   Test SSH/API connectivity for identity");
+    writeln("    verify            Verify identity matches expected for repo");
     writeln("    status            Show current identity status");
     writeln();
 
@@ -253,14 +254,13 @@ prototype module remote_juggler {
     userWidth += 2;
     emailWidth += 2;
 
-    // Header
-    writef("%-*s %-*s %-*s %-*s %-*s %s\n",
-           nameWidth, bold("Identity"),
-           providerWidth, bold("Provider"),
-           hostWidth, bold("SSH Host"),
-           userWidth, bold("User"),
-           emailWidth, bold("Email"),
-           bold("GPG"));
+    // Header - use simple write to avoid format string issues with ANSI codes
+    write(padRight(bold("Identity"), nameWidth));
+    write(padRight(bold("Provider"), providerWidth));
+    write(padRight(bold("SSH Host"), hostWidth));
+    write(padRight(bold("User"), userWidth));
+    write(padRight(bold("Email"), emailWidth));
+    writeln(bold("GPG"));
 
     // Separator
     write(repeatChar("-", nameWidth + providerWidth + hostWidth + userWidth + emailWidth + 12));
@@ -278,15 +278,35 @@ prototype module remote_juggler {
                         then green("Yes")
                         else dim("No");
 
-      writef("%s%-*s %-*s %-*s %-*s %-*s %s\n",
-             marker,
-             nameWidth - 1, nameStr,
-             providerWidth, providerToString(identity.provider),
-             hostWidth, identity.host,
-             userWidth, identity.user,
-             emailWidth, identity.email,
-             gpgStatus);
+      // Use simple write to avoid format string issues with ANSI codes
+      write(marker);
+      write(padRight(nameStr, nameWidth - 1));
+      write(padRight(providerToString(identity.provider), providerWidth));
+      write(padRight(identity.host, hostWidth));
+      write(padRight(identity.user, userWidth));
+      write(padRight(identity.email, emailWidth));
+      writeln(gpgStatus);
     }
+  }
+
+  // Helper to pad string to width (right-aligned padding on left)
+  proc padRight(s: string, width: int): string {
+    // Calculate visible length (ignoring ANSI codes)
+    var visibleLen = 0;
+    var inEscape = false;
+    for ch in s {
+      if ch == '\x1b' then inEscape = true;
+      else if inEscape && ch == 'm' then inEscape = false;
+      else if !inEscape then visibleLen += 1;
+    }
+
+    if visibleLen >= width then return s + " ";
+
+    var padding = "";
+    for i in 1..(width - visibleLen) {
+      padding += " ";
+    }
+    return s + padding;
   }
 
   // Helper to repeat a character
@@ -589,6 +609,78 @@ prototype module remote_juggler {
     }
 
     writeln();
+  }
+
+  // Handle 'verify' command (pre-commit hook verification)
+  proc handleVerify(args: list(string)) {
+    printDebug("Executing verify command");
+
+    var isPreCommit = false;
+    var isPrePush = false;
+
+    // Parse flags
+    for arg in args {
+      if arg == "--pre-commit" then isPreCommit = true;
+      else if arg == "--pre-push" then isPrePush = true;
+    }
+
+    const repoPath = ".";
+
+    // Check if we're in a git repo
+    if !Remote.isGitRepository(repoPath) {
+      if !isPreCommit {
+        printError("Not in a git repository");
+      }
+      halt(1);
+    }
+
+    // Get current git config user.email
+    const (gotEmail, currentEmail) = Remote.getGitConfig(repoPath, "user.email");
+    if !gotEmail || currentEmail == "" {
+      if !isPreCommit {
+        printError("No git user.email configured");
+      }
+      halt(1);
+    }
+
+    // Detect expected identity for this repo
+    const (found, expectedIdentity, reason) = Identity.detectIdentity(repoPath);
+    if !found {
+      // No identity matched, cannot verify
+      if !isPreCommit {
+        printWarning("Could not detect expected identity for this repository");
+        writeln("Run 'remote-juggler config import' to import identities");
+      }
+      // In pre-commit mode, allow commits if no identity is matched (user may have unconfigured repos)
+      if isPreCommit {
+        halt(0);
+      }
+      halt(1);
+    }
+
+    // Compare current git config with expected identity
+    if currentEmail != expectedIdentity.email {
+      if isPreCommit {
+        stderr.writeln("[RemoteJuggler] Identity mismatch!");
+        stderr.writeln("  Current:  ", currentEmail);
+        stderr.writeln("  Expected: ", expectedIdentity.email, " (", expectedIdentity.name, ")");
+      } else {
+        printError("Identity mismatch!");
+        writeln("  Current git config: ", currentEmail);
+        writeln("  Expected identity:  ", expectedIdentity.email, " (", expectedIdentity.name, ")");
+        writeln();
+        writeln("Run: remote-juggler switch ", expectedIdentity.name);
+      }
+      halt(1);
+    }
+
+    // Verification passed
+    if !isPreCommit {
+      printSuccess("Identity verified: " + expectedIdentity.name);
+      writeln("  Email: ", expectedIdentity.email);
+      writeln("  Reason: ", reason);
+    }
+    // Exit 0 on success (implicit)
   }
 
   // Handle 'status' command
@@ -1378,6 +1470,7 @@ prototype module remote_juggler {
       when "detect" do handleDetect(subArgs);
       when "switch", "to" do handleSwitch(subArgs);
       when "validate", "test" do handleValidate(subArgs);
+      when "verify" do handleVerify(subArgs);
       when "status" do handleStatus();
       when "config" do handleConfig(subArgs);
       when "token" do handleToken(subArgs);

@@ -5,8 +5,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK_NAME="post-checkout"
-HOOK_FILE="$SCRIPT_DIR/$HOOK_NAME"
+# Hooks to install (add more hooks here as needed)
+HOOKS=("post-checkout" "pre-commit")
 
 usage() {
     cat <<EOF
@@ -62,9 +62,14 @@ install_global() {
     # Create template directory
     mkdir -p "$template_dir"
 
-    # Install hook
-    cp "$HOOK_FILE" "$template_dir/$HOOK_NAME"
-    chmod +x "$template_dir/$HOOK_NAME"
+    # Install all hooks
+    for hook in "${HOOKS[@]}"; do
+        if [ -f "$SCRIPT_DIR/$hook" ]; then
+            cp "$SCRIPT_DIR/$hook" "$template_dir/$hook"
+            chmod +x "$template_dir/$hook"
+            echo "  ✓ Installed: $hook"
+        fi
+    done
 
     # Configure git to use template
     git config --global init.templateDir "$HOME/.git-templates"
@@ -87,9 +92,14 @@ install_local() {
 
     echo "Installing RemoteJuggler hooks in: $repo_path"
 
-    # Install hook
-    cp "$HOOK_FILE" "$hooks_dir/$HOOK_NAME"
-    chmod +x "$hooks_dir/$HOOK_NAME"
+    # Install all hooks
+    for hook in "${HOOKS[@]}"; do
+        if [ -f "$SCRIPT_DIR/$hook" ]; then
+            cp "$SCRIPT_DIR/$hook" "$hooks_dir/$hook"
+            chmod +x "$hooks_dir/$hook"
+            echo "  ✓ Installed: $hook"
+        fi
+    done
 
     echo "✅ Hooks installed to: $hooks_dir"
 }
@@ -99,12 +109,14 @@ uninstall_global() {
 
     echo "Uninstalling RemoteJuggler global hooks..."
 
-    if [ -f "$template_dir/$HOOK_NAME" ]; then
-        rm "$template_dir/$HOOK_NAME"
-        echo "✅ Removed: $template_dir/$HOOK_NAME"
-    else
-        echo "ℹ️  Hook not found: $template_dir/$HOOK_NAME"
-    fi
+    for hook in "${HOOKS[@]}"; do
+        if [ -f "$template_dir/$hook" ]; then
+            rm "$template_dir/$hook"
+            echo "  ✓ Removed: $hook"
+        else
+            echo "  ℹ️  Hook not found: $hook"
+        fi
+    done
 
     # Check if template dir is empty
     if [ -d "$template_dir" ] && [ -z "$(ls -A "$template_dir")" ]; then
@@ -120,18 +132,22 @@ uninstall_local() {
     local repo_path="${1:-.}"
     local hooks_dir="$repo_path/.git/hooks"
 
-    if [ -f "$hooks_dir/$HOOK_NAME" ]; then
-        # Check if it's our hook
-        if grep -q "RemoteJuggler" "$hooks_dir/$HOOK_NAME" 2>/dev/null; then
-            rm "$hooks_dir/$HOOK_NAME"
-            echo "✅ Removed: $hooks_dir/$HOOK_NAME"
+    echo "Uninstalling RemoteJuggler hooks from: $repo_path"
+
+    for hook in "${HOOKS[@]}"; do
+        if [ -f "$hooks_dir/$hook" ]; then
+            # Check if it's our hook
+            if grep -q "RemoteJuggler" "$hooks_dir/$hook" 2>/dev/null; then
+                rm "$hooks_dir/$hook"
+                echo "  ✓ Removed: $hook"
+            else
+                echo "  ⚠️  Warning: $hook exists but is not a RemoteJuggler hook"
+                echo "     Skipping removal to preserve custom hook"
+            fi
         else
-            echo "⚠️  Warning: $hooks_dir/$HOOK_NAME exists but is not a RemoteJuggler hook"
-            echo "    Skipping removal to preserve custom hook"
+            echo "  ℹ️  Hook not found: $hook"
         fi
-    else
-        echo "ℹ️  Hook not found: $hooks_dir/$HOOK_NAME"
-    fi
+    done
 }
 
 check_installation() {
@@ -139,27 +155,36 @@ check_installation() {
     echo
 
     # Check global
-    local template_dir="$(git config --global init.templateDir)"
-    if [ -n "$template_dir" ] && [ -f "$template_dir/hooks/$HOOK_NAME" ]; then
-        echo "✅ Global hooks: INSTALLED"
-        echo "   Template: $template_dir"
+    local template_dir="$(git config --global init.templateDir 2>/dev/null || true)"
+    echo "Global hooks (template: ${template_dir:-not set}):"
+    if [ -n "$template_dir" ]; then
+        for hook in "${HOOKS[@]}"; do
+            if [ -f "$template_dir/hooks/$hook" ]; then
+                echo "  ✅ $hook: INSTALLED"
+            else
+                echo "  ❌ $hook: NOT INSTALLED"
+            fi
+        done
     else
-        echo "❌ Global hooks: NOT INSTALLED"
+        echo "  ❌ Template directory not configured"
     fi
 
     echo
 
     # Check local (current directory)
     if [ -d ".git" ]; then
-        if [ -f ".git/hooks/$HOOK_NAME" ]; then
-            if grep -q "RemoteJuggler" ".git/hooks/$HOOK_NAME" 2>/dev/null; then
-                echo "✅ Local hooks (current repo): INSTALLED"
+        echo "Local hooks (current repo):"
+        for hook in "${HOOKS[@]}"; do
+            if [ -f ".git/hooks/$hook" ]; then
+                if grep -q "RemoteJuggler" ".git/hooks/$hook" 2>/dev/null; then
+                    echo "  ✅ $hook: INSTALLED"
+                else
+                    echo "  ⚠️  $hook: CUSTOM HOOK DETECTED"
+                fi
             else
-                echo "⚠️  Local hooks (current repo): CUSTOM HOOK DETECTED"
+                echo "  ❌ $hook: NOT INSTALLED"
             fi
-        else
-            echo "❌ Local hooks (current repo): NOT INSTALLED"
-        fi
+        done
     else
         echo "ℹ️  Not in a git repository"
     fi

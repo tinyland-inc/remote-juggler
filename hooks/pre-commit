@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# RemoteJuggler pre-commit hook
+# Verifies identity before allowing commits
+#
+# Install: remote-juggler hooks install
+# Remove: remote-juggler hooks uninstall
+
+set -e
+
+# Allow bypassing hooks via environment variable
+if [ "${REMOTE_JUGGLER_HOOKS_DISABLED:-}" = "1" ]; then
+    exit 0
+fi
+
+# Check if remote-juggler is available
+if ! command -v remote-juggler &> /dev/null; then
+    echo "[RemoteJuggler] WARNING: CLI not found" >&2
+    # In strict mode, fail if CLI not available
+    [ "${REMOTE_JUGGLER_STRICT:-}" = "1" ] && exit 1
+    exit 0
+fi
+
+# Verify identity matches expected for this repo
+if ! remote-juggler verify --pre-commit 2>&1; then
+    echo "" >&2
+    echo "[RemoteJuggler] Identity verification failed!" >&2
+    echo "Run: remote-juggler detect --auto-switch" >&2
+    echo "Or:  remote-juggler switch <identity>" >&2
+    exit 1
+fi
+
+exit 0

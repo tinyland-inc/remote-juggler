@@ -28,6 +28,7 @@ prototype module Identity {
   import super.ProviderCLI;
   import super.GPG;
   import super.Remote;
+  import super.GlobalConfig;
 
   // ============================================================
   // Switch Result Types
@@ -110,9 +111,25 @@ prototype module Identity {
   private var registryLoaded: bool = false;
 
   /*
+   * Ensure the identity registry is loaded from config file.
+   * This is called automatically by functions that access the registry.
+   */
+  proc ensureRegistryLoaded() {
+    if registryLoaded then return;
+
+    // Load identities from GlobalConfig
+    const identities = GlobalConfig.loadIdentities();
+    for identity in identities {
+      identityRegistry[identity.name] = identity;
+    }
+    registryLoaded = true;
+  }
+
+  /*
    * Register an identity in the in-memory registry
    */
   proc registerIdentity(identity: GitIdentity) {
+    ensureRegistryLoaded();
     identityRegistry[identity.name] = identity;
   }
 
@@ -128,6 +145,7 @@ prototype module Identity {
    * Get the number of registered identities
    */
   proc identityCount(): int {
+    ensureRegistryLoaded();
     return identityRegistry.size;
   }
 
@@ -145,6 +163,7 @@ prototype module Identity {
    *   Tuple of (found, identity)
    */
   proc getIdentity(name: string): (bool, GitIdentity) {
+    ensureRegistryLoaded();
     if identityRegistry.contains(name) {
       return (true, identityRegistry[name]);
     }
@@ -161,6 +180,7 @@ prototype module Identity {
    *   List of matching identities
    */
   proc listIdentities(provider: Provider = Provider.Custom): list(GitIdentity) {
+    ensureRegistryLoaded();
     var result: list(GitIdentity);
 
     for name in identityRegistry.keys() {
@@ -181,6 +201,7 @@ prototype module Identity {
    *   List of identity name strings
    */
   proc listIdentityNames(): list(string) {
+    ensureRegistryLoaded();
     var names: list(string);
     for name in identityRegistry.keys() {
       names.pushBack(name);
@@ -208,6 +229,8 @@ prototype module Identity {
    *   Tuple of (found, identity, reason)
    */
   proc detectIdentity(repoPath: string = "."): (bool, GitIdentity, string) {
+    ensureRegistryLoaded();
+
     // Check if path is a git repository
     if !Remote.isGitRepository(repoPath) {
       return (false, new GitIdentity(), "Not a git repository");

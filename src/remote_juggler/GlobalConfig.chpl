@@ -1216,8 +1216,108 @@ prototype module GlobalConfig {
   */
   proc parseIdentitiesJSON(json: string): list(GitIdentity) {
     var identities: list(GitIdentity);
-    // Simple parsing - would use proper JSON parser in production
-    // This is a placeholder that handles the basic structure
+
+    // Parse JSON object where keys are identity names
+    // Format: { "identity-name": { "provider": "...", ... }, ... }
+
+    // Skip opening brace and whitespace
+    var pos = 0;
+    while pos < json.size && (json[pos] == '{' || json[pos] == ' ' ||
+                               json[pos] == '\n' || json[pos] == '\t') {
+      pos += 1;
+    }
+
+    while pos < json.size {
+      // Skip whitespace
+      while pos < json.size && (json[pos] == ' ' || json[pos] == '\n' ||
+                                 json[pos] == '\t' || json[pos] == ',') {
+        pos += 1;
+      }
+
+      // Check for end of object
+      if pos >= json.size || json[pos] == '}' then break;
+
+      // Expect opening quote for key
+      if json[pos] != '"' then break;
+      pos += 1;
+
+      // Extract identity name (key)
+      var nameEnd = pos;
+      while nameEnd < json.size && json[nameEnd] != '"' {
+        nameEnd += 1;
+      }
+      if nameEnd >= json.size then break;
+
+      const identityName = json[pos..<nameEnd];
+      pos = nameEnd + 1;
+
+      // Skip colon and whitespace to find opening brace
+      while pos < json.size && json[pos] != '{' {
+        pos += 1;
+      }
+      if pos >= json.size then break;
+
+      // Find matching closing brace for this identity object
+      var depth = 1;
+      var objStart = pos;
+      pos += 1;
+      while pos < json.size && depth > 0 {
+        if json[pos] == '{' then depth += 1;
+        else if json[pos] == '}' then depth -= 1;
+        pos += 1;
+      }
+
+      // Extract the identity object JSON
+      const identityJSON = json[objStart..<pos];
+
+      // Parse identity fields
+      const provider = extractJSONString(identityJSON, "provider", "custom");
+      const host = extractJSONString(identityJSON, "host", "");
+      const hostname = extractJSONString(identityJSON, "hostname", "");
+      const user = extractJSONString(identityJSON, "user", "");
+      const email = extractJSONString(identityJSON, "email", "");
+      const sshKeyPath = extractJSONString(identityJSON, "sshKeyPath", "");
+
+      // Parse GPG section if present
+      const gpgSection = extractJSONSection(identityJSON, "gpg");
+      var gpgConfig = new GPGConfig();
+      if gpgSection != "" {
+        gpgConfig.keyId = extractJSONString(gpgSection, "keyId", "");
+        gpgConfig.format = extractJSONString(gpgSection, "format", "gpg");
+
+        const signCommits = extractJSONString(gpgSection, "signCommits", "false");
+        gpgConfig.signCommits = signCommits == "true";
+
+        const signTags = extractJSONString(gpgSection, "signTags", "false");
+        gpgConfig.signTags = signTags == "true";
+
+        const autoSignoff = extractJSONString(gpgSection, "autoSignoff", "false");
+        gpgConfig.autoSignoff = autoSignoff == "true";
+
+        const hardwareKey = extractJSONString(gpgSection, "hardwareKey", "false");
+        gpgConfig.hardwareKey = hardwareKey == "true";
+
+        gpgConfig.touchPolicy = extractJSONString(gpgSection, "touchPolicy", "");
+      }
+
+      // Create identity with parsed values
+      var identity = new GitIdentity(
+        identityName,
+        stringToProvider(provider),
+        host,
+        hostname,
+        user,
+        email
+      );
+      identity.sshKeyPath = sshKeyPath;
+      identity.gpg = gpgConfig;
+
+      // Only add valid identities (must have name, host, user)
+      if identity.isValid() {
+        identities.pushBack(identity);
+      }
+    }
+
     return identities;
   }
 
