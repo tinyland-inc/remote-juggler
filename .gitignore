@@ -68,5 +68,8 @@ __pycache__/
 PLAN.md
 IMPLEMENTATION_PLAN.md
 
-# GitHub workflow (this is a GitLab project)
-.github/
+# GitHub Actions workflows are now enabled for mirrored CI
+# .github/
+
+# Claude Code
+.claude/

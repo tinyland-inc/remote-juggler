@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=dev.tinyland.RemoteJuggler
+Exec=/usr/bin/remote-juggler-gui --gapplication-service

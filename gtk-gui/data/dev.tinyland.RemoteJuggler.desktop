@@ -1,0 +1,28 @@
+[Desktop Entry]
+Name=RemoteJuggler
+Comment=Git identity management for multi-account workflows
+Exec=remote-juggler-gui
+Icon=dev.tinyland.RemoteJuggler
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=git;identity;github;gitlab;gpg;ssh;
+StartupNotify=true
+StartupWMClass=dev.tinyland.RemoteJuggler
+
+# DBus activation
+DBusActivatable=true
+
+# GNOME-specific
+X-GNOME-UsesNotifications=true
+
+# Desktop actions
+Actions=switch-identity;status;
+
+[Desktop Action switch-identity]
+Name=Switch Identity
+Exec=remote-juggler-gui --switch
+
+[Desktop Action status]
+Name=Show Status
+Exec=remote-juggler-gui --status

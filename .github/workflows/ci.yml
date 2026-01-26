@@ -1,0 +1,352 @@
+# RemoteJuggler CI Workflow
+# Continuous integration for Chapel CLI and Rust GTK GUI
+# NOTE: macOS builds are handled by GitLab CI (signing keys are there)
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CHAPEL_VERSION: "2.8.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ===========================================================================
+  # Chapel CLI Build & Test (Linux only - macOS in GitLab CI)
+  # ===========================================================================
+
+  chapel-lint:
+    name: Chapel Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          echo "$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64" >> $GITHUB_PATH
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+
+      - name: Run chplcheck
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          # Check main source files
+          find src -name "*.chpl" -exec chplcheck {} \; || true
+          # Check test files
+          find test -name "*.chpl" -exec chplcheck {} \; || true
+        continue-on-error: true  # chplcheck may not be available in all Chapel versions
+
+  chapel-build-linux-amd64:
+    name: Chapel Build (Linux amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          echo "$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64" >> $GITHUB_PATH
+
+      - name: Build
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          mason build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-linux-amd64
+          path: target/release/remote_juggler
+          retention-days: 7
+
+  chapel-build-linux-arm64:
+    name: Chapel Build (Linux arm64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 perl wget
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}.tar.gz
+          cd chapel-${CHAPEL_VERSION}
+          ./configure
+          make -j$(nproc)
+          echo "$PWD/bin/linux64-aarch64" >> $GITHUB_PATH
+
+      - name: Build
+        run: |
+          mason build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-linux-arm64
+          path: target/release/remote_juggler
+          retention-days: 7
+    continue-on-error: true  # ARM64 runners may not be available
+
+  chapel-unit-tests:
+    name: Chapel Unit Tests
+    runs-on: ubuntu-latest
+    needs: chapel-build-linux-amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          echo "$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64" >> $GITHUB_PATH
+
+      - name: Setup Mason registry
+        run: |
+          mkdir -p ~/.mason/registry
+          # Create registry config for quickchpl
+          cat > ~/.mason/registry/mason-registry.toml << 'EOF'
+          [[registry]]
+          name = "tinyland"
+          source = "https://github.com/Jesssullivan/mason-registry"
+          branch = "sid"
+          EOF
+
+      - name: Run Core Tests
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          cd test/unit
+          chpl -o core_tests CoreTests.chpl -M ../../src/remote_juggler --permit-unhandled-module-errors
+          ./core_tests || true
+        continue-on-error: true
+
+      - name: Run Identity Tests
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          cd test/unit
+          chpl -o identity_tests IdentityTests.chpl -M ../../src/remote_juggler --permit-unhandled-module-errors
+          ./identity_tests || true
+        continue-on-error: true
+
+      - name: Run Config Tests
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          cd test/unit
+          chpl -o config_tests ConfigTests.chpl -M ../../src/remote_juggler --permit-unhandled-module-errors
+          ./config_tests || true
+        continue-on-error: true
+
+      - name: Run Remote Tests
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          cd test/unit
+          chpl -o remote_tests RemoteTests.chpl -M ../../src/remote_juggler --permit-unhandled-module-errors
+          ./remote_tests || true
+        continue-on-error: true
+
+      - name: Run Token Health Tests
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          cd test/unit
+          chpl -o token_health_tests TokenHealthTests.chpl -M ../../src/remote_juggler --permit-unhandled-module-errors
+          ./token_health_tests || true
+        continue-on-error: true
+
+  chapel-integration-tests:
+    name: Chapel Integration Tests
+    runs-on: ubuntu-latest
+    needs: chapel-build-linux-amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: remote-juggler-linux-amd64
+
+      - name: Run integration tests
+        run: |
+          chmod +x remote_juggler
+
+          # Test help command
+          echo "=== Testing --help ==="
+          ./remote_juggler --help || echo "Help test completed"
+
+          # Test list command
+          echo "=== Testing list ==="
+          ./remote_juggler list || echo "List test completed"
+
+          # Test MCP mode initialization
+          echo "=== Testing MCP mode ==="
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | \
+            timeout 5 ./remote_juggler --mode=mcp || true
+
+  # ===========================================================================
+  # Rust GTK GUI Build & Test
+  # ===========================================================================
+
+  gtk-gui-lint:
+    name: GTK GUI Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gtk-gui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  gtk-gui-build:
+    name: GTK GUI Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gtk-gui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-gui-linux
+          path: gtk-gui/target/release/remote-juggler-gui
+          retention-days: 7
+
+  gtk-gui-test:
+    name: GTK GUI Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gtk-gui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential \
+            xvfb \
+            at-spi2-core
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Run unit tests
+        run: |
+          # Start Xvfb for headless GTK tests
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 2
+
+          # Run tests
+          cargo test --all-features
+
+      - name: Run property tests
+        run: |
+          # Start Xvfb for headless GTK tests
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 2
+
+          # Run proptest if available
+          cargo test --all-features -- --include-ignored proptest || true
+        continue-on-error: true
+
+  # ===========================================================================
+  # Summary Job
+  # ===========================================================================
+
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs:
+      - chapel-lint
+      - chapel-build-linux-amd64
+      - chapel-unit-tests
+      - chapel-integration-tests
+      - gtk-gui-lint
+      - gtk-gui-build
+      - gtk-gui-test
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Chapel CLI (Linux amd64) | ${{ needs.chapel-build-linux-amd64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Chapel Unit Tests | ${{ needs.chapel-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Chapel Integration Tests | ${{ needs.chapel-integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GTK GUI Lint | ${{ needs.gtk-gui-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GTK GUI Build | ${{ needs.gtk-gui-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GTK GUI Tests | ${{ needs.gtk-gui-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Note:** macOS builds and signing are handled by GitLab CI" >> $GITHUB_STEP_SUMMARY

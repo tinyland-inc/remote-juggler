@@ -1,0 +1,99 @@
+# Dependabot configuration for RemoteJuggler
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # ===========================================================================
+  # Rust GTK GUI (Cargo)
+  # ===========================================================================
+  - package-ecosystem: "cargo"
+    directory: "/gtk-gui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+      - "gtk-gui"
+    reviewers:
+      - "Jesssullivan"
+    groups:
+      # Group minor and patch updates together
+      rust-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Keep major updates separate for careful review
+      gtk-major:
+        patterns:
+          - "gtk4"
+          - "libadwaita"
+        update-types:
+          - "major"
+      serde-major:
+        patterns:
+          - "serde*"
+        update-types:
+          - "major"
+    ignore:
+      # Ignore pre-release versions
+      - dependency-name: "*"
+        update-types: ["version-update:semver-prerelease"]
+
+  # ===========================================================================
+  # GitHub Actions
+  # ===========================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+      - "github-actions"
+    reviewers:
+      - "Jesssullivan"
+    groups:
+      # Group all actions together
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ===========================================================================
+  # Swift Package Manager (Tray App)
+  # ===========================================================================
+  - package-ecosystem: "swift"
+    directory: "/tray/darwin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "swift"
+      - "macos"
+    reviewers:
+      - "Jesssullivan"

@@ -1,0 +1,38 @@
+[package]
+name = "remote-juggler-gui"
+version = "0.1.0"
+edition = "2021"
+description = "GTK4/Libadwaita GUI for RemoteJuggler identity management"
+authors = ["Jess Sullivan <jess@sulliwood.org>"]
+license = "MIT"
+repository = "https://github.com/Jesssullivan/RemoteJuggler"
+keywords = ["git", "identity", "gnome", "gtk4"]
+categories = ["development-tools", "gui"]
+
+[dependencies]
+# GTK4 and Libadwaita for native GNOME experience
+gtk4 = "0.9"
+libadwaita = "0.7"
+
+# Serialization for config parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# XDG directories for config paths
+dirs = "6.0"
+
+[dev-dependencies]
+proptest = "1.4"
+proptest-derive = "0.4"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

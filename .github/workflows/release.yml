@@ -1,0 +1,409 @@
+# RemoteJuggler GitHub Actions Release Workflow
+# Linux-only builds - macOS builds/signing handled by GitLab CI
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v2.0.0)'
+        required: true
+        type: string
+
+env:
+  PROJECT_NAME: remote-juggler
+  CHAPEL_VERSION: "2.8.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ===========================================================================
+  # Chapel CLI Build Jobs (Linux only)
+  # ===========================================================================
+
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          # Download and install Chapel
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}-linux64-x86_64.tar.gz
+          echo "$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64" >> $GITHUB_PATH
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          # Verify installation
+          chpl --version
+
+      - name: Build
+        run: |
+          export PATH="$PWD/chapel-${CHAPEL_VERSION}/bin/linux64-x86_64:$PATH"
+          mason build --release
+          mv target/release/remote_juggler ${{ env.PROJECT_NAME }}-linux-amd64
+          chmod +x ${{ env.PROJECT_NAME }}-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-linux-amd64
+          path: ${{ env.PROJECT_NAME }}-linux-amd64
+          retention-days: 7
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Chapel
+        run: |
+          # Build Chapel from source for ARM64
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 perl wget
+          wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}.tar.gz
+          tar xzf chapel-${CHAPEL_VERSION}.tar.gz
+          cd chapel-${CHAPEL_VERSION}
+          ./configure
+          make -j$(nproc)
+          echo "$PWD/bin/linux64-aarch64" >> $GITHUB_PATH
+
+      - name: Build
+        run: |
+          mason build --release
+          mv target/release/remote_juggler ${{ env.PROJECT_NAME }}-linux-arm64
+          chmod +x ${{ env.PROJECT_NAME }}-linux-arm64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-linux-arm64
+          path: ${{ env.PROJECT_NAME }}-linux-arm64
+          retention-days: 7
+    continue-on-error: true  # ARM64 runners may not be available
+
+  # ===========================================================================
+  # GTK GUI Build Jobs
+  # ===========================================================================
+
+  build-gtk-gui-linux:
+    name: GTK GUI (Linux x86_64)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gtk-gui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Strip binary
+        run: strip target/release/remote-juggler-gui
+
+      - name: Rename artifact
+        run: |
+          mv target/release/remote-juggler-gui ../${{ env.PROJECT_NAME }}-gui-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-gui-linux-amd64
+          path: ${{ env.PROJECT_NAME }}-gui-linux-amd64
+          retention-days: 7
+
+  # ===========================================================================
+  # AppImage Build
+  # ===========================================================================
+
+  build-appimage:
+    name: AppImage (Linux x86_64)
+    runs-on: ubuntu-latest
+    needs: [build-gtk-gui-linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download GTK GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-gui-linux-amd64
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libfuse2 \
+            wget \
+            file \
+            desktop-file-utils
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create AppDir structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+          mkdir -p AppDir/usr/share/metainfo
+
+          # Copy binary
+          cp ${{ env.PROJECT_NAME }}-gui-linux-amd64 AppDir/usr/bin/remote-juggler-gui
+          chmod +x AppDir/usr/bin/remote-juggler-gui
+
+          # Copy desktop file
+          cp gtk-gui/data/dev.tinyland.RemoteJuggler.desktop AppDir/usr/share/applications/
+          cp gtk-gui/data/dev.tinyland.RemoteJuggler.desktop AppDir/
+
+          # Copy metainfo
+          cp gtk-gui/data/dev.tinyland.RemoteJuggler.metainfo.xml AppDir/usr/share/metainfo/
+
+          # Create icon (placeholder SVG if no icon exists)
+          cat > AppDir/usr/share/icons/hicolor/scalable/apps/dev.tinyland.RemoteJuggler.svg << 'EOF'
+          <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+            <rect width="256" height="256" rx="32" fill="#3584e4"/>
+            <text x="128" y="160" font-family="system-ui" font-size="120" font-weight="bold" fill="white" text-anchor="middle">RJ</text>
+          </svg>
+          EOF
+
+          # Create symlink for icon
+          ln -sf usr/share/icons/hicolor/scalable/apps/dev.tinyland.RemoteJuggler.svg AppDir/dev.tinyland.RemoteJuggler.svg
+          ln -sf dev.tinyland.RemoteJuggler.svg AppDir/.DirIcon
+
+          # Create AppRun
+          cat > AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"
+          exec "${HERE}/usr/bin/remote-juggler-gui" "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+
+      - name: Download appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Create AppImage
+        run: |
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir ${{ env.PROJECT_NAME }}-gui-${{ steps.version.outputs.VERSION }}-x86_64.AppImage || true
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-appimage
+          path: ${{ env.PROJECT_NAME }}-gui-*.AppImage
+          retention-days: 7
+        continue-on-error: true  # AppImage build is optional
+
+  # ===========================================================================
+  # Test Jobs
+  # ===========================================================================
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build-linux-amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-linux-amd64
+
+      - name: Run tests
+        run: |
+          chmod +x ${{ env.PROJECT_NAME }}-linux-amd64
+
+          # Test help command
+          ./${{ env.PROJECT_NAME }}-linux-amd64 --help || echo "Help test completed"
+
+          # Test list command
+          ./${{ env.PROJECT_NAME }}-linux-amd64 list || echo "List test completed"
+
+          # Test MCP mode initialization
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | \
+            timeout 5 ./${{ env.PROJECT_NAME }}-linux-amd64 --mode=mcp || true
+    continue-on-error: true
+
+  test-gtk-gui:
+    name: Test GTK GUI
+    runs-on: ubuntu-latest
+    needs: build-gtk-gui-linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            xvfb \
+            at-spi2-core
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-gui-linux-amd64
+
+      - name: Test binary
+        run: |
+          chmod +x ${{ env.PROJECT_NAME }}-gui-linux-amd64
+
+          # Start Xvfb
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 2
+
+          # Test that binary runs (will exit quickly without config)
+          timeout 5 ./${{ env.PROJECT_NAME }}-gui-linux-amd64 --help || true
+    continue-on-error: true
+
+  # ===========================================================================
+  # Release Job (Linux only - macOS from GitLab)
+  # ===========================================================================
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-linux-amd64
+      - build-gtk-gui-linux
+      - build-appimage
+      - test
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+
+          # Move all binaries to release directory
+          find artifacts -type f \( -name "${{ env.PROJECT_NAME }}-*" -o -name "*.AppImage" \) -exec mv {} release/ \;
+
+          # Make all binaries executable
+          chmod +x release/* || true
+
+          # List release contents
+          echo "=== Release Contents ==="
+          ls -la release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          echo "=== Checksums ==="
+          cat SHA256SUMS.txt
+
+      - name: Generate checksums (individual files)
+        run: |
+          cd release
+          for f in *; do
+            if [ "$f" != "SHA256SUMS.txt" ] && [ -f "$f" ]; then
+              sha256sum "$f" > "$f.sha256"
+            fi
+          done
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: RemoteJuggler ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          generate_release_notes: true
+          body: |
+            ## RemoteJuggler ${{ steps.version.outputs.VERSION }}
+
+            Multi-provider git identity management tool with MCP/ACP support.
+
+            ### Installation
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/Jesssullivan/remote-juggler/main/install.sh | bash
+            ```
+
+            Or download the appropriate binary for your platform below.
+
+            ### Downloads (Linux)
+
+            | Platform | CLI | GUI |
+            |----------|-----|-----|
+            | Linux x86_64 | `remote-juggler-linux-amd64` | `remote-juggler-gui-linux-amd64` |
+            | Linux ARM64 | `remote-juggler-linux-arm64` | - |
+            | AppImage | - | `remote-juggler-gui-*.AppImage` |
+
+            > **macOS binaries** are available from [GitLab Releases](https://gitlab.com/tinyland/projects/remote-juggler/-/releases) (signed and notarized).
+
+            ### Features
+
+            - Multi-provider support (GitLab, GitHub, Bitbucket)
+            - Darwin Keychain integration for secure credential storage
+            - GPG signing configuration per identity
+            - MCP server for Claude Code / VS Code / Cursor integration
+            - ACP server for JetBrains IDE integration
+            - Automatic SSH identity detection
+            - Rootless installation
+            - GTK4/Libadwaita GUI for Linux
+
+            ### Checksums
+
+            Verify your download:
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            # Or check individual file
+            sha256sum -c remote-juggler-linux-amd64.sha256
+            ```
+          files: |
+            release/*

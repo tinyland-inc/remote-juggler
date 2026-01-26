@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.tinyland.RemoteJuggler</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>RemoteJuggler</name>
+  <summary>Git identity management for multi-account workflows</summary>
+  <description>
+    <p>
+      RemoteJuggler helps developers manage multiple git identities across GitHub,
+      GitLab, and other providers. It handles SSH key switching, GPG signing
+      configuration, and credential management seamlessly.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Switch between git identities with a single click</li>
+      <li>Automatic identity detection based on repository remote URL</li>
+      <li>GPG signing configuration per identity</li>
+      <li>YubiKey/FIDO2 hardware key support</li>
+      <li>Integration with system keychain for credential storage</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">dev.tinyland.RemoteJuggler.desktop</launchable>
+  <url type="homepage">https://github.com/Jesssullivan/RemoteJuggler</url>
+  <url type="bugtracker">https://github.com/Jesssullivan/RemoteJuggler/issues</url>
+  <developer_name>Jess Sullivan</developer_name>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-01-26">
+      <description>
+        <p>Initial release of the GTK4/Libadwaita GUI.</p>
+      </description>
+    </release>
+  </releases>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main window showing identity selector</caption>
+      <image>https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/gtk-gui/data/screenshots/main-window.png</image>
+    </screenshot>
+  </screenshots>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+</component>

@@ -1,0 +1,356 @@
+# RemoteJuggler GTK GUI Workflow
+# Dedicated CI for the Rust GTK4/Libadwaita GUI component
+
+name: GTK GUI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'gtk-gui/**'
+      - '.github/workflows/gtk-gui.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'gtk-gui/**'
+      - '.github/workflows/gtk-gui.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+defaults:
+  run:
+    working-directory: gtk-gui
+
+jobs:
+  # ===========================================================================
+  # Lint & Format
+  # ===========================================================================
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # ===========================================================================
+  # Build
+  # ===========================================================================
+
+  build-debug:
+    name: Build (Debug)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Build debug
+        run: cargo build
+
+  build-release:
+    name: Build (Release)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Strip binary
+        run: strip target/release/remote-juggler-gui
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-gui-linux-x86_64
+          path: gtk-gui/target/release/remote-juggler-gui
+          retention-days: 30
+
+  # ===========================================================================
+  # Tests
+  # ===========================================================================
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential \
+            xvfb \
+            at-spi2-core \
+            dbus-x11
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Start D-Bus
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+      - name: Run tests with Xvfb
+        run: |
+          # Start Xvfb
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 3
+
+          # Run tests
+          cargo test --all-features -- --test-threads=1
+
+          # Cleanup
+          kill $XVFB_PID || true
+
+  proptest:
+    name: Property Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential \
+            xvfb \
+            at-spi2-core \
+            dbus-x11
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Start D-Bus
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+      - name: Run property tests with Xvfb
+        run: |
+          # Start Xvfb
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 3
+
+          # Run proptest cases (if proptest is a dev dependency)
+          cargo test --all-features proptest -- --test-threads=1 || echo "No proptest cases found"
+
+          # Cleanup
+          kill $XVFB_PID || true
+        continue-on-error: true
+
+  # ===========================================================================
+  # Documentation
+  # ===========================================================================
+
+  doc:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Build documentation
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # ===========================================================================
+  # Security Audit
+  # ===========================================================================
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run audit
+        run: cargo audit
+        continue-on-error: true  # Advisory-only
+
+  # ===========================================================================
+  # Coverage (optional)
+  # ===========================================================================
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential \
+            xvfb \
+            at-spi2-core \
+            dbus-x11
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gtk-gui
+
+      - name: Start D-Bus
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+      - name: Generate coverage
+        run: |
+          # Start Xvfb
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1280x1024x24 &
+          XVFB_PID=$!
+          sleep 3
+
+          # Generate coverage
+          cargo llvm-cov --all-features --lcov --output-path lcov.info -- --test-threads=1
+
+          # Cleanup
+          kill $XVFB_PID || true
+        continue-on-error: true
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: gtk-gui/lcov.info
+          fail_ci_if_error: false
+        continue-on-error: true

@@ -130,6 +130,114 @@ build:tray-linux:
   allow_failure: true
 
 # =============================================================================
+# GTK GUI Build Stage (Rust + Libadwaita)
+# =============================================================================
+
+build:gtk-gui-linux:
+  stage: build
+  image: rust:1.75-bookworm
+  before_script:
+    - apt-get update
+    - apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config
+  script:
+    - cd gtk-gui
+    - cargo build --release
+    - strip target/release/remote-juggler-gui
+    - mv target/release/remote-juggler-gui ../${PROJECT_NAME}-gui-linux-amd64
+    - chmod +x ../${PROJECT_NAME}-gui-linux-amd64
+  artifacts:
+    name: "${PROJECT_NAME}-gui-linux-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - ${PROJECT_NAME}-gui-linux-amd64
+    expire_in: 1 week
+
+test:gtk-gui:
+  stage: test
+  image: rust:1.75-bookworm
+  before_script:
+    - apt-get update
+    - apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config xvfb at-spi2-core dbus-x11
+  script:
+    - cd gtk-gui
+    # Start D-Bus
+    - eval $(dbus-launch --sh-syntax)
+    # Start Xvfb for headless GTK tests
+    - export DISPLAY=:99
+    - Xvfb :99 -screen 0 1280x1024x24 &
+    - sleep 3
+    # Run all tests (unit + proptest)
+    - cargo test --all-features -- --test-threads=1
+  artifacts:
+    reports:
+      junit: gtk-gui/test-results.xml
+    when: always
+  allow_failure: true
+
+test:gtk-gui-lint:
+  stage: test
+  image: rust:1.75-bookworm
+  before_script:
+    - apt-get update
+    - apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config
+    - rustup component add clippy rustfmt
+  script:
+    - cd gtk-gui
+    - cargo fmt --check
+    - cargo clippy --all-targets --all-features -- -D warnings
+  allow_failure: true
+
+package:gtk-gui-appimage:
+  stage: package
+  image: ubuntu:22.04
+  needs:
+    - build:gtk-gui-linux
+  before_script:
+    - apt-get update
+    - apt-get install -y wget file fuse libfuse2 desktop-file-utils
+  script:
+    - export VERSION="${CI_COMMIT_TAG:-0.0.0}"
+    # Create AppDir structure
+    - mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps AppDir/usr/share/metainfo
+    - cp ${PROJECT_NAME}-gui-linux-amd64 AppDir/usr/bin/remote-juggler-gui
+    - chmod +x AppDir/usr/bin/remote-juggler-gui
+    - cp gtk-gui/data/dev.tinyland.RemoteJuggler.desktop AppDir/usr/share/applications/
+    - cp gtk-gui/data/dev.tinyland.RemoteJuggler.desktop AppDir/
+    - cp gtk-gui/data/dev.tinyland.RemoteJuggler.metainfo.xml AppDir/usr/share/metainfo/
+    # Create placeholder icon
+    - |
+      cat > AppDir/usr/share/icons/hicolor/scalable/apps/dev.tinyland.RemoteJuggler.svg << 'EOF'
+      <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+        <rect width="256" height="256" rx="32" fill="#3584e4"/>
+        <text x="128" y="160" font-family="system-ui" font-size="120" font-weight="bold" fill="white" text-anchor="middle">RJ</text>
+      </svg>
+      EOF
+    - ln -sf usr/share/icons/hicolor/scalable/apps/dev.tinyland.RemoteJuggler.svg AppDir/dev.tinyland.RemoteJuggler.svg
+    - ln -sf dev.tinyland.RemoteJuggler.svg AppDir/.DirIcon
+    # Create AppRun
+    - |
+      cat > AppDir/AppRun << 'APPRUN'
+      #!/bin/bash
+      SELF=$(readlink -f "$0")
+      HERE=${SELF%/*}
+      export PATH="${HERE}/usr/bin:${PATH}"
+      export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+      export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"
+      exec "${HERE}/usr/bin/remote-juggler-gui" "$@"
+      APPRUN
+    - chmod +x AppDir/AppRun
+    # Download appimagetool
+    - wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+    - chmod +x appimagetool-x86_64.AppImage
+    - ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir ${PROJECT_NAME}-gui-${VERSION}-x86_64.AppImage
+  artifacts:
+    paths:
+      - "*.AppImage"
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# =============================================================================
 # Test Stage
 # =============================================================================
 
@@ -241,6 +349,8 @@ release:package:
   needs:
     - build:linux-amd64
     - build:darwin-arm64
+    - job: build:gtk-gui-linux
+      optional: true
     - job: build:tray-darwin
       optional: true
     - job: build:tray-linux
@@ -250,6 +360,8 @@ release:package:
     - job: package:deb
       optional: true
     - job: package:pacman
+      optional: true
+    - job: package:gtk-gui-appimage
       optional: true
     - job: sign:darwin-pkg
       optional: true
@@ -296,6 +408,26 @@ release:package:
           curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
             --upload-file "$dmg" \
             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${dmg}"
+        fi
+      done
+    - |
+      # Upload GTK GUI binaries and AppImages
+      for gui in ${PROJECT_NAME}-gui-*; do
+        if [ -f "$gui" ]; then
+          echo "Uploading $gui..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$gui" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${gui}"
+        fi
+      done
+    - |
+      # Upload AppImages
+      for appimage in *.AppImage; do
+        if [ -f "$appimage" ]; then
+          echo "Uploading $appimage..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$appimage" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${appimage}"
         fi
       done
     - |
@@ -346,6 +478,10 @@ release:gitlab:
       - [macOS PKG Installer (ARM64, Signed)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-${CI_COMMIT_TAG}-darwin-arm64.pkg)
       - [macOS DMG Installer (ARM64, Notarized)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/RemoteJuggler-${CI_COMMIT_TAG}-darwin-arm64.dmg)
 
+      **GTK GUI (Linux):**
+      - [GTK GUI (AMD64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-gui-linux-amd64)
+      - [AppImage (AMD64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-gui-${CI_COMMIT_TAG}-x86_64.AppImage)
+
       **Tray Applications:**
       - [macOS Tray (ARM64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-darwin-arm64)
       - [Linux Tray (AMD64)](${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-linux-amd64)
@@ -390,6 +526,14 @@ release:gitlab:
         - name: "${PROJECT_NAME}-tray-linux-amd64"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-tray-linux-amd64"
           filepath: "/tray/${PROJECT_NAME}-tray-linux-amd64"
+          link_type: package
+        - name: "${PROJECT_NAME}-gui-linux-amd64"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-gui-linux-amd64"
+          filepath: "/gui/${PROJECT_NAME}-gui-linux-amd64"
+          link_type: package
+        - name: "${PROJECT_NAME}-gui-appimage"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PROJECT_NAME}/${CI_COMMIT_TAG}/${PROJECT_NAME}-gui-${CI_COMMIT_TAG}-x86_64.AppImage"
+          filepath: "/gui/${PROJECT_NAME}-gui.AppImage"
           link_type: package
 
 # =============================================================================
