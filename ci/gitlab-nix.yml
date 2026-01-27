@@ -14,12 +14,12 @@ stages:
 
 variables:
   # Attic cache configuration
-  ATTIC_SERVER: "https://attic.tinyland.dev"
+  ATTIC_SERVER: "https://nix-cache.fuzzy-dev.tinyland.dev"
   ATTIC_CACHE: "tinyland"
   # Nix configuration for Attic substituter
   NIX_CONFIG: |
     experimental-features = nix-command flakes
-    extra-substituters = https://attic.tinyland.dev/tinyland
+    extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
     extra-trusted-public-keys = tinyland:O1ECUdLTRVhoyLTQ3hYy6xFhFyhlcVqbILJxBVOTwRY=
     accept-flake-config = true
     sandbox = false

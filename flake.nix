@@ -15,7 +15,7 @@
   nixConfig = {
     # Attic binary cache configuration
     extra-substituters = [
-      "https://attic.tinyland.dev/tinyland"
+      "https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
     ];
     extra-trusted-public-keys = [
       "tinyland:O1ECUdLTRVhoyLTQ3hYy6xFhFyhlcVqbILJxBVOTwRY="
@@ -284,7 +284,7 @@
               echo "  cargo test        - Run GTK GUI tests"
             ''}
             echo ""
-            echo "Attic cache: https://attic.tinyland.dev/tinyland"
+            echo "Attic cache: https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
           '';
 
           # Ensure pkg-config can find GTK

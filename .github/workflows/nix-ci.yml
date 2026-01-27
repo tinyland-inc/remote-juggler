@@ -9,7 +9,7 @@
 #
 # Required GitHub Secrets:
 #   ATTIC_TOKEN - Attic server authentication token
-#                 Generate with: attic login tinyland https://attic.tinyland.dev <token>
+#                 Generate with: attic login tinyland https://nix-cache.fuzzy-dev.tinyland.dev <token>
 #                 Token should have push access to the cache
 
 name: Nix CI
@@ -28,7 +28,7 @@ on:
         type: boolean
 
 env:
-  ATTIC_SERVER: https://attic.tinyland.dev
+  ATTIC_SERVER: https://nix-cache.fuzzy-dev.tinyland.dev
   ATTIC_CACHE: tinyland
 
 # Cancel in-progress runs for the same branch
