@@ -1,0 +1,395 @@
+# RemoteJuggler Nix CI Workflow
+# Nix flake-based builds with Attic binary cache
+#
+# This workflow runs alongside the existing ci.yml and provides:
+# - Reproducible Nix builds for all platforms
+# - Attic binary cache for fast rebuilds
+# - Multi-arch Linux via QEMU emulation
+# - Native macOS builds (Intel + Apple Silicon)
+#
+# Required GitHub Secrets:
+#   ATTIC_TOKEN - Attic server authentication token
+#                 Generate with: attic login tinyland https://attic.tinyland.dev <token>
+#                 Token should have push access to the cache
+
+name: Nix CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      push_cache:
+        description: 'Push build results to Attic cache'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  ATTIC_SERVER: https://attic.tinyland.dev
+  ATTIC_CACHE: tinyland
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Nix Flake Check
+  # ===========================================================================
+
+  flake-check:
+    name: Flake Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Check flake
+        run: nix flake check --no-build
+        continue-on-error: true  # May fail if flake.nix doesn't exist yet
+
+      - name: Show flake info
+        run: nix flake show
+        continue-on-error: true
+
+  # ===========================================================================
+  # Linux Builds (x86_64 + aarch64 via QEMU)
+  # ===========================================================================
+
+  build-linux-x86_64:
+    name: Build (Linux x86_64)
+    runs-on: ubuntu-latest
+    needs: flake-check
+    if: always() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure Attic
+        run: |
+          nix profile install nixpkgs#attic-client
+
+          # Login to Attic cache
+          if [ -n "${{ secrets.ATTIC_TOKEN }}" ]; then
+            attic login tinyland ${{ env.ATTIC_SERVER }} ${{ secrets.ATTIC_TOKEN }}
+            echo "ATTIC_CONFIGURED=true" >> $GITHUB_ENV
+          else
+            echo "::warning::ATTIC_TOKEN not set, skipping cache"
+            echo "ATTIC_CONFIGURED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Configure Attic as substituter
+        if: env.ATTIC_CONFIGURED == 'true'
+        run: |
+          # Use Attic cache as a substituter for pulling cached builds
+          attic use ${{ env.ATTIC_CACHE }} || echo "::warning::Failed to configure Attic substituter"
+
+      - name: Build CLI
+        run: |
+          nix build .#remote-juggler --print-build-logs
+
+          # Copy result to accessible location
+          cp -L result/bin/remote-juggler ./remote-juggler-linux-x86_64
+          chmod +x ./remote-juggler-linux-x86_64
+
+      - name: Build GTK GUI
+        run: |
+          nix build .#remote-juggler-gui --print-build-logs
+
+          # Copy result to accessible location
+          cp -L result/bin/remote-juggler-gui ./remote-juggler-gui-linux-x86_64
+          chmod +x ./remote-juggler-gui-linux-x86_64
+        continue-on-error: true  # GUI may not build without GTK in Nix
+
+      - name: Push to Attic
+        if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
+        run: |
+          # Push all build results to cache
+          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+
+          # Also push the runtime closure for faster subsequent builds
+          nix path-info --recursive result | head -100 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+
+      - name: Test CLI binary
+        run: |
+          ./remote-juggler-linux-x86_64 --help
+          ./remote-juggler-linux-x86_64 list || true
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-nix-linux-x86_64
+          path: remote-juggler-linux-x86_64
+          retention-days: 7
+
+      - name: Upload GUI artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: remote-juggler-gui-nix-linux-x86_64
+          path: remote-juggler-gui-linux-x86_64
+          retention-days: 7
+        continue-on-error: true
+
+  build-linux-aarch64:
+    name: Build (Linux aarch64)
+    runs-on: ubuntu-latest
+    needs: flake-check
+    if: always() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for aarch64
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+            extra-platforms = aarch64-linux
+
+      - name: Configure Attic
+        run: |
+          nix profile install nixpkgs#attic-client
+
+          if [ -n "${{ secrets.ATTIC_TOKEN }}" ]; then
+            attic login tinyland ${{ env.ATTIC_SERVER }} ${{ secrets.ATTIC_TOKEN }}
+            echo "ATTIC_CONFIGURED=true" >> $GITHUB_ENV
+          else
+            echo "::warning::ATTIC_TOKEN not set, skipping cache"
+            echo "ATTIC_CONFIGURED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Configure Attic as substituter
+        if: env.ATTIC_CONFIGURED == 'true'
+        run: |
+          attic use ${{ env.ATTIC_CACHE }} || echo "::warning::Failed to configure Attic substituter"
+
+      - name: Build CLI (aarch64)
+        run: |
+          nix build .#packages.aarch64-linux.remote-juggler --print-build-logs
+
+          # For cross-built binaries, we need to handle the path differently
+          cp -L result/bin/remote-juggler ./remote-juggler-linux-aarch64
+          chmod +x ./remote-juggler-linux-aarch64
+
+      - name: Push to Attic
+        if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
+        run: |
+          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-nix-linux-aarch64
+          path: remote-juggler-linux-aarch64
+          retention-days: 7
+    continue-on-error: true  # aarch64 emulation can be slow/flaky
+
+  # ===========================================================================
+  # macOS Builds (Intel + Apple Silicon)
+  # ===========================================================================
+
+  build-macos-x86_64:
+    name: Build (macOS x86_64)
+    runs-on: macos-13  # Intel Mac
+    needs: flake-check
+    if: always() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure Attic
+        run: |
+          nix profile install nixpkgs#attic-client
+
+          if [ -n "${{ secrets.ATTIC_TOKEN }}" ]; then
+            attic login tinyland ${{ env.ATTIC_SERVER }} ${{ secrets.ATTIC_TOKEN }}
+            echo "ATTIC_CONFIGURED=true" >> $GITHUB_ENV
+          else
+            echo "::warning::ATTIC_TOKEN not set, skipping cache"
+            echo "ATTIC_CONFIGURED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Configure Attic as substituter
+        if: env.ATTIC_CONFIGURED == 'true'
+        run: |
+          attic use ${{ env.ATTIC_CACHE }} || echo "::warning::Failed to configure Attic substituter"
+
+      - name: Build CLI
+        run: |
+          nix build .#remote-juggler --print-build-logs
+
+          cp -L result/bin/remote-juggler ./remote-juggler-darwin-x86_64
+          chmod +x ./remote-juggler-darwin-x86_64
+
+      - name: Push to Attic
+        if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
+        run: |
+          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+          nix path-info --recursive result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+
+      - name: Test CLI binary
+        run: |
+          ./remote-juggler-darwin-x86_64 --help
+          ./remote-juggler-darwin-x86_64 list || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-nix-darwin-x86_64
+          path: remote-juggler-darwin-x86_64
+          retention-days: 7
+
+  build-macos-aarch64:
+    name: Build (macOS aarch64)
+    runs-on: macos-14  # Apple Silicon
+    needs: flake-check
+    if: always() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure Attic
+        run: |
+          nix profile install nixpkgs#attic-client
+
+          if [ -n "${{ secrets.ATTIC_TOKEN }}" ]; then
+            attic login tinyland ${{ env.ATTIC_SERVER }} ${{ secrets.ATTIC_TOKEN }}
+            echo "ATTIC_CONFIGURED=true" >> $GITHUB_ENV
+          else
+            echo "::warning::ATTIC_TOKEN not set, skipping cache"
+            echo "ATTIC_CONFIGURED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Configure Attic as substituter
+        if: env.ATTIC_CONFIGURED == 'true'
+        run: |
+          attic use ${{ env.ATTIC_CACHE }} || echo "::warning::Failed to configure Attic substituter"
+
+      - name: Build CLI
+        run: |
+          nix build .#remote-juggler --print-build-logs
+
+          cp -L result/bin/remote-juggler ./remote-juggler-darwin-aarch64
+          chmod +x ./remote-juggler-darwin-aarch64
+
+      - name: Push to Attic
+        if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
+        run: |
+          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+          nix path-info --recursive result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+
+      - name: Test CLI binary
+        run: |
+          ./remote-juggler-darwin-aarch64 --help
+          ./remote-juggler-darwin-aarch64 list || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-nix-darwin-aarch64
+          path: remote-juggler-darwin-aarch64
+          retention-days: 7
+
+  # ===========================================================================
+  # Development Shell
+  # ===========================================================================
+
+  devshell-check:
+    name: DevShell Check
+    runs-on: ubuntu-latest
+    needs: flake-check
+    if: always() && !cancelled()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          extra-conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Check devShell builds
+        run: |
+          nix develop --command echo "DevShell OK"
+        continue-on-error: true
+
+      - name: List devShell environment
+        run: |
+          nix develop --command bash -c 'echo "PATH: $PATH"; which chpl || true; which cargo || true'
+        continue-on-error: true
+
+  # ===========================================================================
+  # Summary Job
+  # ===========================================================================
+
+  nix-ci-summary:
+    name: Nix CI Summary
+    runs-on: ubuntu-latest
+    needs:
+      - flake-check
+      - build-linux-x86_64
+      - build-linux-aarch64
+      - build-macos-x86_64
+      - build-macos-aarch64
+      - devshell-check
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## Nix CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Architecture | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | x86_64 | ${{ needs.build-linux-x86_64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | aarch64 | ${{ needs.build-linux-aarch64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | x86_64 | ${{ needs.build-macos-x86_64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | aarch64 | ${{ needs.build-macos-aarch64.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Flake Check | ${{ needs.flake-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| DevShell | ${{ needs.devshell-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Note:** This workflow requires a \`flake.nix\` in the repository root." >> $GITHUB_STEP_SUMMARY
+          echo "> Builds are cached via Attic at \`${{ env.ATTIC_SERVER }}\`" >> $GITHUB_STEP_SUMMARY
