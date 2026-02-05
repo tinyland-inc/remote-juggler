@@ -1,12 +1,16 @@
-#!/bin/bash
-# RemoteJuggler - Rootless Installation Script
+#!/bin/sh
+# RemoteJuggler - POSIX-Compatible Rootless Installation Script
 # https://gitlab.com/tinyland/projects/remote-juggler
 #
 # Usage:
-#   curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/Jesssullivan/remote-juggler/main/install.sh | bash
+#   curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Jesssullivan/remote-juggler/main/install.sh | sh
+#
+# Options:
+#   --help              Show this help message
+#   --version VERSION   Install specific version (or set REMOTE_JUGGLER_VERSION)
 
-set -euo pipefail
+set -eu
 
 # Configuration
 GITLAB_REPO="https://gitlab.com/tinyland/projects/remote-juggler"
@@ -15,7 +19,7 @@ BINARY_NAME="remote-juggler"
 VERSION="${REMOTE_JUGGLER_VERSION:-2.0.0}"
 
 # Colors for output (if terminal supports it)
-if [[ -t 1 ]]; then
+if [ -t 1 ]; then
   RED='\033[0;31m'
   GREEN='\033[0;32m'
   YELLOW='\033[0;33m'
@@ -29,6 +33,70 @@ else
   NC=''
 fi
 
+# Show help message
+show_help() {
+  cat << EOF
+RemoteJuggler Installation Script
+
+USAGE:
+    curl -fsSL <script-url> | sh
+    sh install.sh [OPTIONS]
+
+OPTIONS:
+    --help              Show this help message
+    --version VERSION   Install specific version (default: $VERSION)
+
+ENVIRONMENT VARIABLES:
+    REMOTE_JUGGLER_VERSION    Override default version
+
+EXAMPLES:
+    # Install latest version
+    curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | sh
+
+    # Install specific version
+    REMOTE_JUGGLER_VERSION=2.1.0 sh install.sh
+
+DESCRIPTION:
+    This script performs the following operations:
+    1. Detects platform (darwin/linux, amd64/arm64)
+    2. Downloads binary from GitLab releases or GitHub
+    3. Installs to ~/.local/bin (or first available in PATH)
+    4. Initializes configuration at ~/.config/remote-juggler/config.json
+    5. Imports identities from ~/.ssh/config
+    6. Configures Claude Code slash commands
+
+DOCUMENTATION:
+    https://gitlab.com/tinyland/projects/remote-juggler
+
+EOF
+  exit 0
+}
+
+# Parse command-line arguments
+parse_args() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --help|-h)
+        show_help
+        ;;
+      --version)
+        if [ -z "${2:-}" ]; then
+          printf '%bError: --version requires a value%b\n' "$RED" "$NC" >&2
+          exit 1
+        fi
+        VERSION="$2"
+        shift
+        ;;
+      *)
+        printf '%bUnknown option: %s%b\n' "$RED" "$1" "$NC" >&2
+        printf 'Use --help for usage information\n' >&2
+        exit 1
+        ;;
+    esac
+    shift
+  done
+}
+
 # Detect platform
 detect_platform() {
   OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -38,7 +106,7 @@ detect_platform() {
     x86_64) ARCH="amd64" ;;
     aarch64|arm64) ARCH="arm64" ;;
     *)
-      echo -e "${RED}Unsupported architecture: $ARCH${NC}"
+      printf '%bUnsupported architecture: %s%b\n' "$RED" "$ARCH" "$NC" >&2
       exit 1
       ;;
   esac
@@ -46,7 +114,7 @@ detect_platform() {
   case "$OS" in
     darwin|linux) ;;
     *)
-      echo -e "${RED}Unsupported operating system: $OS${NC}"
+      printf '%bUnsupported operating system: %s%b\n' "$RED" "$OS" "$NC" >&2
       exit 1
       ;;
   esac
@@ -54,59 +122,43 @@ detect_platform() {
   PLATFORM="${OS}-${ARCH}"
 }
 
-# Binary installation paths (in order of preference)
-BIN_PATHS=(
-  "$HOME/.local/bin"
-  "$HOME/bin"
-  "$HOME/.bin"
-)
-
-# Config location (XDG Base Directory Specification)
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/remote-juggler"
-
-# IDE config locations
-declare -A IDE_CONFIGS=(
-  ["claude"]="$HOME/.claude"
-  ["jetbrains"]="$HOME/.jetbrains"
-)
-
 # Print banner
 print_banner() {
-  echo -e "${BLUE}"
-  echo "=============================================================="
-  echo "          RemoteJuggler Installer v${VERSION}"
-  echo "=============================================================="
-  echo -e "${NC}"
-  echo "Platform: ${PLATFORM}"
-  echo ""
+  printf '%b' "$BLUE"
+  printf '==============================================================\n'
+  printf '          RemoteJuggler Installer v%s\n' "$VERSION"
+  printf '==============================================================\n'
+  printf '%b' "$NC"
+  printf 'Platform: %s\n' "$PLATFORM"
+  printf '\n'
 }
 
 # Download binary from best available source
 download_binary() {
-  local target="$1"
-  local artifact="${BINARY_NAME}-${PLATFORM}"
-  local tmp_file="${target}.tmp"
+  target="$1"
+  artifact="${BINARY_NAME}-${PLATFORM}"
+  tmp_file="${target}.tmp"
 
-  echo "Downloading ${artifact}..."
+  printf 'Downloading %s...\n' "$artifact"
 
-  # Try GitLab Generic Packages first
+  # Try GitLab releases first
   if curl -fsSL "${GITLAB_REPO}/-/releases/v${VERSION}/downloads/${artifact}" -o "${tmp_file}" 2>/dev/null; then
     mv "${tmp_file}" "${target}"
-    echo -e "${GREEN}Downloaded from GitLab${NC}"
+    printf '%bDownloaded from GitLab releases%b\n' "$GREEN" "$NC"
     return 0
   fi
 
   # Try GitLab Package Registry
   if curl -fsSL "${GITLAB_REPO}/-/package_files/generic/remote-juggler/${VERSION}/${artifact}" -o "${tmp_file}" 2>/dev/null; then
     mv "${tmp_file}" "${target}"
-    echo -e "${GREEN}Downloaded from GitLab Package Registry${NC}"
+    printf '%bDownloaded from GitLab Package Registry%b\n' "$GREEN" "$NC"
     return 0
   fi
 
   # Fall back to GitHub Releases
   if curl -fsSL "${GITHUB_REPO}/releases/download/v${VERSION}/${artifact}" -o "${tmp_file}" 2>/dev/null; then
     mv "${tmp_file}" "${target}"
-    echo -e "${GREEN}Downloaded from GitHub${NC}"
+    printf '%bDownloaded from GitHub%b\n' "$GREEN" "$NC"
     return 0
   fi
 
@@ -117,39 +169,40 @@ download_binary() {
 
 # Find or create binary directory
 install_binary() {
-  local target_dir=""
+  target_dir=""
 
-  # Find existing directory in PATH
-  for dir in "${BIN_PATHS[@]}"; do
-    if [[ -d "$dir" && ":$PATH:" == *":$dir:"* ]]; then
+  # Check directories in order of preference
+  for dir in "$HOME/.local/bin" "$HOME/bin" "$HOME/.bin"; do
+    # Check if directory exists and is in PATH
+    if [ -d "$dir" ] && printf '%s\n' "$PATH" | grep -q "\(^\|:\)$dir\(:\|\$\)"; then
       target_dir="$dir"
       break
     fi
   done
 
-  # Create first preference if none found
-  if [[ -z "$target_dir" ]]; then
-    target_dir="${BIN_PATHS[0]}"
+  # Create ~/.local/bin if none found
+  if [ -z "$target_dir" ]; then
+    target_dir="$HOME/.local/bin"
     mkdir -p "$target_dir"
-    echo -e "${YELLOW}Created ${target_dir}${NC}"
-    echo ""
-    echo -e "${YELLOW}Add to your PATH by adding this to your shell rc file:${NC}"
-    echo "  export PATH=\"\$PATH:${target_dir}\""
-    echo ""
+    printf '%bCreated %s%b\n' "$YELLOW" "$target_dir" "$NC"
+    printf '\n'
+    printf '%bAdd to your PATH by adding this to your shell rc file:%b\n' "$YELLOW" "$NC"
+    printf '  export PATH="$PATH:%s"\n' "$target_dir"
+    printf '\n'
   fi
 
-  echo "Installing ${BINARY_NAME} to ${target_dir}..."
+  printf 'Installing %s to %s...\n' "$BINARY_NAME" "$target_dir"
 
   if download_binary "${target_dir}/${BINARY_NAME}"; then
     chmod +x "${target_dir}/${BINARY_NAME}"
-    echo -e "${GREEN}Binary installed successfully${NC}"
+    printf '%bBinary installed successfully%b\n' "$GREEN" "$NC"
   else
-    echo -e "${RED}Failed to download binary${NC}"
-    echo ""
-    echo "You can try:"
-    echo "  1. Check your internet connection"
-    echo "  2. Verify the version exists: v${VERSION}"
-    echo "  3. Build from source: mason build --release"
+    printf '%bFailed to download binary%b\n' "$RED" "$NC" >&2
+    printf '\n' >&2
+    printf 'You can try:\n' >&2
+    printf '  1. Check your internet connection\n' >&2
+    printf '  2. Verify the version exists: v%s\n' "$VERSION" >&2
+    printf '  3. Build from source: make release\n' >&2
     exit 1
   fi
 
@@ -159,15 +212,17 @@ install_binary() {
 
 # Initialize configuration
 init_config() {
-  echo ""
-  echo "Initializing configuration..."
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/remote-juggler"
 
-  mkdir -p "${CONFIG_DIR}"
+  printf '\n'
+  printf 'Initializing configuration...\n'
 
-  if [[ ! -f "${CONFIG_DIR}/config.json" ]]; then
-    # Create initial config using the binary
+  mkdir -p "$CONFIG_DIR"
+
+  if [ ! -f "${CONFIG_DIR}/config.json" ]; then
+    # Try to use the binary to initialize config
     if "${INSTALLED_BINARY}" config init 2>/dev/null; then
-      echo -e "${GREEN}Configuration initialized at ${CONFIG_DIR}/config.json${NC}"
+      printf '%bConfiguration initialized at %s/config.json%b\n' "$GREEN" "$CONFIG_DIR" "$NC"
     else
       # Create minimal config manually
       cat > "${CONFIG_DIR}/config.json" << 'EOF'
@@ -189,41 +244,41 @@ init_config() {
   }
 }
 EOF
-      echo -e "${GREEN}Configuration created at ${CONFIG_DIR}/config.json${NC}"
+      printf '%bConfiguration created at %s/config.json%b\n' "$GREEN" "$CONFIG_DIR" "$NC"
     fi
   else
-    echo -e "${GREEN}Configuration already exists${NC}"
+    printf '%bConfiguration already exists%b\n' "$GREEN" "$NC"
   fi
 
   # Import identities from SSH config
-  echo "Importing identities from ~/.ssh/config..."
+  printf 'Importing identities from ~/.ssh/config...\n'
   if "${INSTALLED_BINARY}" config import 2>/dev/null; then
-    echo -e "${GREEN}SSH identities imported${NC}"
+    printf '%bSSH identities imported%b\n' "$GREEN" "$NC"
   else
-    echo -e "${YELLOW}SSH import skipped (run 'remote-juggler config import' manually)${NC}"
+    printf '%bSSH import skipped (run "remote-juggler config import" manually)%b\n' "$YELLOW" "$NC"
   fi
 
   # Sync managed blocks
   if "${INSTALLED_BINARY}" config sync 2>/dev/null; then
-    echo -e "${GREEN}Managed blocks synchronized${NC}"
+    printf '%bManaged blocks synchronized%b\n' "$GREEN" "$NC"
   fi
 }
 
 # Configure Claude Code integration
 configure_claude() {
-  local config_dir="$1"
+  config_dir="$1"
 
-  echo "  Configuring Claude Code..."
+  printf '  Configuring Claude Code...\n'
 
   mkdir -p "${config_dir}/commands"
   mkdir -p "${config_dir}/skills/git-identity"
 
   # Download slash commands
-  local commands_url="${GITLAB_REPO}/-/raw/main/.claude/commands"
+  commands_url="${GITLAB_REPO}/-/raw/main/.claude/commands"
 
   for cmd in juggle identity remotes; do
     if curl -fsSL "${commands_url}/${cmd}.md" -o "${config_dir}/commands/${cmd}.md" 2>/dev/null; then
-      echo -e "    ${GREEN}/${cmd} command installed${NC}"
+      printf '    %b/%s command installed%b\n' "$GREEN" "$cmd" "$NC"
     else
       # Create from embedded content
       case "$cmd" in
@@ -243,7 +298,7 @@ Steps:
 2. Run `remote-juggler switch $ARGUMENTS` to switch
 3. Verify the switch with `remote-juggler status`
 EOF
-          echo -e "    ${GREEN}/${cmd} command created${NC}"
+          printf '    %b/%s command created%b\n' "$GREEN" "$cmd" "$NC"
           ;;
         identity)
           cat > "${config_dir}/commands/${cmd}.md" << 'EOF'
@@ -261,7 +316,7 @@ Usage:
 
 Run the appropriate remote-juggler command based on $ARGUMENTS.
 EOF
-          echo -e "    ${GREEN}/${cmd} command created${NC}"
+          printf '    %b/%s command created%b\n' "$GREEN" "$cmd" "$NC"
           ;;
         remotes)
           cat > "${config_dir}/commands/${cmd}.md" << 'EOF'
@@ -275,16 +330,16 @@ View and manage git remotes with identity context.
 Run `remote-juggler detect` to identify the current remote configuration
 and suggest appropriate identity switches if needed.
 EOF
-          echo -e "    ${GREEN}/${cmd} command created${NC}"
+          printf '    %b/%s command created%b\n' "$GREEN" "$cmd" "$NC"
           ;;
       esac
     fi
   done
 
   # Download skill
-  local skill_url="${GITLAB_REPO}/-/raw/main/.claude/skills/git-identity/SKILL.md"
+  skill_url="${GITLAB_REPO}/-/raw/main/.claude/skills/git-identity/SKILL.md"
   if curl -fsSL "${skill_url}" -o "${config_dir}/skills/git-identity/SKILL.md" 2>/dev/null; then
-    echo -e "    ${GREEN}git-identity skill installed${NC}"
+    printf '    %bgit-identity skill installed%b\n' "$GREEN" "$NC"
   else
     cat > "${config_dir}/skills/git-identity/SKILL.md" << 'EOF'
 ---
@@ -310,35 +365,35 @@ This skill helps manage multiple git identities seamlessly.
 - `remote-juggler switch <name>` - Switch to identity
 - `remote-juggler validate <name>` - Test SSH/API connectivity
 EOF
-    echo -e "    ${GREEN}git-identity skill created${NC}"
+    printf '    %bgit-identity skill created%b\n' "$GREEN" "$NC"
   fi
 
-  echo -e "  ${GREEN}Claude Code integration configured${NC}"
+  printf '  %bClaude Code integration configured%b\n' "$GREEN" "$NC"
 }
 
 # Configure JetBrains integration
 configure_jetbrains() {
-  local config_dir="$1"
+  config_dir="$1"
 
-  echo "  Configuring JetBrains ACP..."
+  printf '  Configuring JetBrains ACP...\n'
 
-  mkdir -p "${config_dir}"
+  mkdir -p "$config_dir"
 
-  if [[ -f "${config_dir}/acp.json" ]]; then
-    echo -e "    ${YELLOW}Existing acp.json found - checking for RemoteJuggler entry${NC}"
+  if [ -f "${config_dir}/acp.json" ]; then
+    printf '    %bExisting acp.json found - checking for RemoteJuggler entry%b\n' "$YELLOW" "$NC"
 
     # Check if RemoteJuggler is already configured
     if grep -q "RemoteJuggler" "${config_dir}/acp.json" 2>/dev/null; then
-      echo -e "    ${GREEN}RemoteJuggler already configured${NC}"
+      printf '    %bRemoteJuggler already configured%b\n' "$GREEN" "$NC"
     else
-      echo -e "    ${YELLOW}Add RemoteJuggler manually to ${config_dir}/acp.json:${NC}"
-      echo '    "RemoteJuggler": {'
-      echo '      "command": "remote-juggler",'
-      echo '      "args": ["--mode=acp"],'
-      echo '      "env": {},'
-      echo '      "use_idea_mcp": false,'
-      echo '      "use_custom_mcp": false'
-      echo '    }'
+      printf '    %bAdd RemoteJuggler manually to %s/acp.json:%b\n' "$YELLOW" "$config_dir" "$NC"
+      printf '    "RemoteJuggler": {\n'
+      printf '      "command": "remote-juggler",\n'
+      printf '      "args": ["--mode=acp"],\n'
+      printf '      "env": {},\n'
+      printf '      "use_idea_mcp": false,\n'
+      printf '      "use_custom_mcp": false\n'
+      printf '    }\n'
     fi
   else
     # Create new acp.json
@@ -355,95 +410,98 @@ configure_jetbrains() {
   }
 }
 EOF
-    echo -e "  ${GREEN}JetBrains ACP integration configured${NC}"
+    printf '  %bJetBrains ACP integration configured%b\n' "$GREEN" "$NC"
   fi
 }
 
 # Configure IDE integrations
 configure_ides() {
-  echo ""
-  echo "Configuring IDE integrations..."
+  printf '\n'
+  printf 'Configuring IDE integrations...\n'
 
   # Always configure Claude Code (create dirs if needed)
-  configure_claude "${IDE_CONFIGS[claude]}"
+  configure_claude "$HOME/.claude"
 
   # Configure JetBrains if directory exists or user has IntelliJ
-  if [[ -d "${IDE_CONFIGS[jetbrains]}" ]] || [[ -d "$HOME/Library/Application Support/JetBrains" ]]; then
-    configure_jetbrains "${IDE_CONFIGS[jetbrains]}"
+  if [ -d "$HOME/.jetbrains" ] || [ -d "$HOME/Library/Application Support/JetBrains" ]; then
+    configure_jetbrains "$HOME/.jetbrains"
   fi
 
   # Note about project-level configs
-  echo ""
-  echo -e "${BLUE}Project-level configuration:${NC}"
-  echo "  For MCP-enabled editors (VS Code, Cursor, etc.):"
-  echo "  Copy .mcp.json to your project root:"
-  echo ""
-  echo '  {
+  printf '\n'
+  printf '%bProject-level configuration:%b\n' "$BLUE" "$NC"
+  printf '  For MCP-enabled editors (VS Code, Cursor, etc.):\n'
+  printf '  Copy .mcp.json to your project root:\n'
+  printf '\n'
+  cat << 'EOF'
+  {
     "mcpServers": {
       "remote-juggler": {
         "command": "remote-juggler",
         "args": ["--mode=mcp"]
       }
     }
-  }'
+  }
+EOF
 }
 
 # Setup Darwin keychain (if applicable)
 setup_keychain() {
-  if [[ "$OS" == "darwin" ]]; then
-    echo ""
-    echo -e "${BLUE}Darwin Keychain Integration${NC}"
-    echo "  macOS detected - secure keychain storage enabled"
-    echo ""
-    echo "  Store tokens securely:"
-    echo "    ${BINARY_NAME} token set personal"
-    echo "    ${BINARY_NAME} token set work"
-    echo ""
-    echo "  Tokens are stored in macOS Keychain with service name:"
-    echo "    remote-juggler.<provider>.<identity>"
+  if [ "$OS" = "darwin" ]; then
+    printf '\n'
+    printf '%bDarwin Keychain Integration%b\n' "$BLUE" "$NC"
+    printf '  macOS detected - secure keychain storage enabled\n'
+    printf '\n'
+    printf '  Store tokens securely:\n'
+    printf '    %s token set personal\n' "$BINARY_NAME"
+    printf '    %s token set work\n' "$BINARY_NAME"
+    printf '\n'
+    printf '  Tokens are stored in macOS Keychain with service name:\n'
+    printf '    remote-juggler.<provider>.<identity>\n'
   fi
 }
 
 # Print completion message
 print_completion() {
-  echo ""
-  echo -e "${GREEN}=============================================================="
-  echo "          Installation Complete!"
-  echo "==============================================================${NC}"
-  echo ""
-  echo "Quick start:"
-  echo "  ${BINARY_NAME} list              # List configured identities"
-  echo "  ${BINARY_NAME} detect            # Detect current repo identity"
-  echo "  ${BINARY_NAME} switch <identity> # Switch identity"
-  echo ""
-  echo "Configuration:"
-  echo "  ${BINARY_NAME} config show       # View current configuration"
-  echo "  ${BINARY_NAME} config add <name> # Add new identity"
-  echo "  ${BINARY_NAME} config import     # Import from SSH config"
-  echo ""
-  echo "Credential management:"
-  echo "  ${BINARY_NAME} token set <id>    # Store in keychain (Darwin)"
-  echo "  ${BINARY_NAME} token verify      # Test all credentials"
-  echo ""
-  echo "Server modes (for AI agents):"
-  echo "  ${BINARY_NAME} --mode=mcp        # Claude Code, VS Code, Cursor"
-  echo "  ${BINARY_NAME} --mode=acp        # JetBrains IDEs"
-  echo ""
-  echo "Documentation:"
-  echo "  ${GITLAB_REPO}"
-  echo ""
+  printf '\n'
+  printf '%b==============================================================\n' "$GREEN"
+  printf '          Installation Complete!\n'
+  printf '==============================================================%b\n' "$NC"
+  printf '\n'
+  printf 'Quick start:\n'
+  printf '  %s list              # List configured identities\n' "$BINARY_NAME"
+  printf '  %s detect            # Detect current repo identity\n' "$BINARY_NAME"
+  printf '  %s switch <identity> # Switch identity\n' "$BINARY_NAME"
+  printf '\n'
+  printf 'Configuration:\n'
+  printf '  %s config show       # View current configuration\n' "$BINARY_NAME"
+  printf '  %s config add <name> # Add new identity\n' "$BINARY_NAME"
+  printf '  %s config import     # Import from SSH config\n' "$BINARY_NAME"
+  printf '\n'
+  printf 'Credential management:\n'
+  printf '  %s token set <id>    # Store in keychain (Darwin)\n' "$BINARY_NAME"
+  printf '  %s token verify      # Test all credentials\n' "$BINARY_NAME"
+  printf '\n'
+  printf 'Server modes (for AI agents):\n'
+  printf '  %s --mode=mcp        # Claude Code, VS Code, Cursor\n' "$BINARY_NAME"
+  printf '  %s --mode=acp        # JetBrains IDEs\n' "$BINARY_NAME"
+  printf '\n'
+  printf 'Documentation:\n'
+  printf '  %s\n' "$GITLAB_REPO"
+  printf '\n'
 }
 
 # Cleanup on error
 cleanup() {
-  if [[ -n "${tmp_file:-}" && -f "${tmp_file}" ]]; then
+  if [ -n "${tmp_file:-}" ] && [ -f "${tmp_file}" ]; then
     rm -f "${tmp_file}"
   fi
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 # Main installation
 main() {
+  parse_args "$@"
   detect_platform
   print_banner
   install_binary

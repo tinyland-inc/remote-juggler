@@ -1,0 +1,136 @@
+# RemoteJuggler Bazel Configuration
+#
+# This file configures Bazel for the RemoteJuggler project.
+# See MODULE.bazel for dependency configuration.
+
+# =============================================================================
+# Build Settings
+# =============================================================================
+
+# Enable Bzlmod (MODULE.bazel) - the modern Bazel dependency system
+common --enable_bzlmod
+
+# Use C++17 for C++ targets
+build --cxxopt=-std=c++17
+build --host_cxxopt=-std=c++17
+
+# Enable position independent code for shared libraries
+build --copt=-fPIC
+
+# Optimize by default
+build --compilation_mode=opt
+
+# Enable colored output
+build --color=yes
+
+# Show progress
+build --show_progress
+
+# Show test output on failure
+test --test_output=errors
+
+# =============================================================================
+# Platform Configuration
+# =============================================================================
+
+# Linux-specific settings
+build:linux --platforms=//platforms:linux_x86_64
+
+# macOS-specific settings
+build:macos --platforms=//platforms:macos_arm64
+
+# ARM64 Linux
+build:linux_arm64 --platforms=//platforms:linux_aarch64
+
+# =============================================================================
+# Rust Settings
+# =============================================================================
+
+# Rust edition
+build --@rules_rust//:extra_rustc_flags=-Zunstable-options,--edition=2021
+
+# Enable Rust LTO for release builds
+build:release --@rules_rust//:extra_rustc_flags=-Clto=thin
+
+# =============================================================================
+# Go Settings
+# =============================================================================
+
+# Go build mode
+build --@rules_go//go/config:race=false
+
+# =============================================================================
+# Test Settings
+# =============================================================================
+
+# Test timeouts
+test --test_timeout=60,300,900,3600
+
+# Test size defaults
+test --test_size_filters=small,medium
+
+# Cache test results
+test --cache_test_results=yes
+
+# =============================================================================
+# CI Settings
+# =============================================================================
+
+# Configuration for CI environments
+build:ci --color=yes
+build:ci --curses=no
+build:ci --show_progress_rate_limit=5
+build:ci --disk_cache=
+
+# Strict mode for CI
+build:ci --noremote_upload_local_results
+
+# =============================================================================
+# Development Settings
+# =============================================================================
+
+# Incremental builds for development
+build:dev --compilation_mode=fastbuild
+
+# Verbose failures
+build:dev --verbose_failures
+
+# Keep going on errors
+build:dev --keep_going
+
+# =============================================================================
+# Remote Cache (Optional)
+# =============================================================================
+
+# Uncomment and configure for remote caching
+# build --remote_cache=grpcs://cache.example.com
+
+# =============================================================================
+# Debug Settings
+# =============================================================================
+
+build:debug --compilation_mode=dbg
+build:debug --strip=never
+build:debug --copt=-g
+
+# =============================================================================
+# Sanitizers (for testing)
+# =============================================================================
+
+# Address sanitizer
+build:asan --copt=-fsanitize=address
+build:asan --linkopt=-fsanitize=address
+
+# Undefined behavior sanitizer
+build:ubsan --copt=-fsanitize=undefined
+build:ubsan --linkopt=-fsanitize=undefined
+
+# Thread sanitizer
+build:tsan --copt=-fsanitize=thread
+build:tsan --linkopt=-fsanitize=thread
+
+# =============================================================================
+# Try importing local user settings (if exists)
+# =============================================================================
+
+try-import %workspace%/.bazelrc.local

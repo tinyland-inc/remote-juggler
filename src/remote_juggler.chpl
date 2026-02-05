@@ -32,6 +32,10 @@ prototype module remote_juggler {
   include module MCP;
   include module ACP;
   include module Tools;
+  include module YubiKey;
+  include module HSM;
+  include module TrustedWorkstation;
+  include module Setup;
 
   // Public re-exports for external consumers
   public use Core;
@@ -48,6 +52,9 @@ prototype module remote_juggler {
   public use MCP;
   public use ACP;
   public use Tools;
+  public use YubiKey;
+  public use HSM;
+  public use TrustedWorkstation;
 
   // ==========================================================================
   // ANSI Color/Formatting Helpers
@@ -197,10 +204,36 @@ prototype module remote_juggler {
     writeln("    gpg verify        Check provider registration");
     writeln();
 
+    writeln("  ", bold("PIN Management (Trusted Workstation):"));
+    writeln("    pin store <n>     Store YubiKey PIN in HSM (TPM/SecureEnclave)");
+    writeln("    pin clear <n>     Remove stored PIN from HSM");
+    writeln("    pin status [n]    Check PIN storage status");
+    writeln("    security-mode <m> Set security mode: maximum_security,");
+    writeln("                      developer_workflow, trusted_workstation");
+    writeln();
+
+    writeln("  ", bold("YubiKey Management:"));
+    writeln("    yubikey info                    Show YubiKey device info");
+    writeln("    yubikey set-pin-policy <p>      Set PIN policy (once|always)");
+    writeln("    yubikey set-touch <s> <p>       Set touch policy for slot");
+    writeln("                                    Slots: sig, enc, aut");
+    writeln("                                    Policies: on, off, cached");
+    writeln("    yubikey configure-trusted       Configure for Trusted Workstation");
+    writeln("    yubikey diagnostics             Run diagnostic checks");
+    writeln();
+
+    writeln("  ", bold("Trusted Workstation Mode:"));
+    writeln("    trusted-workstation enable <n>  Enable mode for identity (prompts for PIN)");
+    writeln("    trusted-workstation disable <n> Disable mode for identity");
+    writeln("    trusted-workstation status [n]  Show current TWS status");
+    writeln("    trusted-workstation verify <n>  Verify mode is working (test sign)");
+    writeln();
+
     writeln("  ", bold("Debug:"));
     writeln("    debug ssh-config  Show parsed SSH configuration");
     writeln("    debug git-config  Show parsed gitconfig rewrites");
     writeln("    debug keychain    Test keychain access");
+    writeln("    debug hsm         Test HSM (TPM/SecureEnclave) access");
     writeln();
 
     writeln(bold("SERVER MODES:"));
@@ -1295,7 +1328,7 @@ prototype module remote_juggler {
   proc handleDebug(args: list(string)) {
     if args.size < 1 {
       printError("Missing subcommand");
-      writeln("Usage: remote-juggler debug <ssh-config|git-config|keychain>");
+      writeln("Usage: remote-juggler debug <ssh-config|git-config|keychain|hsm>");
       return;
     }
 
@@ -1305,9 +1338,10 @@ prototype module remote_juggler {
       when "ssh-config", "ssh" do handleDebugSSH();
       when "git-config", "gitconfig", "git" do handleDebugGit();
       when "keychain" do handleDebugKeychain();
+      when "hsm", "tpm", "secure-enclave" do handleDebugHSM();
       otherwise {
         printError("Unknown debug subcommand: " + subcommand);
-        writeln("Available: ssh-config, git-config, keychain");
+        writeln("Available: ssh-config, git-config, keychain, hsm");
       }
     }
   }
@@ -1476,6 +1510,11 @@ prototype module remote_juggler {
       when "token" do handleToken(subArgs);
       when "gpg" do handleGPG(subArgs);
       when "debug" do handleDebug(subArgs);
+      when "pin" do handlePin(subArgs);
+      when "security-mode" do handleSecurityMode(subArgs);
+      when "yubikey", "yk" do handleYubiKey(subArgs);
+      when "trusted-workstation", "tws" do handleTrustedWorkstationCmd(subArgs);
+      when "unseal-pin" do handleUnsealPin(subArgs);
       when "help", "--help", "-h" do printUsage();
       when "version", "--version", "-v" {
         writeln("RemoteJuggler v", Core.VERSION);
@@ -1486,5 +1525,1062 @@ prototype module remote_juggler {
         writeln("Run 'remote-juggler help' for usage information.");
       }
     }
+  }
+
+  // ==========================================================================
+  // PIN Management Command Handlers (Trusted Workstation Mode)
+  // ==========================================================================
+
+  // Handle 'pin' subcommands
+  proc handlePin(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing subcommand");
+      writeln("Usage: remote-juggler pin <store|clear|status> [identity]");
+      return;
+    }
+
+    const subcommand = args[0];
+    const subArgs = if args.size > 1 then sublist(args, 1) else new list(string);
+
+    select subcommand {
+      when "store" do handlePinStore(subArgs);
+      when "clear", "delete", "rm" do handlePinClear(subArgs);
+      when "status", "check" do handlePinStatus(subArgs);
+      otherwise {
+        printError("Unknown pin subcommand: " + subcommand);
+        writeln("Available: store, clear, status");
+      }
+    }
+  }
+
+  // HSM functions are already available via public use HSM above
+
+  proc handlePinStore(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing identity name");
+      writeln("Usage: remote-juggler pin store <identity>");
+      return;
+    }
+
+    const name = args[0];
+    printDebug("Storing PIN for: " + name);
+
+    // Check if HSM is available
+    const hsmType = hsm_detect_available();
+    if hsmType == HSM_TYPE_NONE {
+      printError("No HSM backend available");
+      writeln("Trusted Workstation mode requires:");
+      writeln("  - Linux: TPM 2.0 (/dev/tpmrm0)");
+      writeln("  - macOS: Secure Enclave (T1/T2/M1+)");
+      return;
+    }
+
+    const hsmTypeName = hsm_type_name(hsmType);
+    printInfo("Using HSM backend: " + hsmTypeName);
+
+    // Verify identity exists
+    const identity = GlobalConfig.getIdentity(name);
+    if identity.name == "" {
+      printError("Identity not found: " + name);
+      return;
+    }
+
+    // Read PIN from stdin
+    writeln("Enter YubiKey PIN for ", green(identity.name), " (input hidden):");
+    write("> ");
+
+    var pin: string;
+    if !stdin.readLine(pin) {
+      printError("Failed to read PIN");
+      return;
+    }
+    pin = pin.strip();
+
+    if pin == "" {
+      printError("PIN cannot be empty");
+      return;
+    }
+
+    if pin.size < 6 || pin.size > 127 {
+      printError("PIN must be between 6 and 127 characters");
+      return;
+    }
+
+    // Store PIN in HSM
+    const result = hsm_store_pin(name, pin, pin.size);
+
+    if result == HSM_SUCCESS {
+      printSuccess("PIN stored securely in " + hsmTypeName);
+      writeln();
+      writeln("The PIN is now sealed and can only be retrieved on this device");
+      writeln("under the same security conditions.");
+      writeln();
+      writeln("To enable trusted workstation mode, run:");
+      writeln("  remote-juggler security-mode trusted_workstation");
+    } else {
+      const errMsg = hsm_error_message(result);
+      printError("Failed to store PIN: " + errMsg);
+    }
+  }
+
+  proc handlePinClear(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing identity name");
+      writeln("Usage: remote-juggler pin clear <identity>");
+      return;
+    }
+
+    const name = args[0];
+    printDebug("Clearing PIN for: " + name);
+
+    // Check if HSM is available
+    if hsm_is_available() == 0 {
+      printError("No HSM backend available");
+      return;
+    }
+
+    // Check if PIN exists
+    if hsm_has_pin(name) == 0 {
+      printWarning("No PIN stored for identity: " + name);
+      return;
+    }
+
+    // Clear the PIN
+    const result = hsm_clear_pin(name);
+
+    if result == HSM_SUCCESS {
+      printSuccess("PIN cleared from HSM for identity: " + name);
+      writeln();
+      writeln("To store a new PIN, run:");
+      writeln("  remote-juggler pin store ", name);
+    } else {
+      const errMsg = hsm_error_message(result);
+      printError("Failed to clear PIN: " + errMsg);
+    }
+  }
+
+  proc handlePinStatus(args: list(string)) {
+    printDebug("Checking PIN status");
+
+    writeln(bold("PIN Storage Status"));
+    writeln("==================");
+    writeln();
+
+    // Check HSM availability
+    const hsmType = hsm_detect_available();
+    write("HSM Backend: ");
+    if hsmType != HSM_TYPE_NONE {
+      const hsmTypeName = hsm_type_name(hsmType);
+      writeln(green(hsmTypeName));
+    } else {
+      writeln(red("None available"));
+      writeln();
+      writeln(dim("Trusted Workstation mode requires TPM 2.0 (Linux) or Secure Enclave (macOS)"));
+      return;
+    }
+
+    writeln();
+
+    // If specific identity requested
+    if args.size > 0 {
+      const name = args[0];
+      const hasPIN = hsm_has_pin(name) != 0;
+      writeln("Identity: ", bold(name));
+      write("  PIN Stored: ");
+      if hasPIN {
+        writeln(green("Yes"));
+      } else {
+        writeln(dim("No"));
+      }
+      return;
+    }
+
+    // Show status for all identities
+    writeln("Stored PINs by Identity:");
+    const identities = Identity.listIdentities();
+    var anyStored = false;
+
+    for identity in identities {
+      const hasPIN = hsm_has_pin(identity.name) != 0;
+      write("  ", identity.name, ": ");
+      if hasPIN {
+        writeln(green("stored"));
+        anyStored = true;
+      } else {
+        writeln(dim("-"));
+      }
+    }
+
+    if !anyStored {
+      writeln();
+      writeln(dim("No PINs stored. Use 'remote-juggler pin store <identity>' to store one."));
+    }
+
+    // Show current security mode
+    writeln();
+    const settings = GlobalConfig.loadSettings();
+    writeln("Current Security Mode: ", bold(settings.defaultSecurityMode));
+
+    if settings.defaultSecurityMode == "trusted_workstation" {
+      writeln(green("  Trusted Workstation mode is active"));
+      writeln("  YubiKey PINs will be retrieved from HSM automatically");
+    } else {
+      writeln(dim("  Run 'remote-juggler security-mode trusted_workstation' to enable"));
+    }
+  }
+
+  // Handle 'security-mode' command
+  proc handleSecurityMode(args: list(string)) {
+    if args.size < 1 {
+      // Show current mode
+      const settings = GlobalConfig.loadSettings();
+      writeln(bold("Current Security Mode: "), settings.defaultSecurityMode);
+      writeln();
+      writeln("Available modes:");
+      writeln("  ", bold("maximum_security"), " - PIN required for every signing operation");
+      writeln("  ", bold("developer_workflow"), " - PIN cached by gpg-agent (default)");
+      writeln("  ", bold("trusted_workstation"), " - PIN stored in HSM, auto-retrieved");
+      writeln();
+      writeln("Change mode with: remote-juggler security-mode <mode>");
+      return;
+    }
+
+    const mode = args[0];
+
+    // Validate mode
+    if mode != "maximum_security" && mode != "developer_workflow" && mode != "trusted_workstation" {
+      printError("Invalid security mode: " + mode);
+      writeln("Valid modes: maximum_security, developer_workflow, trusted_workstation");
+      return;
+    }
+
+    // Check HSM requirement for trusted_workstation
+    if mode == "trusted_workstation" {
+      if hsm_is_available() == 0 {
+        printError("Cannot enable trusted_workstation mode: No HSM available");
+        writeln("Trusted Workstation mode requires:");
+        writeln("  - Linux: TPM 2.0 (/dev/tpmrm0)");
+        writeln("  - macOS: Secure Enclave (T1/T2/M1+)");
+        return;
+      }
+    }
+
+    // Update settings
+    const success = GlobalConfig.setSecurityMode(mode);
+
+    if success {
+      printSuccess("Security mode set to: " + mode);
+      writeln();
+
+      select mode {
+        when "maximum_security" {
+          writeln("YubiKey PIN will be required for every signing operation.");
+          writeln("This provides maximum security but requires manual PIN entry.");
+        }
+        when "developer_workflow" {
+          writeln("PIN will be cached by gpg-agent for the session.");
+          writeln("Enter PIN once, then sign multiple times without re-entry.");
+        }
+        when "trusted_workstation" {
+          writeln("PIN will be retrieved from HSM (TPM/SecureEnclave) automatically.");
+          writeln("No PIN entry required on this trusted device.");
+          writeln();
+          writeln(yellow("IMPORTANT:"), " Switching away from this mode will require");
+          writeln("re-entering the PIN. The HSM-stored PIN is not transferable.");
+          writeln();
+          writeln("Ensure PINs are stored: remote-juggler pin status");
+        }
+      }
+    } else {
+      printError("Failed to set security mode");
+    }
+  }
+
+  // Handle 'debug hsm' subcommand
+  proc handleDebugHSM() {
+    printDebug("Testing HSM access");
+
+    writeln(bold("HSM (Hardware Security Module) Status:"));
+    writeln();
+
+    // Platform detection
+    const hsmType = hsm_detect_available();
+    write("Detected HSM: ");
+
+    select hsmType {
+      when HSM_TYPE_TPM {
+        writeln(green("TPM 2.0"));
+        writeln("  Device: /dev/tpmrm0 (Linux Resource Manager)");
+        writeln("  Security: PIN sealed to PCR 7 (Secure Boot state)");
+      }
+      when HSM_TYPE_SECURE_ENCLAVE {
+        writeln(green("Apple Secure Enclave"));
+        writeln("  Hardware: T1/T2/Apple Silicon");
+        writeln("  Security: ECIES encryption with biometric/password");
+      }
+      when HSM_TYPE_KEYCHAIN {
+        writeln(yellow("Keychain (Fallback)"));
+        writeln("  Platform: System credential store");
+        writeln("  Security: Protected by login password (less secure)");
+      }
+      otherwise {
+        writeln(red("None"));
+        writeln("  No HSM backend available on this system");
+        return;
+      }
+    }
+
+    writeln();
+
+    // Test store/retrieve cycle with a test identity
+    const testIdentity = "__test_hsm__";
+    const testPin = "test123456";
+
+    write("Testing HSM operations... ");
+
+    // Store
+    var storeResult = hsm_store_pin(testIdentity, testPin, testPin.size);
+    if storeResult != HSM_SUCCESS {
+      const errMsg = hsm_error_message(storeResult);
+      writeln(red("FAILED"));
+      writeln("  Store failed: ", errMsg);
+      return;
+    }
+
+    // Retrieve
+    var (retrieveResult, retrievedPin) = hsm_retrieve_pin(testIdentity);
+
+    if retrieveResult != HSM_SUCCESS {
+      const errMsg = hsm_error_message(retrieveResult);
+      writeln(red("FAILED"));
+      writeln("  Retrieve failed: ", errMsg);
+      hsm_clear_pin(testIdentity);
+      return;
+    }
+
+    // Verify
+    var match = (retrievedPin == testPin);
+
+    // Clean up test identity
+    hsm_clear_pin(testIdentity);
+
+    if match {
+      writeln(green("OK"));
+      writeln();
+      writeln("HSM is working correctly. Trusted Workstation mode is available.");
+    } else {
+      writeln(red("FAILED"));
+      writeln("  Retrieved PIN does not match stored PIN");
+    }
+  }
+
+  // ==========================================================================
+  // YubiKey Management Command Handlers
+  // ==========================================================================
+
+  // Handle 'yubikey' subcommands
+  proc handleYubiKey(args: list(string)) {
+    if args.size < 1 {
+      // Default to info
+      handleYubiKeyInfo();
+      return;
+    }
+
+    const subcommand = args[0];
+    const subArgs = if args.size > 1 then sublist(args, 1) else new list(string);
+
+    select subcommand {
+      when "info", "status" do handleYubiKeyInfo();
+      when "set-pin-policy", "pin-policy" do handleYubiKeySetPinPolicy(subArgs);
+      when "set-touch", "touch" do handleYubiKeySetTouch(subArgs);
+      when "configure-trusted", "trusted" do handleYubiKeyConfigureTrusted();
+      when "diagnostics", "diag", "check" do handleYubiKeyDiagnostics();
+      otherwise {
+        printError("Unknown yubikey subcommand: " + subcommand);
+        writeln("Available: info, set-pin-policy, set-touch, configure-trusted, diagnostics");
+      }
+    }
+  }
+
+  proc handleYubiKeyInfo() {
+    printDebug("Showing YubiKey info");
+
+    writeln(bold("YubiKey Status"));
+    writeln("==============");
+    writeln();
+
+    // Check ykman availability
+    if !YubiKey.isYkmanAvailable() {
+      printError("ykman (YubiKey Manager) is not installed");
+      writeln();
+      writeln("Install ykman to manage YubiKey settings:");
+      writeln("  pip install yubikey-manager");
+      writeln("  brew install ykman          # macOS");
+      writeln("  apt install yubikey-manager # Debian/Ubuntu");
+      return;
+    }
+
+    const ykmanVersion = YubiKey.getYkmanVersion();
+    writeln("ykman version: ", green(ykmanVersion));
+    writeln();
+
+    // Check YubiKey connection
+    if !YubiKey.isYubiKeyConnected() {
+      printWarning("No YubiKey detected");
+      writeln();
+      writeln("Insert a YubiKey to view device information.");
+      return;
+    }
+
+    // Get comprehensive info
+    const info = YubiKey.getYubiKeyInfo();
+
+    writeln(bold("Device Information:"));
+    writeln("  Serial Number: ", green(info.serialNumber));
+    if info.firmware != "" {
+      writeln("  Firmware:      ", info.firmware);
+    }
+    if info.formFactor != "" {
+      writeln("  Form Factor:   ", info.formFactor);
+    }
+
+    writeln();
+    writeln(bold("OpenPGP Configuration:"));
+
+    // PIN policy
+    write("  Signature PIN Policy: ");
+    if info.sigPinPolicy == "once" {
+      writeln(green("once"), " (PIN cached for session)");
+    } else if info.sigPinPolicy == "always" {
+      writeln(yellow("always"), " (PIN required every time)");
+    } else {
+      writeln(dim("unknown"));
+    }
+
+    // Touch policies
+    writeln();
+    writeln("  Touch Policies:");
+    writeln("    Signature:      ", formatTouchPolicy(info.sigTouchPolicy));
+    writeln("    Encryption:     ", formatTouchPolicy(info.encTouchPolicy));
+    writeln("    Authentication: ", formatTouchPolicy(info.autTouchPolicy));
+
+    // Key slots
+    writeln();
+    writeln("  Key Slots:");
+    writeln("    Signature:      ", if info.sigKeyPresent then green("Present") else dim("Empty"));
+    writeln("    Encryption:     ", if info.encKeyPresent then green("Present") else dim("Empty"));
+    writeln("    Authentication: ", if info.autKeyPresent then green("Present") else dim("Empty"));
+
+    // PIN retries
+    if info.pinRetries > 0 {
+      writeln();
+      write("  PIN Retries: ");
+      if info.pinRetries <= 2 {
+        writeln(yellow(info.pinRetries:string), "/", info.resetRetries:string, "/", info.adminRetries:string);
+        writeln("    ", yellow("[WARNING]"), " Low PIN retries remaining!");
+      } else {
+        writeln(info.pinRetries:string, "/", info.resetRetries:string, "/", info.adminRetries:string);
+      }
+    }
+
+    // Trusted Workstation readiness
+    writeln();
+    write(bold("Trusted Workstation Ready: "));
+    if info.isTrustedWorkstationReady() {
+      writeln(green("Yes"));
+      writeln("  YubiKey is configured for optimal automation.");
+    } else {
+      writeln(yellow("No"));
+      writeln("  Recommendations for Trusted Workstation mode:");
+      if info.sigPinPolicy == "always" {
+        writeln("    - Run: remote-juggler yubikey set-pin-policy once");
+      }
+      if info.sigTouchPolicy == "on" || info.sigTouchPolicy == "fixed" {
+        writeln("    - Run: remote-juggler yubikey set-touch sig cached");
+      }
+      writeln();
+      writeln("  Or run: remote-juggler yubikey configure-trusted");
+    }
+  }
+
+  // Helper to format touch policy with colors
+  proc formatTouchPolicy(policy: string): string {
+    select policy {
+      when "off" do return green("off") + " (no touch required)";
+      when "cached" do return green("cached") + " (touch cached 15s)";
+      when "on" do return yellow("on") + " (touch every time)";
+      when "fixed" do return red("fixed") + " (cannot be changed)";
+      otherwise do return dim("unknown");
+    }
+  }
+
+  proc handleYubiKeySetPinPolicy(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing policy argument");
+      writeln("Usage: remote-juggler yubikey set-pin-policy <once|always>");
+      writeln();
+      writeln("Policies:");
+      writeln("  once   - PIN required once per session (recommended)");
+      writeln("  always - PIN required for every signature");
+      return;
+    }
+
+    const policy = args[0];
+    printDebug("Setting PIN policy to: " + policy);
+
+    if policy != "once" && policy != "always" {
+      printError("Invalid policy: " + policy);
+      writeln("Valid policies: once, always");
+      return;
+    }
+
+    // Check prerequisites
+    if !YubiKey.isYkmanAvailable() {
+      printError("ykman is not installed");
+      return;
+    }
+
+    if !YubiKey.isYubiKeyConnected() {
+      printError("No YubiKey connected");
+      return;
+    }
+
+    writeln("Setting signature PIN policy to '", bold(policy), "'...");
+    writeln();
+    writeln(yellow("Note:"), " This operation requires the admin PIN.");
+    writeln();
+
+    const success = YubiKey.setSignaturePinPolicy(policy);
+
+    if success {
+      printSuccess("PIN policy set to '" + policy + "'");
+
+      if policy == "once" {
+        writeln();
+        writeln("The YubiKey will now cache the PIN for the session.");
+        writeln("Enter PIN once, then sign multiple times without re-entry.");
+      }
+    } else {
+      printError("Failed to set PIN policy");
+      writeln();
+      writeln("Possible causes:");
+      writeln("  - Admin PIN was incorrect");
+      writeln("  - YubiKey firmware doesn't support this feature");
+      writeln("  - YubiKey is in a locked state");
+    }
+  }
+
+  proc handleYubiKeySetTouch(args: list(string)) {
+    if args.size < 2 {
+      printError("Missing arguments");
+      writeln("Usage: remote-juggler yubikey set-touch <slot> <policy>");
+      writeln();
+      writeln("Slots:");
+      writeln("  sig - Signature key");
+      writeln("  enc - Encryption key");
+      writeln("  aut - Authentication key");
+      writeln();
+      writeln("Policies:");
+      writeln("  on     - Touch required for every operation");
+      writeln("  off    - Touch never required");
+      writeln("  cached - Touch cached for 15 seconds (recommended)");
+      return;
+    }
+
+    const slot = args[0];
+    const policy = args[1];
+    printDebug("Setting touch policy for " + slot + " to: " + policy);
+
+    // Validate slot
+    if slot != "sig" && slot != "enc" && slot != "aut" {
+      printError("Invalid slot: " + slot);
+      writeln("Valid slots: sig, enc, aut");
+      return;
+    }
+
+    // Validate policy
+    if policy != "on" && policy != "off" && policy != "cached" {
+      printError("Invalid policy: " + policy);
+      writeln("Valid policies: on, off, cached");
+      return;
+    }
+
+    // Check prerequisites
+    if !YubiKey.isYkmanAvailable() {
+      printError("ykman is not installed");
+      return;
+    }
+
+    if !YubiKey.isYubiKeyConnected() {
+      printError("No YubiKey connected");
+      return;
+    }
+
+    // Get current info to check if slot has a key
+    const info = YubiKey.getYubiKeyInfo();
+    var hasKey = false;
+    select slot {
+      when "sig" do hasKey = info.sigKeyPresent;
+      when "enc" do hasKey = info.encKeyPresent;
+      when "aut" do hasKey = info.autKeyPresent;
+    }
+
+    if !hasKey {
+      printWarning("No key present in " + slot + " slot");
+      writeln("Touch policy only applies when a key is loaded.");
+      writeln();
+    }
+
+    writeln("Setting touch policy for '", bold(slot), "' to '", bold(policy), "'...");
+    writeln();
+    writeln(yellow("Note:"), " This operation requires the admin PIN.");
+    writeln();
+
+    const success = YubiKey.setTouchPolicy(slot, policy);
+
+    if success {
+      printSuccess("Touch policy for '" + slot + "' set to '" + policy + "'");
+
+      select policy {
+        when "cached" {
+          writeln();
+          writeln("Touch will be required once, then cached for 15 seconds.");
+          writeln("This allows multiple operations without repeated touches.");
+        }
+        when "off" {
+          writeln();
+          writeln(yellow("Warning:"), " Disabling touch removes a security layer.");
+          writeln("Consider using 'cached' for a balance of security and convenience.");
+        }
+      }
+    } else {
+      printError("Failed to set touch policy");
+      writeln();
+      writeln("Possible causes:");
+      writeln("  - Admin PIN was incorrect");
+      writeln("  - Touch policy is 'fixed' and cannot be changed");
+      writeln("  - YubiKey firmware doesn't support this feature");
+    }
+  }
+
+  proc handleYubiKeyConfigureTrusted() {
+    printDebug("Configuring YubiKey for Trusted Workstation mode");
+
+    writeln(bold("Configuring YubiKey for Trusted Workstation Mode"));
+    writeln("=================================================");
+    writeln();
+
+    // Check prerequisites
+    if !YubiKey.isYkmanAvailable() {
+      printError("ykman is not installed");
+      return;
+    }
+
+    if !YubiKey.isYubiKeyConnected() {
+      printError("No YubiKey connected");
+      return;
+    }
+
+    // Get current info
+    const infoBefore = YubiKey.getYubiKeyInfo();
+
+    writeln("Current configuration:");
+    writeln("  PIN Policy:   ", if infoBefore.sigPinPolicy != "" then infoBefore.sigPinPolicy else "unknown");
+    writeln("  Touch Policy: ", if infoBefore.sigTouchPolicy != "" then infoBefore.sigTouchPolicy else "unknown");
+    writeln();
+
+    if infoBefore.isTrustedWorkstationReady() {
+      printInfo("YubiKey is already configured for Trusted Workstation mode");
+      return;
+    }
+
+    writeln("This will configure:");
+    writeln("  - PIN Policy:   once (PIN cached for session)");
+    writeln("  - Touch Policy: cached (touch cached for 15 seconds)");
+    writeln();
+    writeln(yellow("Note:"), " This operation requires the admin PIN.");
+    writeln();
+
+    // Perform configuration
+    const (success, message) = YubiKey.configureForTrustedWorkstation();
+
+    writeln();
+    if success {
+      printSuccess("YubiKey configured for Trusted Workstation mode");
+      writeln();
+      writeln("Configuration details: ", message);
+      writeln();
+      writeln("Next steps:");
+      writeln("  1. Store your PIN securely: remote-juggler pin store <identity>");
+      writeln("  2. Enable Trusted Workstation mode: remote-juggler security-mode trusted_workstation");
+    } else {
+      printError("Configuration partially failed");
+      writeln("Details: ", message);
+      writeln();
+      writeln("Try configuring individual settings:");
+      writeln("  remote-juggler yubikey set-pin-policy once");
+      writeln("  remote-juggler yubikey set-touch sig cached");
+    }
+  }
+
+  proc handleYubiKeyDiagnostics() {
+    printDebug("Running YubiKey diagnostics");
+
+    writeln(bold("YubiKey Diagnostics"));
+    writeln("===================");
+    writeln();
+
+    const results = YubiKey.runDiagnostics();
+
+    for result in results {
+      if result.startsWith("[OK]") {
+        writeln(green("[OK]"), result[4..]);
+      } else if result.startsWith("[FAIL]") {
+        writeln(red("[FAIL]"), result[6..]);
+      } else if result.startsWith("[WARN]") {
+        writeln(yellow("[WARN]"), result[6..]);
+      } else if result.startsWith("[INFO]") {
+        writeln(cyan("[INFO]"), result[6..]);
+      } else {
+        writeln(result);
+      }
+    }
+
+    writeln();
+
+    // Check if ykman is available for additional recommendations
+    if YubiKey.isYkmanAvailable() && YubiKey.isYubiKeyConnected() {
+      const info = YubiKey.getYubiKeyInfo();
+
+      if info.isTrustedWorkstationReady() {
+        writeln(bold("Summary: "), green("YubiKey is ready for Trusted Workstation mode"));
+      } else {
+        writeln(bold("Summary: "), yellow("YubiKey needs configuration for optimal automation"));
+        writeln();
+        writeln("Run 'remote-juggler yubikey configure-trusted' to configure automatically.");
+      }
+    }
+  }
+
+  // ==========================================================================
+  // Trusted Workstation Orchestration Command Handlers
+  // ==========================================================================
+
+  // Handle 'trusted-workstation' subcommands
+  proc handleTrustedWorkstationCmd(args: list(string)) {
+    if args.size < 1 {
+      // Default to status
+      handleTrustedWorkstationStatus(emptyArgs());
+      return;
+    }
+
+    const subcommand = args[0];
+    const subArgs = if args.size > 1 then sublist(args, 1) else new list(string);
+
+    select subcommand {
+      when "enable" do handleTrustedWorkstationEnable(subArgs);
+      when "disable" do handleTrustedWorkstationDisable(subArgs);
+      when "status" do handleTrustedWorkstationStatus(subArgs);
+      when "verify" do handleTrustedWorkstationVerify(subArgs);
+      otherwise {
+        printError("Unknown trusted-workstation subcommand: " + subcommand);
+        writeln("Available: enable, disable, status, verify");
+      }
+    }
+  }
+
+  proc handleTrustedWorkstationEnable(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing identity name");
+      writeln("Usage: remote-juggler trusted-workstation enable <identity>");
+      return;
+    }
+
+    const name = args[0];
+    printDebug("Enabling Trusted Workstation for: " + name);
+
+    // Check if identity exists
+    const identity = GlobalConfig.getIdentity(name);
+    if identity.name == "" {
+      printError("Identity not found: " + name);
+      return;
+    }
+
+    writeln(bold("Enabling Trusted Workstation Mode"));
+    writeln("==================================");
+    writeln();
+    writeln("Identity: ", green(name));
+    writeln();
+
+    // Check prerequisites
+    writeln("Checking prerequisites...");
+    const prereqs = TrustedWorkstation.checkPrerequisites(name);
+
+    if !prereqs.allMet {
+      writeln();
+      printError("Prerequisites not met:");
+      for issue in prereqs.issues {
+        writeln("  - ", red(issue));
+      }
+      return;
+    }
+
+    // Show warnings
+    for warning in prereqs.warnings {
+      printWarning(warning);
+    }
+
+    writeln(green("[OK]"), " All prerequisites met");
+    writeln();
+
+    // Prompt for PIN
+    writeln("Enter YubiKey PIN for ", green(name), " (input hidden):");
+    write("> ");
+
+    var pin: string;
+    if !stdin.readLine(pin) {
+      printError("Failed to read PIN");
+      return;
+    }
+    pin = pin.strip();
+
+    if pin == "" {
+      printError("PIN cannot be empty");
+      return;
+    }
+
+    writeln();
+    writeln("Enabling Trusted Workstation mode...");
+    writeln();
+
+    // Use the TrustedWorkstation module to enable
+    const result = TrustedWorkstation.enableTrustedWorkstation(name, pin);
+
+    // Clear PIN from memory
+    pin = "";
+
+    if result.success {
+      printSuccess(result.message);
+      writeln();
+      writeln("Trusted Workstation mode is now active.");
+      writeln();
+      writeln("What this means:");
+      writeln("  - YubiKey PIN is stored securely in HSM (TPM/SecureEnclave)");
+      writeln("  - gpg-agent is configured to use custom pinentry");
+      writeln("  - PIN will be auto-retrieved during signing operations");
+      writeln("  - YubiKey PIN policy set to 'once' (if ykman available)");
+      writeln();
+      writeln("To verify: remote-juggler trusted-workstation verify ", name);
+      writeln("To disable: remote-juggler trusted-workstation disable ", name);
+    } else {
+      printError("Failed to enable Trusted Workstation mode");
+      writeln("Error: ", result.message);
+    }
+  }
+
+  proc handleTrustedWorkstationDisable(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing identity name");
+      writeln("Usage: remote-juggler trusted-workstation disable <identity>");
+      return;
+    }
+
+    const name = args[0];
+    printDebug("Disabling Trusted Workstation for: " + name);
+
+    // Check if identity exists
+    const identity = GlobalConfig.getIdentity(name);
+    if identity.name == "" {
+      printError("Identity not found: " + name);
+      return;
+    }
+
+    writeln(bold("Disabling Trusted Workstation Mode"));
+    writeln("===================================");
+    writeln();
+    writeln("Identity: ", yellow(name));
+    writeln();
+
+    // Confirm action
+    writeln(yellow("Warning:"), " This will:");
+    writeln("  - Remove PIN from HSM storage");
+    writeln("  - Restore original gpg-agent configuration");
+    writeln("  - Reset YubiKey PIN policy to 'always' (if ykman available)");
+    writeln();
+    writeln("You will need to re-enter your PIN for signing operations.");
+    writeln();
+
+    // Disable
+    const result = TrustedWorkstation.disableTrustedWorkstation(name);
+
+    if result.success {
+      printSuccess(result.message);
+      writeln();
+      writeln("Trusted Workstation mode has been disabled.");
+      writeln("You will be prompted for your PIN during signing operations.");
+    } else {
+      printError("Failed to disable Trusted Workstation mode");
+      writeln("Error: ", result.message);
+    }
+  }
+
+  proc handleTrustedWorkstationStatus(args: list(string)) {
+    printDebug("Checking Trusted Workstation status");
+
+    const identity = if args.size > 0 then args[0] else "";
+    const status = TrustedWorkstation.getTrustedWorkstationStatus(identity);
+
+    writeln(bold("Trusted Workstation Status"));
+    writeln("===========================");
+    writeln();
+
+    // Mode status
+    write("Mode: ");
+    if status.enabled {
+      writeln(green("ENABLED"));
+    } else {
+      writeln(dim("DISABLED"));
+    }
+
+    if status.identity != "" {
+      writeln("Identity: ", bold(status.identity));
+    }
+
+    writeln();
+
+    // HSM status
+    writeln(bold("Hardware Security Module:"));
+    write("  Available: ");
+    if status.hsmAvailable {
+      writeln(green("Yes"), " (", status.hsmType, ")");
+    } else {
+      writeln(red("No"));
+    }
+
+    write("  PIN Stored: ");
+    if status.pinStored {
+      writeln(green("Yes"));
+    } else {
+      writeln(dim("No"));
+    }
+
+    writeln();
+
+    // gpg-agent status
+    writeln(bold("GPG Agent:"));
+    write("  Running: ");
+    if status.gpgAgentRunning {
+      writeln(green("Yes"));
+    } else {
+      writeln(red("No"));
+    }
+
+    write("  Custom Pinentry: ");
+    if status.pinentryConfigured {
+      writeln(green("Configured"));
+    } else {
+      writeln(dim("Not configured"));
+    }
+
+    if status.gpgAgentConfigured {
+      writeln("  Pinentry Path: ", dim(status.pinentryPath));
+    }
+
+    writeln();
+
+    // YubiKey status
+    writeln(bold("YubiKey:"));
+    write("  ykman Available: ");
+    if status.ykmanAvailable {
+      writeln(green("Yes"));
+    } else {
+      writeln(yellow("No"), " (optional)");
+    }
+
+    if status.ykmanAvailable {
+      write("  YubiKey Connected: ");
+      if status.yubiKeyConnected {
+        writeln(green("Yes"));
+        if status.yubiKeyPinPolicy != "" {
+          writeln("  PIN Policy: ", bold(status.yubiKeyPinPolicy));
+        }
+      } else {
+        writeln(yellow("No"));
+      }
+    }
+
+    // Show missing prerequisites
+    const missing = status.getMissingPrerequisites();
+    if missing.size > 0 {
+      writeln();
+      writeln(yellow("Issues:"));
+      for issue in missing {
+        writeln("  - ", issue);
+      }
+    }
+
+    // Recommendations
+    if !status.enabled && status.hasPrerequisites() {
+      writeln();
+      writeln("To enable Trusted Workstation mode:");
+      writeln("  remote-juggler trusted-workstation enable <identity>");
+    }
+  }
+
+  proc handleTrustedWorkstationVerify(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing identity name");
+      writeln("Usage: remote-juggler trusted-workstation verify <identity>");
+      return;
+    }
+
+    const name = args[0];
+    printDebug("Verifying Trusted Workstation for: " + name);
+
+    writeln(bold("Verifying Trusted Workstation"));
+    writeln("==============================");
+    writeln();
+    writeln("Identity: ", green(name));
+    writeln();
+
+    writeln("Testing GPG signing...");
+    const result = TrustedWorkstation.verifyTrustedWorkstation(name);
+
+    writeln();
+    if result.success {
+      printSuccess(result.message);
+      writeln();
+      writeln("Trusted Workstation is working correctly.");
+      writeln("GPG signing operations will automatically retrieve the PIN.");
+    } else {
+      printError("Verification failed");
+      writeln("Error: ", result.message);
+      writeln();
+      writeln("Troubleshooting:");
+      writeln("  - Check YubiKey is connected");
+      writeln("  - Verify PIN is stored: remote-juggler pin status ", name);
+      writeln("  - Check gpg-agent: remote-juggler trusted-workstation status");
+    }
+  }
+
+  // Handle 'unseal-pin' command (used by pinentry-remotejuggler.py)
+  proc handleUnsealPin(args: list(string)) {
+    if args.size < 1 {
+      // Silent failure for pinentry compatibility
+      halt(1);
+    }
+
+    const name = args[0];
+    printDebug("Unsealing PIN for: " + name);
+
+    // This command outputs PIN to stdout for pinentry to capture
+    // No other output should go to stdout
+    const result = TrustedWorkstation.unsealPinForPinentry(name);
+
+    if !result.success {
+      // Exit with error code, no output
+      halt(1);
+    }
+    // Success - PIN was written to stdout by unsealPinForPinentry
   }
 }

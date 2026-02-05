@@ -1,0 +1,104 @@
+# RemoteJuggler Root BUILD File
+#
+# This file defines top-level build targets and filegroups.
+# Individual components have their own BUILD.bazel files.
+#
+# Build commands:
+#   bazelisk build //...              - Build all targets
+#   bazelisk build //gtk-gui:all      - Build GTK GUI only
+#   bazelisk build //pinentry:all     - Build HSM library only
+#   bazelisk test //...               - Run all tests
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
+
+# =============================================================================
+# Package Visibility
+# =============================================================================
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Build Flags
+# =============================================================================
+
+# Flag to enable TPM support (Linux only)
+bool_flag(
+    name = "enable_tpm",
+    build_setting_default = True,
+)
+
+# Flag to enable Secure Enclave support (macOS only)
+bool_flag(
+    name = "enable_secure_enclave",
+    build_setting_default = True,
+)
+
+# =============================================================================
+# Filegroups
+# =============================================================================
+
+# All source files (for formatting checks)
+filegroup(
+    name = "all_sources",
+    srcs = glob([
+        "src/**/*.chpl",
+        "gtk-gui/src/**/*.rs",
+        "tray/linux/**/*.go",
+        "tray/darwin/Sources/**/*.swift",
+        "pinentry/**/*.c",
+        "pinentry/**/*.h",
+        "test/**/*.py",
+    ]),
+)
+
+# Configuration files
+filegroup(
+    name = "config_files",
+    srcs = [
+        ".bazelrc",
+        "MODULE.bazel",
+        "justfile",
+        "flake.nix",
+        "Makefile",
+    ],
+)
+
+# Documentation
+filegroup(
+    name = "docs",
+    srcs = glob([
+        "docs/**/*.md",
+        "*.md",
+    ]),
+)
+
+# Test fixtures
+filegroup(
+    name = "test_fixtures",
+    srcs = glob([
+        "test/fixtures/**/*",
+    ]),
+)
+
+# =============================================================================
+# Alias Targets
+# =============================================================================
+
+# Convenience aliases for common targets
+alias(
+    name = "gui",
+    actual = "//gtk-gui:remote-juggler-gui",
+)
+
+alias(
+    name = "hsm",
+    actual = "//pinentry:libhsm_remotejuggler",
+)
+
+alias(
+    name = "tray-linux",
+    actual = "//tray/linux:remote-juggler-tray",
+)
+
+# Note: Chapel CLI is built via Nix, not Bazel
+# Use: nix build .#remote-juggler

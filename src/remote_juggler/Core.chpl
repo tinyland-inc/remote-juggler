@@ -200,6 +200,15 @@ prototype module Core {
     :var autoSignoff: Add Signed-off-by trailer to commits
     :var hardwareKey: Whether key is on hardware token (YubiKey)
     :var touchPolicy: Touch policy for signing ("on", "cached", "off")
+    :var securityMode: Security mode for PIN handling:
+        - "maximum_security": PIN required for every operation (default YubiKey behavior)
+        - "developer_workflow": PIN cached for session (default)
+        - "trusted_workstation": PIN stored in TPM/SecureEnclave
+    :var pinStorageMethod: Where PIN is stored for trusted_workstation mode:
+        - "tpm": Linux TPM 2.0
+        - "secure_enclave": macOS Secure Enclave
+        - "keychain": System keychain (fallback)
+        - "none": No storage (auto-detected if empty)
   */
   record GPGConfig {
     var keyId: string = "";
@@ -210,6 +219,8 @@ prototype module Core {
     var autoSignoff: bool = false;
     var hardwareKey: bool = false;
     var touchPolicy: string = "";
+    var securityMode: string = "developer_workflow";
+    var pinStorageMethod: string = "";
 
     /*
       Initialize with default values.
@@ -223,6 +234,8 @@ prototype module Core {
       this.autoSignoff = false;
       this.hardwareKey = false;
       this.touchPolicy = "";
+      this.securityMode = "developer_workflow";
+      this.pinStorageMethod = "";
     }
 
     /*
@@ -243,6 +256,8 @@ prototype module Core {
       this.autoSignoff = autoSignoff;
       this.hardwareKey = false;
       this.touchPolicy = "";
+      this.securityMode = "developer_workflow";
+      this.pinStorageMethod = "";
     }
 
     /*
@@ -255,10 +270,14 @@ prototype module Core {
       :arg signTags: Enable tag signing
       :arg hardwareKey: Whether key is on hardware token
       :arg touchPolicy: Touch policy for signing
+      :arg securityMode: Security mode for PIN handling
+      :arg pinStorageMethod: PIN storage method for trusted_workstation
     */
     proc init(keyId: string, format: string, sshKeyPath: string,
               signCommits: bool = false, signTags: bool = false,
-              hardwareKey: bool = false, touchPolicy: string = "") {
+              hardwareKey: bool = false, touchPolicy: string = "",
+              securityMode: string = "developer_workflow",
+              pinStorageMethod: string = "") {
       this.keyId = keyId;
       this.format = format;
       this.sshKeyPath = sshKeyPath;
@@ -267,6 +286,8 @@ prototype module Core {
       this.autoSignoff = false;
       this.hardwareKey = hardwareKey;
       this.touchPolicy = touchPolicy;
+      this.securityMode = securityMode;
+      this.pinStorageMethod = pinStorageMethod;
     }
 
     /*
@@ -315,6 +336,37 @@ prototype module Core {
         return sshKeyPath;
       }
       return keyId;
+    }
+
+    /*
+      Check if security mode is valid.
+
+      :returns: true if securityMode is a recognized value
+    */
+    proc isValidSecurityMode(): bool {
+      return securityMode == "maximum_security" ||
+             securityMode == "developer_workflow" ||
+             securityMode == "trusted_workstation";
+    }
+
+    /*
+      Check if trusted workstation mode is enabled.
+
+      :returns: true if securityMode is "trusted_workstation"
+    */
+    proc isTrustedWorkstation(): bool {
+      return securityMode == "trusted_workstation";
+    }
+
+    /*
+      Check if PIN storage is configured.
+
+      :returns: true if pinStorageMethod is set and valid
+    */
+    proc hasPinStorage(): bool {
+      return pinStorageMethod == "tpm" ||
+             pinStorageMethod == "secure_enclave" ||
+             pinStorageMethod == "keychain";
     }
   }
 

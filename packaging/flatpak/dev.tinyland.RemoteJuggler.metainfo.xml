@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.tinyland.RemoteJuggler</id>
+
+  <name>RemoteJuggler</name>
+  <summary>Git identity manager for multi-account workflows</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Zlib</project_license>
+
+  <description>
+    <p>
+      RemoteJuggler seamlessly manages multiple git identities across different
+      hosting providers (GitLab, GitHub, Bitbucket) with automatic SSH key
+      selection, GPG signing, and credential resolution.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Auto-detect identity from repository remote URL</li>
+      <li>SSH host alias management for multi-account setups</li>
+      <li>GPG commit signing with hardware key support (YubiKey)</li>
+      <li>Trusted Workstation mode with TPM/Secure Enclave PIN storage</li>
+      <li>MCP server for AI agent integration</li>
+      <li>System tray app for quick identity switching</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">dev.tinyland.RemoteJuggler.desktop</launchable>
+
+  <url type="homepage">https://remote-juggler.dev</url>
+  <url type="bugtracker">https://gitlab.com/tinyland/remote-juggler/-/issues</url>
+  <url type="help">https://remote-juggler.dev/docs</url>
+  <url type="vcs-browser">https://gitlab.com/tinyland/remote-juggler</url>
+
+  <developer_name>Tinyland</developer_name>
+
+  <provides>
+    <binary>remote-juggler</binary>
+    <binary>remote-juggler-gui</binary>
+    <binary>remote-juggler-tray</binary>
+    <binary>pinentry-remotejuggler</binary>
+  </provides>
+
+  <categories>
+    <category>Development</category>
+    <category>Utility</category>
+  </categories>
+
+  <keywords>
+    <keyword>git</keyword>
+    <keyword>ssh</keyword>
+    <keyword>gpg</keyword>
+    <keyword>identity</keyword>
+    <keyword>gitlab</keyword>
+    <keyword>github</keyword>
+    <keyword>yubikey</keyword>
+    <keyword>tpm</keyword>
+    <keyword>mcp</keyword>
+  </keywords>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>RemoteJuggler GUI showing identity configuration</caption>
+      <image>https://remote-juggler.dev/screenshots/gui-main.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>System tray menu for quick identity switching</caption>
+      <image>https://remote-juggler.dev/screenshots/tray-menu.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Terminal showing identity switch operation</caption>
+      <image>https://remote-juggler.dev/screenshots/cli-switch.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="2.0.0" date="2026-02-01">
+      <description>
+        <p>Major release with hardware security support:</p>
+        <ul>
+          <li>TPM 2.0 support for Linux PIN storage</li>
+          <li>Secure Enclave support for macOS</li>
+          <li>MCP server for AI agent integration</li>
+          <li>First-time setup wizard</li>
+          <li>Bazel build system for multi-language components</li>
+        </ul>
+      </description>
+    </release>
+    <release version="1.5.0" date="2025-09-15">
+      <description>
+        <p>Added GTK4 GUI and system tray applications.</p>
+      </description>
+    </release>
+    <release version="1.0.0" date="2025-06-01">
+      <description>
+        <p>Initial stable release with SSH and GPG support.</p>
+      </description>
+    </release>
+  </releases>
+
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>console</control>
+  </supports>
+</component>

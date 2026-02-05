@@ -4,6 +4,14 @@ target/
 *.o
 *.so
 *.dylib
+/remote_juggler
+result
+
+# Pinentry test binary
+pinentry/test_hsm
+
+# Tray binaries
+tray/linux/linux
 
 # Mason (Chapel package manager)
 .mason/
@@ -53,7 +61,18 @@ chplcheck-report.txt
 # Environment/secrets
 .env
 .env.*
+.env.local
+.envrc.local
 !.env.example
+
+# Credential files (protected by global hooks)
+credentials.json
+secrets.json
+*_secret*
+*_token*
+*_key.json
+id_rsa
+id_ed25519
 
 # Chapel linting cache
 .chplcheck/
@@ -64,6 +83,14 @@ uv.lock
 __pycache__/
 *.pyc
 
+# Nix/direnv
+.direnv/
+result
+result-*
+
+# Node (if any tooling uses it)
+node_modules/
+
 # Internal planning docs
 PLAN.md
 IMPLEMENTATION_PLAN.md
@@ -71,5 +98,9 @@ IMPLEMENTATION_PLAN.md
 # GitHub Actions workflows are now enabled for mirrored CI
 # .github/
 
-# Claude Code
+# Claude Code (never commit)
 .claude/
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+**/CLAUDE.local.md

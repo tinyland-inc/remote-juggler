@@ -1,0 +1,18 @@
+# RemoteJuggler Tray Applications BUILD File
+#
+# Parent package for platform-specific tray implementations.
+# See tray/linux/BUILD.bazel and tray/darwin/BUILD.bazel for actual targets.
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Filegroups
+# =============================================================================
+
+filegroup(
+    name = "all_sources",
+    srcs = [
+        "//tray/darwin:all",
+        "//tray/linux:all",
+    ],
+)

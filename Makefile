@@ -3,7 +3,8 @@
 
 .PHONY: all build release test lint check clean deps install install-dev \
         uninstall install-completions install-claude install-mcp \
-        mcp acp help info
+        mcp acp help info hsm hsm-clean \
+        test-integration test-integration-tws test-integration-tws-tap test-all
 
 # Installation paths
 PREFIX ?= $(HOME)/.local
@@ -27,32 +28,103 @@ MASON_TARGET = target/release/remote_juggler
 # Note: prototype modules are used in the code for this purpose
 CHPL_FLAGS = -M src/remote_juggler
 
-# Platform-specific linker flags for macOS Security.framework
+# Platform detection
 UNAME_S := $(shell uname -s)
+
+# =============================================================================
+# HSM Library Configuration
+# =============================================================================
+
+# HSM library paths
+HSM_DIR = pinentry
+HSM_HEADER = $(HSM_DIR)/hsm.h
+ifeq ($(UNAME_S),Darwin)
+  HSM_LIB = $(HSM_DIR)/libhsm_remotejuggler.dylib
+  HSM_LIB_EXT = dylib
+else
+  HSM_LIB = $(HSM_DIR)/libhsm_remotejuggler.so
+  HSM_LIB_EXT = so
+endif
+
+# Check if HSM library exists (for conditional linking)
+HSM_EXISTS := $(shell test -f $(HSM_LIB) && echo yes || echo no)
+
+# HSM-related Chapel flags
+# -I for header include path, -L for library path, -l for library name
+HSM_CHPL_FLAGS = --ccflags="-I$(CURDIR)/$(HSM_DIR)"
+HSM_LINK_FLAGS = --ldflags="-L$(CURDIR)/$(HSM_DIR) -lhsm_remotejuggler -Wl,-rpath,$(CURDIR)/$(HSM_DIR)"
+
+# Platform-specific linker flags for macOS Security.framework
 ifeq ($(UNAME_S),Darwin)
   CHPL_LDFLAGS = --ldflags="-framework Security -framework CoreFoundation"
+  # macOS needs additional flags for HSM library
+  HSM_LINK_FLAGS += --ldflags="-framework Security -framework CoreFoundation"
 else
   CHPL_LDFLAGS =
+  # Linux may need TPM2-TSS libraries if available
+  TPM_AVAILABLE := $(shell pkg-config --exists tss2-esys 2>/dev/null && echo yes || echo no)
+  ifeq ($(TPM_AVAILABLE),yes)
+    HSM_LINK_FLAGS += --ldflags="$(shell pkg-config --libs tss2-esys tss2-rc tss2-tctildr)"
+  endif
+endif
+
+# Combine HSM flags when library is available
+ifeq ($(HSM_EXISTS),yes)
+  CHPL_HSM_FLAGS = $(HSM_CHPL_FLAGS) $(HSM_LINK_FLAGS) -sHSM_NATIVE_AVAILABLE=true
+else
+  CHPL_HSM_FLAGS = -sHSM_NATIVE_AVAILABLE=false
 endif
 
 # Default target
 all: lint build test
 
 # =============================================================================
+# HSM Library Target
+# =============================================================================
+
+# Build HSM library (optional - build continues without it)
+hsm:
+	@echo "Building HSM library..."
+	@$(MAKE) -C $(HSM_DIR) all || { \
+		echo ""; \
+		echo "WARNING: HSM library build failed or TPM2-TSS not available."; \
+		echo "         Building without native HSM support (stub mode)."; \
+		echo ""; \
+	}
+
+# Clean HSM library artifacts
+hsm-clean:
+	@$(MAKE) -C $(HSM_DIR) clean
+
+# =============================================================================
 # Build Targets
 # =============================================================================
 
-# Build debug version
-build:
+# Build debug version (with HSM if available)
+build: hsm
 	@echo "Building RemoteJuggler (debug)..."
 	@mkdir -p target/debug
-	@chpl $(CHPL_FLAGS) $(CHPL_LDFLAGS) -o target/debug/$(BINARY) src/remote_juggler.chpl
+	$(eval HSM_EXISTS := $(shell test -f $(HSM_LIB) && echo yes || echo no))
+	$(eval CHPL_HSM_FLAGS := $(if $(filter yes,$(HSM_EXISTS)),$(HSM_CHPL_FLAGS) $(HSM_LINK_FLAGS) -sHSM_NATIVE_AVAILABLE=true,-sHSM_NATIVE_AVAILABLE=false))
+	@if [ "$(HSM_EXISTS)" = "yes" ]; then \
+		echo "  [HSM] Native HSM library found, linking..."; \
+	else \
+		echo "  [HSM] Native HSM library not found, using stub implementation..."; \
+	fi
+	@chpl $(CHPL_FLAGS) $(CHPL_HSM_FLAGS) $(CHPL_LDFLAGS) -o target/debug/$(BINARY) src/remote_juggler.chpl
 
-# Build release version (optimized)
-release:
+# Build release version (optimized, with HSM if available)
+release: hsm
 	@echo "Building RemoteJuggler (release)..."
 	@mkdir -p target/release
-	@chpl $(CHPL_FLAGS) $(CHPL_LDFLAGS) --fast -o $(MASON_TARGET) src/remote_juggler.chpl
+	$(eval HSM_EXISTS := $(shell test -f $(HSM_LIB) && echo yes || echo no))
+	$(eval CHPL_HSM_FLAGS := $(if $(filter yes,$(HSM_EXISTS)),$(HSM_CHPL_FLAGS) $(HSM_LINK_FLAGS) -sHSM_NATIVE_AVAILABLE=true,-sHSM_NATIVE_AVAILABLE=false))
+	@if [ "$(HSM_EXISTS)" = "yes" ]; then \
+		echo "  [HSM] Native HSM library found, linking..."; \
+	else \
+		echo "  [HSM] Native HSM library not found, using stub implementation..."; \
+	fi
+	@chpl $(CHPL_FLAGS) $(CHPL_HSM_FLAGS) $(CHPL_LDFLAGS) --fast -o $(MASON_TARGET) src/remote_juggler.chpl
 
 # =============================================================================
 # Test & Lint Targets
@@ -70,6 +142,21 @@ lint:
 
 # Run both lint and test
 check: lint test
+
+# Run integration tests for Trusted Workstation
+test-integration-tws: build
+	@echo "Running Trusted Workstation integration tests..."
+	@./test/integration/test_trusted_workstation.sh --binary target/debug/$(BINARY)
+
+# Run integration tests with TAP output (for CI)
+test-integration-tws-tap: build
+	@./test/integration/test_trusted_workstation.sh --binary target/debug/$(BINARY) --tap
+
+# Run all integration tests
+test-integration: test-integration-tws
+
+# Run all tests (unit + integration)
+test-all: test test-integration
 
 # =============================================================================
 # Installation Targets
@@ -178,7 +265,7 @@ deps:
 	@mason update || echo "Mason update skipped"
 
 # Clean build artifacts
-clean:
+clean: hsm-clean
 	@echo "Cleaning build artifacts..."
 	@rm -rf target/
 	@rm -f test-results.xml
@@ -231,13 +318,17 @@ help:
 	@echo "==================================="
 	@echo ""
 	@echo "Building:"
-	@echo "  make build        Build debug version"
+	@echo "  make build        Build debug version (includes HSM)"
 	@echo "  make release      Build release version (optimized)"
+	@echo "  make hsm          Build HSM library only"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test         Run unit tests"
-	@echo "  make lint         Run chplcheck linter"
-	@echo "  make check        Run lint + test"
+	@echo "  make test                  Run unit tests"
+	@echo "  make lint                  Run chplcheck linter"
+	@echo "  make check                 Run lint + test"
+	@echo "  make test-integration-tws  Run Trusted Workstation E2E tests"
+	@echo "  make test-integration      Run all integration tests"
+	@echo "  make test-all              Run unit + integration tests"
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install      Full user-wide installation"
@@ -253,7 +344,8 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make deps         Fetch Mason dependencies"
-	@echo "  make clean        Remove build artifacts"
+	@echo "  make clean        Remove build artifacts (including HSM)"
+	@echo "  make hsm-clean    Remove HSM library artifacts only"
 	@echo "  make distclean    Clean + remove Mason cache"
 	@echo "  make mcp          Run MCP server mode"
 	@echo "  make acp          Run ACP server mode"
@@ -263,3 +355,17 @@ help:
 	@echo "  PREFIX            Install prefix (default: ~/.local)"
 	@echo "  BINDIR            Binary directory (default: PREFIX/bin)"
 	@echo "  CONFIG_DIR        Config directory (default: ~/.config/remote-juggler)"
+	@echo ""
+	@echo "HSM Support:"
+	@echo "  Platform:         $(UNAME_S)"
+ifeq ($(UNAME_S),Darwin)
+	@echo "  Backend:          Secure Enclave / Keychain"
+else
+  ifeq ($(TPM_AVAILABLE),yes)
+	@echo "  Backend:          TPM 2.0 (tss2-esys available)"
+  else
+	@echo "  Backend:          Stub (tss2-esys not found)"
+  endif
+endif
+	@echo "  Library:          $(HSM_LIB)"
+	@echo "  Status:           $(if $(filter yes,$(shell test -f $(HSM_LIB) && echo yes || echo no)),Built,Not built)"

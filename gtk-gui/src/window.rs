@@ -10,7 +10,7 @@ use gtk4::{gio, glib};
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
-use crate::config::{Config, SshKeyType};
+use crate::config::{Config, SecurityMode, SshKeyType};
 
 glib::wrapper! {
     pub struct RemoteJugglerWindow(ObjectSubclass<imp::RemoteJugglerWindow>)
@@ -29,6 +29,7 @@ mod imp {
     use gtk4::subclass::prelude::*;
     use libadwaita::subclass::prelude::*;
     use std::cell::RefCell;
+    use std::process::Command;
 
     #[derive(Default)]
     pub struct RemoteJugglerWindow {
@@ -257,6 +258,136 @@ mod imp {
 
                 gpg_group.add(&gpg_status_row);
                 main_box.append(&gpg_group);
+
+                // Add Security Mode group
+                let security_group = adw::PreferencesGroup::new();
+                security_group.set_title("Security");
+                security_group.set_description(Some("YubiKey PIN handling mode"));
+
+                // Security Mode combo row
+                let security_mode_row = adw::ComboRow::new();
+                security_mode_row.set_title("Security Mode");
+                security_mode_row.set_subtitle("How YubiKey PIN is handled during signing");
+
+                // Create string list for security modes
+                let mode_names: Vec<&str> = SecurityMode::all()
+                    .iter()
+                    .map(|m| m.display_name())
+                    .collect();
+                let mode_list = gtk4::StringList::new(&mode_names);
+                security_mode_row.set_model(Some(&mode_list));
+
+                // Get current security mode from the current profile's GPG config
+                let current_security_mode = current_profile
+                    .as_ref()
+                    .map(|p| p.gpg.security_mode.clone())
+                    .unwrap_or_default();
+                security_mode_row.set_selected(current_security_mode.index());
+
+                security_group.add(&security_mode_row);
+
+                // YubiKey PIN Storage group (only visible in TrustedWorkstation mode)
+                let pin_group = adw::PreferencesGroup::new();
+                pin_group.set_title("YubiKey PIN Storage");
+                pin_group.set_description(Some("Store PIN in hardware security module"));
+
+                // PIN entry row using gtk4::PasswordEntry inside an ActionRow
+                let pin_entry = gtk4::PasswordEntry::new();
+                pin_entry.set_show_peek_icon(true);
+                pin_entry.set_hexpand(true);
+                pin_entry.set_valign(gtk4::Align::Center);
+
+                let pin_entry_row = adw::ActionRow::new();
+                pin_entry_row.set_title("Enter PIN");
+                pin_entry_row.add_suffix(&pin_entry);
+                pin_entry_row.set_activatable_widget(Some(&pin_entry));
+                pin_group.add(&pin_entry_row);
+
+                // Store PIN button and status row
+                let store_pin_row = adw::ActionRow::new();
+                store_pin_row.set_title("Store PIN in HSM");
+
+                // Status indicator
+                let pin_status_label = gtk4::Label::new(Some("Not stored"));
+                pin_status_label.add_css_class("dim-label");
+                store_pin_row.add_suffix(&pin_status_label);
+
+                // Store button
+                let store_button = gtk4::Button::with_label("Store PIN");
+                store_button.set_valign(gtk4::Align::Center);
+                store_button.add_css_class("suggested-action");
+                store_pin_row.add_suffix(&store_button);
+                store_pin_row.set_activatable_widget(Some(&store_button));
+
+                pin_group.add(&store_pin_row);
+
+                // Set initial visibility based on security mode
+                let show_pin_storage = current_security_mode == SecurityMode::TrustedWorkstation;
+                pin_group.set_visible(show_pin_storage);
+
+                main_box.append(&security_group);
+                main_box.append(&pin_group);
+
+                // Connect security mode change handler
+                let pin_group_clone = pin_group.clone();
+                security_mode_row.connect_selected_notify(move |row| {
+                    let selected = row.selected();
+                    let mode = SecurityMode::from_index(selected);
+                    let show = mode == SecurityMode::TrustedWorkstation;
+                    pin_group_clone.set_visible(show);
+
+                    // Log the change (actual config save would be implemented here)
+                    tracing::info!("Security mode changed to: {}", mode.display_name());
+                });
+
+                // Connect store PIN button handler
+                let pin_entry_clone = pin_entry.clone();
+                let pin_status_clone = pin_status_label.clone();
+                let current_identity = config.state.current_identity.clone();
+                store_button.connect_clicked(move |button| {
+                    let pin = pin_entry_clone.text();
+                    if pin.is_empty() {
+                        tracing::warn!("Cannot store empty PIN");
+                        return;
+                    }
+
+                    let identity = current_identity.clone();
+                    if identity.is_empty() {
+                        tracing::warn!("No identity selected");
+                        return;
+                    }
+
+                    // Disable button during operation
+                    button.set_sensitive(false);
+                    pin_status_clone.set_text("Storing...");
+
+                    // Spawn async task to call CLI
+                    let button_clone = button.clone();
+                    let status_clone = pin_status_clone.clone();
+                    let entry_clone = pin_entry_clone.clone();
+                    let pin = pin.to_string();
+                    glib::spawn_future_local(async move {
+                        let result = store_pin_async(&identity, &pin).await;
+
+                        // Update UI based on result
+                        match result {
+                            Ok(()) => {
+                                status_clone.set_text("Stored");
+                                status_clone.remove_css_class("dim-label");
+                                status_clone.add_css_class("success");
+                                entry_clone.set_text("");
+                                tracing::info!("PIN stored successfully for {}", identity);
+                            }
+                            Err(e) => {
+                                status_clone.set_text("Failed");
+                                status_clone.remove_css_class("dim-label");
+                                status_clone.add_css_class("error");
+                                tracing::error!("Failed to store PIN: {}", e);
+                            }
+                        }
+                        button_clone.set_sensitive(true);
+                    });
+                });
             } else {
                 // Show error status page
                 let status_page = adw::StatusPage::new();
@@ -272,6 +403,38 @@ mod imp {
             scrolled.set_child(Some(&main_box));
             vbox.append(&scrolled);
             window.set_content(Some(&vbox));
+        }
+    }
+
+    /// Store a PIN for an identity using the remote-juggler CLI
+    async fn store_pin_async(identity: &str, pin: &str) -> Result<(), String> {
+        // Run the command in a blocking thread to avoid blocking the UI
+        let identity = identity.to_string();
+        let pin = pin.to_string();
+
+        let result = gio::spawn_blocking(move || {
+            let output = Command::new("remote-juggler")
+                .args(["pin", "store", &identity])
+                .env("REMOTE_JUGGLER_PIN", &pin)
+                .output();
+
+            match output {
+                Ok(output) => {
+                    if output.status.success() {
+                        Ok(())
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        Err(format!("Command failed: {}", stderr))
+                    }
+                }
+                Err(e) => Err(format!("Failed to execute command: {}", e)),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(inner_result) => inner_result,
+            Err(e) => Err(format!("Task join error: {:?}", e)),
         }
     }
 }

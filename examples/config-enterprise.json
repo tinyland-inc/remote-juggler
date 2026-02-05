@@ -1,0 +1,65 @@
+{
+  "$schema": "../packaging/schemas/config.json",
+  "version": "2.0",
+  "identities": {
+    "corp-gitlab": {
+      "provider": "gitlab",
+      "instance": "https://gitlab.corp.example.com",
+      "username": "jsmith",
+      "email": "john.smith@example.com",
+      "ssh_host": "gitlab-corp",
+      "ssh_key": "~/.ssh/corp_ed25519",
+      "gpg": {
+        "key_id": "CORP12345678CORP",
+        "sign_commits": true,
+        "sign_tags": true
+      }
+    },
+    "corp-github": {
+      "provider": "github",
+      "instance": "https://github.example.com",
+      "username": "jsmith",
+      "email": "john.smith@example.com",
+      "ssh_host": "github-corp",
+      "ssh_key": "~/.ssh/corp_ed25519",
+      "gpg": {
+        "key_id": "CORP12345678CORP",
+        "sign_commits": true,
+        "sign_tags": true
+      }
+    },
+    "personal": {
+      "provider": "github",
+      "username": "johnsmith",
+      "email": "john@personal.dev",
+      "ssh_host": "github-personal",
+      "ssh_key": "~/.ssh/personal_ed25519",
+      "gpg": {
+        "key_id": "PERS87654321PERS",
+        "sign_commits": true,
+        "sign_tags": false
+      }
+    }
+  },
+  "url_rewrites": {
+    "corp-gitlab": {
+      "match": "gitlab.corp.example.com:",
+      "rewrite": "gitlab-corp:"
+    },
+    "corp-github": {
+      "match": "github.example.com:",
+      "rewrite": "github-corp:"
+    },
+    "personal": {
+      "match": "github.com:johnsmith/",
+      "rewrite": "github-personal:johnsmith/"
+    }
+  },
+  "settings": {
+    "default_identity": "corp-gitlab",
+    "auto_switch": true,
+    "security_mode": "standard",
+    "shell_integration": true,
+    "debug": false
+  }
+}

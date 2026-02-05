@@ -1,6 +1,6 @@
 ---
 title: "Chapel Modules"
-description: "Internal module architecture including dependency graph, type definitions, and function references for all 14 Chapel modules."
+description: "Internal module architecture including dependency graph, type definitions, and function references for all 20 Chapel modules."
 category: "reference"
 llm_priority: 4
 keywords:
@@ -12,7 +12,7 @@ keywords:
 
 # Chapel Modules
 
-RemoteJuggler consists of 14 Chapel modules in `src/remote_juggler/`.
+RemoteJuggler consists of 20 Chapel modules in `src/remote_juggler/`.
 
 ## Module Dependency Graph
 
@@ -36,8 +36,17 @@ flowchart LR
         ProviderCLI[ProviderCLI]
     end
 
+    subgraph HSM["Hardware Security"]
+        HSMod[HSM]
+        YubiKey[YubiKey]
+        TrustedWS[TrustedWorkstation]
+        GPGAgent[GPGAgent]
+    end
+
     subgraph External["External"]
         Keychain[Keychain]
+        TokenHealth[TokenHealth]
+        Setup[Setup]
     end
 
     subgraph Protocol["Protocol Layer"]
@@ -95,7 +104,7 @@ record GitIdentity {
   var hostname: string;
   var user: string;
   var email: string;
-  var identityFile: string;
+  var sshKeyPath: string;  // SSH key path (not identityFile)
   var tokenEnvVar: string;
   var gpg: GPGConfig;
   var credentialSource: CredentialSource;
@@ -365,6 +374,12 @@ MCP/ACP tool definitions and handlers.
 | `juggler_validate` | `handleValidate` |
 | `juggler_store_token` | `handleStoreToken` |
 | `juggler_sync_config` | `handleSyncConfig` |
+| `juggler_gpg_status` | `handleGPGStatus` |
+| `juggler_pin_store` | `handlePinStore` |
+| `juggler_pin_clear` | `handlePinClear` |
+| `juggler_pin_status` | `handlePinStatus` |
+| `juggler_security_mode` | `handleSecurityMode` |
+| `juggler_setup` | `handleSetup` |
 
 **Key Functions:**
 
@@ -400,3 +415,199 @@ prototype module remote_juggler {
 ```
 
 The `prototype module` declaration enables fatal error handling for unhandled exceptions.
+
+---
+
+### HSM.chpl
+
+Hardware Security Module abstraction for TPM 2.0 and Secure Enclave.
+
+**Location:** `src/remote_juggler/HSM.chpl`
+
+**Key Types:**
+
+```chapel
+enum HSMType { None, TPM, SecureEnclave, Keychain }
+enum HSMError { Success, NotAvailable, SealFailed, UnsealFailed, KeyNotFound, AuthFailed }
+```
+
+**Key Functions:**
+
+```chapel
+proc hsmAvailable(): bool
+proc hsmType(): HSMType
+proc hsmStorePIN(identity: string, pin: string): HSMError
+proc hsmRetrievePIN(identity: string): (HSMError, string)
+proc hsmClearPIN(identity: string): HSMError
+proc hsmHasPIN(identity: string): bool
+```
+
+**Platform Behavior:**
+
+| Platform | Backend | Binding Method |
+|----------|---------|----------------|
+| Linux | TPM 2.0 | PCR 7 (Secure Boot state) |
+| macOS | Secure Enclave | ECIES with P-256 |
+| Fallback | OS Keychain | System credential store |
+
+---
+
+### YubiKey.chpl
+
+YubiKey detection and management via ykman CLI.
+
+**Location:** `src/remote_juggler/YubiKey.chpl`
+
+**Key Types:**
+
+```chapel
+record YubiKeyInfo {
+  var serialNumber: string;
+  var firmwareVersion: string;
+  var formFactor: string;
+  var interfaces: list(string);
+}
+
+record TouchPolicy {
+  var sig: string;  // "on", "off", "cached", "fixed"
+  var enc: string;
+  var aut: string;
+}
+```
+
+**Key Functions:**
+
+```chapel
+proc isYubiKeyConnected(): bool
+proc getYubiKeyInfo(): YubiKeyInfo
+proc getTouchPolicy(): TouchPolicy
+proc setTouchPolicy(slot: string, policy: string): bool
+proc setPINPolicy(policy: string): bool
+proc runDiagnostics(): DiagnosticResult
+```
+
+---
+
+### TrustedWorkstation.chpl
+
+Orchestration for trusted workstation mode (passwordless GPG signing).
+
+**Location:** `src/remote_juggler/TrustedWorkstation.chpl`
+
+**Key Types:**
+
+```chapel
+enum SecurityMode { MaximumSecurity, DeveloperWorkflow, TrustedWorkstation }
+
+record TrustedWorkstationStatus {
+  var enabled: bool;
+  var securityMode: SecurityMode;
+  var hsmAvailable: bool;
+  var pinStored: bool;
+  var gpgAgentConfigured: bool;
+}
+```
+
+**Key Functions:**
+
+```chapel
+proc enableTrustedWorkstation(identity: string, pin: string): bool
+proc disableTrustedWorkstation(identity: string): bool
+proc getTrustedWorkstationStatus(identity: string): TrustedWorkstationStatus
+proc verifyTrustedWorkstation(identity: string): VerificationResult
+proc setSecurityMode(mode: SecurityMode): bool
+proc getSecurityMode(): SecurityMode
+```
+
+---
+
+### GPGAgent.chpl
+
+gpg-agent configuration management for custom pinentry.
+
+**Location:** `src/remote_juggler/GPGAgent.chpl`
+
+**Key Functions:**
+
+```chapel
+proc getGPGAgentConfPath(): string
+proc isCustomPinentryConfigured(): bool
+proc configureCustomPinentry(): bool
+proc restoreDefaultPinentry(): bool
+proc reloadGPGAgent(): bool
+proc getGPGAgentPID(): int
+```
+
+---
+
+### TokenHealth.chpl
+
+Token expiration detection and renewal prompts.
+
+**Location:** `src/remote_juggler/TokenHealth.chpl`
+
+**Key Types:**
+
+```chapel
+record TokenHealthResult {
+  var identity: string;
+  var provider: Provider;
+  var hasToken: bool;
+  var expiresAt: real;  // Unix timestamp, 0 if unknown
+  var daysRemaining: int;
+  var needsRenewal: bool;
+  var isExpired: bool;
+}
+```
+
+**Key Functions:**
+
+```chapel
+proc checkTokenHealth(identity: string): TokenHealthResult
+proc checkAllTokens(): list(TokenHealthResult)
+proc daysUntilExpiry(expiresAt: real): int
+proc needsRenewal(daysRemaining: int): bool
+proc formatHealthResult(result: TokenHealthResult): string
+```
+
+---
+
+### Setup.chpl
+
+First-time setup wizard for automatic configuration.
+
+**Location:** `src/remote_juggler/Setup.chpl`
+
+**Key Types:**
+
+```chapel
+record SetupResult {
+  var success: bool;
+  var identitiesCreated: int;
+  var gpgKeysAssociated: int;
+  var hsmDetected: bool;
+  var hsmType: string;
+  var message: string;
+}
+
+record DetectedIdentity {
+  var name: string;
+  var provider: Provider;
+  var host: string;
+  var hostname: string;
+  var sshKeyPath: string;
+  var email: string;
+}
+```
+
+**Key Functions:**
+
+```chapel
+proc runSetupWizard(force: bool = false): SetupResult
+proc detectSSHHosts(): list(DetectedIdentity)
+proc detectGPGKeys(): list(GPGKey)
+proc detectHSM(): (bool, string)
+proc associateGPGKeys(identities: list(DetectedIdentity)): int
+proc generateConfig(identities: list(DetectedIdentity)): string
+proc writeConfig(config: string): bool
+```

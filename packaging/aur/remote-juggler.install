@@ -1,0 +1,52 @@
+# RemoteJuggler Arch Linux install hooks
+
+post_install() {
+    echo ""
+    echo "==> RemoteJuggler has been installed!"
+    echo ""
+    echo "    Quick start:"
+    echo "      remote-juggler setup     # Run first-time setup wizard"
+    echo "      remote-juggler list      # List configured identities"
+    echo "      remote-juggler switch    # Switch git identity"
+    echo ""
+    echo "    For TPM 2.0 support (Trusted Workstation mode):"
+    echo "      sudo systemctl enable --now tpm2-abrmd"
+    echo "      sudo usermod -aG tss \$USER"
+    echo "      # Log out and back in, then:"
+    echo "      remote-juggler pin store <identity>"
+    echo ""
+    echo "    Documentation: https://remote-juggler.dev/docs"
+    echo ""
+}
+
+post_upgrade() {
+    echo ""
+    echo "==> RemoteJuggler has been upgraded!"
+    echo ""
+    echo "    Run 'remote-juggler --version' to verify the new version."
+    echo ""
+    echo "    If you use Trusted Workstation mode, your stored PINs"
+    echo "    remain valid and don't need to be re-entered."
+    echo ""
+}
+
+pre_remove() {
+    # Disable autostart if tray was installed
+    if [[ -f /etc/xdg/autostart/remote-juggler-tray.desktop ]]; then
+        echo "==> Disabling tray app autostart..."
+    fi
+}
+
+post_remove() {
+    echo ""
+    echo "==> RemoteJuggler has been removed."
+    echo ""
+    echo "    User configuration preserved at ~/.config/remote-juggler/"
+    echo "    To remove: rm -rf ~/.config/remote-juggler"
+    echo ""
+    echo "    TPM-stored PINs remain in the TPM and can be cleared with:"
+    echo "      tpm2_clear  # WARNING: Clears ALL TPM data"
+    echo ""
+}
+
+# vim: set ts=4 sw=4 et:

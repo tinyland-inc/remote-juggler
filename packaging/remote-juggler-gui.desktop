@@ -1,0 +1,34 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=RemoteJuggler
+GenericName=Git Identity Manager
+Comment=Manage multiple git identities for SSH, GPG, and credential workflows
+Icon=remote-juggler
+Exec=remote-juggler-gui
+Terminal=false
+Categories=Development;Utility;
+Keywords=git;ssh;gpg;identity;gitlab;github;yubikey;
+
+# Desktop actions for quick access
+Actions=switch-personal;switch-work;status;
+
+[Desktop Action switch-personal]
+Name=Switch to Personal
+Exec=remote-juggler switch personal
+
+[Desktop Action switch-work]
+Name=Switch to Work
+Exec=remote-juggler switch work
+
+[Desktop Action status]
+Name=Show Status
+Exec=remote-juggler status
+
+# GNOME/GTK specific
+StartupNotify=true
+StartupWMClass=remote-juggler-gui
+
+# Additional metadata
+X-GNOME-UsesNotifications=true
+X-Flatpak-RenamedFrom=dev.tinyland.RemoteJuggler.desktop;

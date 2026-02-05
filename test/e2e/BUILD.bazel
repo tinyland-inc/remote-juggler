@@ -1,0 +1,161 @@
+# RemoteJuggler E2E Tests BUILD File
+#
+# Python-based end-to-end tests using pytest.
+#
+# Run all e2e tests:
+#   bazelisk test //test/e2e:all
+#
+# Run specific test:
+#   bazelisk test //test/e2e:test_mcp_protocol
+#
+# Run with specific markers:
+#   bazelisk test //test/e2e:test_switch_gpg --test_arg=-m --test_arg=gpg
+
+load("@rules_python//python:defs.bzl", "py_test", "py_library")
+load("@pip//:requirements.bzl", "requirement")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Test Library (shared fixtures)
+# =============================================================================
+
+py_library(
+    name = "conftest",
+    srcs = ["conftest.py"],
+    deps = [
+        requirement("pytest"),
+    ],
+)
+
+# =============================================================================
+# Test Targets
+# =============================================================================
+
+py_test(
+    name = "test_mcp_protocol",
+    srcs = ["test_mcp_protocol.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    data = [
+        "//:config_files",
+    ],
+    tags = ["e2e"],
+)
+
+py_test(
+    name = "test_switch_basic",
+    srcs = ["test_switch_basic.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = ["e2e"],
+)
+
+py_test(
+    name = "test_switch_gpg",
+    srcs = ["test_switch_gpg.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = [
+        "e2e",
+        "gpg",
+    ],
+)
+
+py_test(
+    name = "test_tpm",
+    srcs = ["test_tpm.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = [
+        "e2e",
+        "tpm",
+        "hardware",
+    ],
+)
+
+py_test(
+    name = "test_secure_enclave",
+    srcs = ["test_secure_enclave.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = [
+        "e2e",
+        "secure_enclave",
+        "hardware",
+    ],
+)
+
+py_test(
+    name = "test_hsm_workflow",
+    srcs = ["test_hsm_workflow.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = [
+        "e2e",
+        "hsm",
+    ],
+)
+
+py_test(
+    name = "test_installation",
+    srcs = ["test_installation.py"],
+    deps = [
+        ":conftest",
+        requirement("pytest"),
+    ],
+    tags = [
+        "e2e",
+        "installation",
+    ],
+)
+
+# =============================================================================
+# Test Suite
+# =============================================================================
+
+test_suite(
+    name = "all",
+    tests = [
+        ":test_mcp_protocol",
+        ":test_switch_basic",
+        ":test_switch_gpg",
+        ":test_tpm",
+        ":test_secure_enclave",
+        ":test_hsm_workflow",
+        ":test_installation",
+    ],
+)
+
+# Non-hardware tests (for CI without TPM/SE)
+test_suite(
+    name = "ci",
+    tests = [
+        ":test_mcp_protocol",
+        ":test_switch_basic",
+        ":test_switch_gpg",
+        ":test_hsm_workflow",
+        ":test_installation",
+    ],
+)
+
+# =============================================================================
+# Exports
+# =============================================================================
+
+exports_files([
+    "requirements.txt",
+    "conftest.py",
+])

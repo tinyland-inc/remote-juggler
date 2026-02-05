@@ -157,6 +157,12 @@ prototype module GlobalConfig {
     :var gpgVerifyWithProvider: Verify GPG keys with provider API
     :var fallbackToSSH: Allow SSH-only mode when no token
     :var verboseLogging: Enable verbose output
+    :var defaultSecurityMode: Default security mode for new identities:
+        - "maximum_security": PIN required for every operation
+        - "developer_workflow": PIN cached for session (default)
+        - "trusted_workstation": PIN stored in TPM/SecureEnclave
+    :var hsmAvailable: Whether hardware security module is available (runtime detection)
+    :var trustedWorkstationRequiresHSM: Require HSM for trusted_workstation mode
   */
   record AppSettings {
     var defaultProvider: Provider = Provider.GitLab;
@@ -166,6 +172,9 @@ prototype module GlobalConfig {
     var gpgVerifyWithProvider: bool = true;
     var fallbackToSSH: bool = true;
     var verboseLogging: bool = false;
+    var defaultSecurityMode: string = "developer_workflow";
+    var hsmAvailable: bool = false;
+    var trustedWorkstationRequiresHSM: bool = true;
 
     /*
       Initialize with default values.
@@ -178,6 +187,30 @@ prototype module GlobalConfig {
       this.gpgVerifyWithProvider = true;
       this.fallbackToSSH = true;
       this.verboseLogging = false;
+      this.defaultSecurityMode = "developer_workflow";
+      this.hsmAvailable = false;
+      this.trustedWorkstationRequiresHSM = true;
+    }
+
+    /*
+      Validate security mode string.
+
+      :arg mode: Security mode to validate
+      :returns: true if mode is valid
+    */
+    proc isValidSecurityMode(mode: string): bool {
+      return mode == "maximum_security" ||
+             mode == "developer_workflow" ||
+             mode == "trusted_workstation";
+    }
+
+    /*
+      Check if trusted workstation mode is allowed.
+
+      :returns: true if HSM not required or HSM is available
+    */
+    proc canUseTrustedWorkstation(): bool {
+      return !trustedWorkstationRequiresHSM || hsmAvailable;
     }
   }
 
@@ -572,6 +605,36 @@ prototype module GlobalConfig {
       saveConfig(cfg);
     }
     return found;
+  }
+
+  /*
+    Set the global security mode for GPG operations.
+
+    :arg mode: Security mode to set (maximum_security, developer_workflow, trusted_workstation)
+    :returns: true if mode was set successfully
+  */
+  proc setSecurityMode(mode: string): bool {
+    var cfg = loadConfig();
+
+    // Validate mode
+    if !cfg.settings.isValidSecurityMode(mode) {
+      return false;
+    }
+
+    cfg.settings.defaultSecurityMode = mode;
+    return saveConfig(cfg);
+  }
+
+  /*
+    Update HSM availability status in settings.
+
+    :arg available: Whether HSM is available
+    :returns: true if setting was updated
+  */
+  proc setHSMAvailability(available: bool): bool {
+    var cfg = loadConfig();
+    cfg.settings.hsmAvailable = available;
+    return saveConfig(cfg);
   }
 
   // =========================================================================
@@ -1065,7 +1128,10 @@ prototype module GlobalConfig {
     json += '    "gpgSign": ' + cfg.settings.gpgSign:string + ',\n';
     json += '    "gpgVerifyWithProvider": ' + cfg.settings.gpgVerifyWithProvider:string + ',\n';
     json += '    "fallbackToSSH": ' + cfg.settings.fallbackToSSH:string + ',\n';
-    json += '    "verboseLogging": ' + cfg.settings.verboseLogging:string + '\n';
+    json += '    "verboseLogging": ' + cfg.settings.verboseLogging:string + ',\n';
+    json += '    "defaultSecurityMode": "' + cfg.settings.defaultSecurityMode + '",\n';
+    json += '    "hsmAvailable": ' + cfg.settings.hsmAvailable:string + ',\n';
+    json += '    "trustedWorkstationRequiresHSM": ' + cfg.settings.trustedWorkstationRequiresHSM:string + '\n';
     json += '  },\n';
     json += '\n';
 
@@ -1118,7 +1184,11 @@ prototype module GlobalConfig {
     json += indent + '    "keyId": "' + escapeJSON(identity.gpg.keyId) + '",\n';
     json += indent + '    "signCommits": ' + identity.gpg.signCommits:string + ',\n';
     json += indent + '    "signTags": ' + identity.gpg.signTags:string + ',\n';
-    json += indent + '    "autoSignoff": ' + identity.gpg.autoSignoff:string + '\n';
+    json += indent + '    "autoSignoff": ' + identity.gpg.autoSignoff:string + ',\n';
+    json += indent + '    "hardwareKey": ' + identity.gpg.hardwareKey:string + ',\n';
+    json += indent + '    "touchPolicy": "' + escapeJSON(identity.gpg.touchPolicy) + '",\n';
+    json += indent + '    "securityMode": "' + escapeJSON(identity.gpg.securityMode) + '",\n';
+    json += indent + '    "pinStorageMethod": "' + escapeJSON(identity.gpg.pinStorageMethod) + '"\n';
     json += indent + '  }\n';
 
     json += indent + '}';
@@ -1298,6 +1368,10 @@ prototype module GlobalConfig {
         gpgConfig.hardwareKey = hardwareKey == "true";
 
         gpgConfig.touchPolicy = extractJSONString(gpgSection, "touchPolicy", "");
+
+        // New security mode fields
+        gpgConfig.securityMode = extractJSONString(gpgSection, "securityMode", "developer_workflow");
+        gpgConfig.pinStorageMethod = extractJSONString(gpgSection, "pinStorageMethod", "");
       }
 
       // Create identity with parsed values

@@ -71,13 +71,33 @@ fn arb_gpg_config() -> impl Strategy<Value = GpgConfig> {
         prop::bool::ANY,
         prop::bool::ANY,
         prop::bool::ANY,
+        // security_mode: 0=MaximumSecurity, 1=DeveloperWorkflow, 2=TrustedWorkstation
+        prop::sample::select(vec![0u32, 1, 2]),
+        // pin_storage_method: None, or one of "tpm", "secure_enclave", "keychain"
+        prop::option::of(prop::sample::select(vec![
+            "tpm".to_string(),
+            "secure_enclave".to_string(),
+            "keychain".to_string(),
+        ])),
     )
         .prop_map(
-            |(key_id, sign_commits, sign_tags, auto_signoff)| GpgConfig {
-                key_id: key_id.unwrap_or_default(),
+            |(
+                key_id,
                 sign_commits,
                 sign_tags,
                 auto_signoff,
+                security_mode_idx,
+                pin_storage_method,
+            )| {
+                use crate::config::SecurityMode;
+                GpgConfig {
+                    key_id: key_id.unwrap_or_default(),
+                    sign_commits,
+                    sign_tags,
+                    auto_signoff,
+                    security_mode: SecurityMode::from_index(security_mode_idx),
+                    pin_storage_method,
+                }
             },
         )
 }

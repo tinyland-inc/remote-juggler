@@ -1,0 +1,27 @@
+# RemoteJuggler Chapel Source BUILD File
+#
+# NOTE: Chapel sources are NOT built with Bazel.
+# Use Nix or Make for Chapel compilation:
+#   - nix build .#remote-juggler
+#   - nix develop .#chapel --command make release
+#   - make release (with system Chapel)
+#
+# This BUILD file exists for file visibility and tooling integration.
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Chapel Source Files
+# =============================================================================
+
+filegroup(
+    name = "chapel_sources",
+    srcs = glob([
+        "**/*.chpl",
+    ]),
+)
+
+# Main entry point
+exports_files([
+    "remote_juggler.chpl",
+])

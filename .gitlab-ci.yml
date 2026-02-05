@@ -8,6 +8,7 @@ stages:
   - package
   - sign
   - release
+  - cache
   - sync
 
 variables:
@@ -68,6 +69,8 @@ build:darwin-arm64:
     - macos
     - arm64
     - shell  # Force native shell executor (Chapel/Homebrew not available in Docker)
+  variables:
+    GIT_STRATEGY: clone  # Force fresh clone after project rename
   <<: *mason_cache
   script:
     # Add Homebrew to PATH for shell executor
@@ -136,6 +139,13 @@ build:tray-linux:
 build:gtk-gui-linux:
   stage: build
   image: rust:latest
+  timeout: 90 minutes
+  cache:
+    key: gtk-gui-cargo-${CI_COMMIT_REF_SLUG}
+    paths:
+      - gtk-gui/target/
+      - /usr/local/cargo/registry/
+      - /usr/local/cargo/git/
   before_script:
     - apt-get update
     - apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config
@@ -172,6 +182,46 @@ test:gtk-gui:
       junit: gtk-gui/test-results.xml
     when: always
   allow_failure: true
+
+test:gtk-gui-integration:
+  stage: test
+  image: rust:latest
+  before_script:
+    - apt-get update
+    - apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config xvfb at-spi2-core dbus-x11
+  script:
+    - cd gtk-gui
+    # Run integration tests (config parsing, security modes)
+    - cargo test --test integration_test
+    # Run UI tests with Xvfb
+    - eval $(dbus-launch --sh-syntax)
+    - export DISPLAY=:99
+    - Xvfb :99 -screen 0 1280x1024x24 &
+    - sleep 3
+    - cargo test --test integration_test -- --include-ignored --test-threads=1
+  allow_failure: true
+
+test:tray-linux:
+  stage: test
+  image: golang:1.21
+  script:
+    - cd tray/linux
+    - go test -v ./...
+  allow_failure: true
+
+test:tray-darwin:
+  stage: test
+  tags:
+    - macos
+    - arm64
+    - shell
+  script:
+    - cd tray/darwin
+    - swift test
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
 
 test:gtk-gui-lint:
   stage: test
@@ -245,6 +295,7 @@ test:unit:
   stage: test
   image: chapel/chapel:${CHAPEL_VERSION}
   <<: *mason_cache
+  needs: []  # Run immediately, don't wait for build stage
   script:
     # Add Mason registry for QuickChpl
     - |
@@ -270,6 +321,7 @@ test:unit:
 test:chplcheck:
   stage: test
   image: chapel/chapel:${CHAPEL_VERSION}
+  needs: []  # Run immediately, don't wait for build stage
   script:
     # Run chplcheck linter on all Chapel source files
     - |
@@ -289,6 +341,7 @@ test:chplcheck:
 test:lint:
   stage: test
   image: chapel/chapel:${CHAPEL_VERSION}
+  needs: []  # Run immediately, don't wait for build stage
   script:
     # Verify code compiles without errors
     - mason build
@@ -326,12 +379,220 @@ test:integration:
   allow_failure: true
 
 # =============================================================================
+# HSM C Library Tests
+# =============================================================================
+
+test:hsm-unit:
+  stage: test
+  image: ubuntu:24.04
+  needs: []  # Run immediately, don't wait for build stage
+  before_script:
+    - apt-get update
+    - apt-get install -y build-essential
+  script:
+    - cd pinentry
+    - make test
+  artifacts:
+    paths:
+      - pinentry/test_hsm
+    when: always
+
+test:hsm-integration:
+  stage: test
+  image: ubuntu:24.04
+  needs:
+    - test:hsm-unit
+  before_script:
+    - apt-get update
+    - apt-get install -y build-essential python3 gnupg gpg-agent
+  script:
+    - cd pinentry
+    - make all
+    - chmod +x test_hsm_integration.sh
+    - ./test_hsm_integration.sh --verbose
+  allow_failure: true  # Some tests require hardware (GPG agent, HSM)
+
+test:hsm-tpm-mock:
+  stage: test
+  image: ubuntu:24.04
+  tags:
+    - tpm-available
+  before_script:
+    - apt-get update
+    - apt-get install -y build-essential libtss2-dev libtss2-esys-dev swtpm swtpm-tools tpm2-tools
+  script:
+    - |
+      # Start software TPM emulator
+      mkdir -p /tmp/swtpm
+      swtpm socket --tpmstate dir=/tmp/swtpm --tpm2 --ctrl type=tcp,port=2322 --server type=tcp,port=2321 &
+      sleep 2
+      export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=2321"
+      # Build and test with TPM support
+      cd pinentry
+      make test
+  allow_failure: true  # TPM runners may not be available
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+
+# =============================================================================
+# E2E Test Stage (pytest)
+# =============================================================================
+
+test:e2e:
+  stage: test
+  image: python:3.12-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - apt-get update
+    - apt-get install -y git gnupg gpg-agent
+    - pip install -r test/e2e/requirements.txt
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    - export REMOTE_JUGGLER_BIN="$(pwd)/${PROJECT_NAME}-linux-amd64"
+    - pytest test/e2e/ -v --tb=short -m "not tpm and not secure_enclave and not yubikey and not hardware"
+  artifacts:
+    reports:
+      junit: pytest-results.xml
+    when: always
+
+test:e2e-installation:
+  stage: test
+  image: python:3.12-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - apt-get update
+    - apt-get install -y git gnupg gpg-agent
+    - pip install -r test/e2e/requirements.txt
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    - export REMOTE_JUGGLER_BIN="$(pwd)/${PROJECT_NAME}-linux-amd64"
+    - pytest test/e2e/test_installation.py -v --tb=short
+  artifacts:
+    reports:
+      junit: pytest-installation-results.xml
+    when: always
+
+test:e2e-gpg:
+  stage: test
+  image: python:3.12-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - apt-get update
+    - apt-get install -y git gnupg gpg-agent
+    - pip install -r test/e2e/requirements.txt
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    - export REMOTE_JUGGLER_BIN="$(pwd)/${PROJECT_NAME}-linux-amd64"
+    - pytest test/e2e/ -v --tb=short -m gpg
+  artifacts:
+    reports:
+      junit: pytest-gpg-results.xml
+    when: always
+  allow_failure: true
+
+test:e2e-tpm:
+  stage: test
+  image: ubuntu:24.04
+  needs:
+    - build:linux-amd64
+  services:
+    - name: registry.gitlab.com/tinyland/projects/remote-juggler/swtpm:latest
+      alias: swtpm
+  before_script:
+    - apt-get update
+    - apt-get install -y python3 python3-pip python3-venv git gnupg gpg-agent tpm2-tools libtss2-tcti-swtpm0
+    - python3 -m venv /venv
+    - /venv/bin/pip install -r test/e2e/requirements.txt
+  variables:
+    TPM2TOOLS_TCTI: "swtpm:host=swtpm,port=2321"
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    - export REMOTE_JUGGLER_BIN="$(pwd)/${PROJECT_NAME}-linux-amd64"
+    # Wait for swtpm service
+    - |
+      for i in $(seq 1 30); do
+        if tpm2_getcap properties-fixed > /dev/null 2>&1; then
+          echo "swtpm is ready"
+          break
+        fi
+        echo "Waiting for swtpm... ($i/30)"
+        sleep 1
+      done
+    - /venv/bin/pytest test/e2e/ -v --tb=short -m tpm
+  artifacts:
+    reports:
+      junit: pytest-tpm-results.xml
+    when: always
+  allow_failure: true
+  rules:
+    # Run automatically on main/dev branches and tags
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"
+      when: on_success
+    - if: $CI_COMMIT_TAG
+      when: on_success
+    # Run automatically on merge requests
+    - if: $CI_MERGE_REQUEST_IID
+      when: on_success
+    # Manual trigger for other branches
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+
+test:e2e-mcp:
+  stage: test
+  image: python:3.12-slim
+  needs:
+    - build:linux-amd64
+  before_script:
+    - apt-get update
+    - apt-get install -y git
+    - pip install -r test/e2e/requirements.txt
+  script:
+    - chmod +x ${PROJECT_NAME}-linux-amd64
+    - export REMOTE_JUGGLER_BIN="$(pwd)/${PROJECT_NAME}-linux-amd64"
+    - pytest test/e2e/test_mcp_protocol.py -v --tb=short
+  artifacts:
+    reports:
+      junit: pytest-mcp-results.xml
+    when: always
+
+# =============================================================================
 # Security Scanning (inherited from template)
 # =============================================================================
+
+# =============================================================================
+# Docker Image Builds
+# =============================================================================
+
+build:swtpm-image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    IMAGE_TAG: ${CI_REGISTRY_IMAGE}/swtpm:${CI_COMMIT_SHORT_SHA}
+    IMAGE_LATEST: ${CI_REGISTRY_IMAGE}/swtpm:latest
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $IMAGE_TAG -t $IMAGE_LATEST ci/docker/swtpm/
+    - docker push $IMAGE_TAG
+    - docker push $IMAGE_LATEST
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - ci/docker/swtpm/**/*
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
 
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
+  - local: 'ci/gitlab-nix.yml'
 
 sast:
   stage: test

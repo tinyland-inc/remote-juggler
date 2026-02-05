@@ -1,0 +1,57 @@
+{
+  "$schema": "../packaging/schemas/config.json",
+  "version": "2.0",
+  "identities": {
+    "github-personal": {
+      "provider": "github",
+      "username": "myuser",
+      "email": "me@personal.com",
+      "ssh_host": "github-personal",
+      "ssh_key": "~/.ssh/github_personal_ed25519",
+      "gpg": {
+        "key_id": "ABCD1234ABCD1234",
+        "sign_commits": true,
+        "sign_tags": true
+      }
+    },
+    "gitlab-work": {
+      "provider": "gitlab",
+      "username": "jsmith",
+      "email": "john.smith@company.com",
+      "ssh_host": "gitlab-work",
+      "ssh_key": "~/.ssh/gitlab_work_ed25519",
+      "gpg": {
+        "key_id": "EFGH5678EFGH5678",
+        "sign_commits": true,
+        "sign_tags": true
+      }
+    },
+    "bitbucket-client": {
+      "provider": "bitbucket",
+      "username": "jsmith-consulting",
+      "email": "john@consulting.com",
+      "ssh_host": "bitbucket-client",
+      "ssh_key": "~/.ssh/bitbucket_client_ed25519"
+    }
+  },
+  "url_rewrites": {
+    "github-personal": {
+      "match": "github.com:myuser/",
+      "rewrite": "github-personal:myuser/"
+    },
+    "gitlab-work": {
+      "match": "gitlab.com:company/",
+      "rewrite": "gitlab-work:company/"
+    },
+    "bitbucket-client": {
+      "match": "bitbucket.org:clientorg/",
+      "rewrite": "bitbucket-client:clientorg/"
+    }
+  },
+  "settings": {
+    "default_identity": "github-personal",
+    "auto_switch": true,
+    "security_mode": "standard",
+    "shell_integration": true
+  }
+}

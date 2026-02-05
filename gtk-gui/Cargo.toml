@@ -1,11 +1,11 @@
 [package]
 name = "remote-juggler-gui"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
 description = "GTK4/Libadwaita GUI for RemoteJuggler identity management"
 authors = ["Jess Sullivan <jess@sulliwood.org>"]
-license = "MIT"
-repository = "https://github.com/Jesssullivan/RemoteJuggler"
+license = "Zlib"
+repository = "https://gitlab.com/tinyland/projects/remote-juggler"
 keywords = ["git", "identity", "gnome", "gtk4"]
 categories = ["development-tools", "gui"]
 
@@ -31,6 +31,7 @@ dirs = "6.0"
 [dev-dependencies]
 proptest = "1.4"
 proptest-derive = "0.4"
+tempfile = "3.10"
 
 [profile.release]
 strip = true

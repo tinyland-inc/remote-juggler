@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "chapel-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1765842005,
+        "narHash": "sha256-vqEeyT3k6eMW4iqFFMSGGAa3wUA9nni7ZvbTQx0nAoo=",
+        "owner": "chapel-lang",
+        "repo": "chapel",
+        "rev": "3f188879c10aacbc377d3b02f577539e7b187742",
+        "type": "github"
+      },
+      "original": {
+        "owner": "chapel-lang",
+        "ref": "refs/tags/2.7.0",
+        "repo": "chapel",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -36,6 +53,7 @@
     },
     "root": {
       "inputs": {
+        "chapel-src": "chapel-src",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"

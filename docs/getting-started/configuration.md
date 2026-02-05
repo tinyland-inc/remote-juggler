@@ -122,7 +122,7 @@ Override settings via environment variables:
 
 ## CLI Configuration Flags
 
-Override settings per-invocation (see `src/remote_juggler.chpl:181-187`):
+Override settings per-invocation (see `src/remote_juggler.chpl`):
 
 ```bash
 remote-juggler --configPath=/custom/config.json list

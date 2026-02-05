@@ -248,6 +248,6 @@ curl -I https://nix-cache.fuzzy-dev.tinyland.dev/nix-cache-info
 ## References
 
 - [Attic Documentation](https://docs.attic.rs/)
-- [RemoteJuggler GitLab CI](../ci/gitlab-nix.yml)
-- [RemoteJuggler GitHub Actions](../.github/workflows/nix-ci.yml)
+- [RemoteJuggler GitLab CI](https://gitlab.com/tinyland/projects/remote-juggler/-/blob/main/ci/gitlab-nix.yml)
+- [RemoteJuggler GitHub Actions](https://gitlab.com/tinyland/projects/remote-juggler/-/blob/main/.github/workflows/nix-ci.yml)
 - [crush-dots CI Variables](https://gitlab.com/tinyland/crush-dots/-/blob/main/docs/CI_VARIABLES.md)

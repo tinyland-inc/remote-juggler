@@ -1,0 +1,161 @@
+# Flatpak manifest for RemoteJuggler
+#
+# Build and install:
+#   flatpak-builder --user --install build-dir dev.tinyland.RemoteJuggler.yml
+#
+# Run:
+#   flatpak run dev.tinyland.RemoteJuggler
+#
+# Export bundle:
+#   flatpak-builder --repo=repo build-dir dev.tinyland.RemoteJuggler.yml
+#   flatpak build-bundle repo remote-juggler.flatpak dev.tinyland.RemoteJuggler
+#
+app-id: dev.tinyland.RemoteJuggler
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.golang
+
+command: remote-juggler
+
+finish-args:
+  # Filesystem access for git repos and SSH config
+  - --filesystem=home
+  - --filesystem=~/.ssh:ro
+  - --filesystem=~/.gnupg:ro
+  - --filesystem=~/.config/remote-juggler:create
+  - --filesystem=~/.gitconfig:ro
+  - --filesystem=~/.config/git:ro
+
+  # Network access for git operations and API calls
+  - --share=network
+
+  # D-Bus access for secrets/keyring
+  - --socket=session-bus
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.gnome.keyring
+
+  # SSH agent access
+  - --socket=ssh-auth
+  - --env=SSH_AUTH_SOCK=/run/user/1000/keyring/ssh
+
+  # GPG agent access
+  - --filesystem=~/.gnupg/S.gpg-agent:ro
+
+  # TPM access (for Trusted Workstation mode)
+  - --device=all
+
+  # For GUI components
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+
+  # Environment
+  - --env=REMOTE_JUGGLER_FLATPAK=1
+
+modules:
+  # Build Chapel compiler (or use prebuilt)
+  - name: chapel
+    buildsystem: simple
+    build-options:
+      env:
+        CHPL_HOME: /app/share/chapel
+    build-commands:
+      - |
+        # Download prebuilt Chapel for Linux
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+          CHAPEL_ARCH="x86_64"
+        else
+          CHAPEL_ARCH="aarch64"
+        fi
+        curl -fsSL "https://github.com/chapel-lang/chapel/releases/download/2.0.0/chapel-2.0.0-linux64-${CHAPEL_ARCH}.tar.gz" \
+          | tar xzf - --strip-components=1 -C /app/share/chapel
+    sources:
+      - type: shell
+        commands:
+          - mkdir -p /app/share/chapel
+
+  # Build tpm2-tss for TPM support
+  - name: tpm2-tss
+    buildsystem: autotools
+    config-opts:
+      - --disable-static
+      - --disable-doxygen-doc
+      - --with-udevrulesdir=/app/lib/udev/rules.d
+    sources:
+      - type: archive
+        url: https://github.com/tpm2-software/tpm2-tss/releases/download/4.0.1/tpm2-tss-4.0.1.tar.gz
+        sha256: FIXME  # Add actual checksum
+
+  # Build RemoteJuggler CLI
+  - name: remote-juggler
+    buildsystem: simple
+    build-options:
+      append-path: /app/share/chapel/bin
+      env:
+        CHPL_HOME: /app/share/chapel
+        CHPL_TARGET_PLATFORM: linux64
+    build-commands:
+      # Build CLI
+      - make release PREFIX=/app
+      # Build HSM library
+      - make -C pinentry HSM_BACKEND=linux PREFIX=/app
+      # Install
+      - make install PREFIX=/app
+      - make -C pinentry install PREFIX=/app
+    sources:
+      - type: git
+        url: https://gitlab.com/tinyland/remote-juggler.git
+        tag: v2.0.0
+        # Or use local directory for development:
+        # type: dir
+        # path: ../..
+
+  # Build GTK GUI (optional)
+  - name: remote-juggler-gui
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/remote-juggler-gui/cargo
+    build-commands:
+      - cd gtk-gui && cargo build --release
+      - install -Dm755 gtk-gui/target/release/remote-juggler-gui /app/bin/
+    sources:
+      - type: git
+        url: https://gitlab.com/tinyland/remote-juggler.git
+        tag: v2.0.0
+    modules:
+      # GTK4 and Libadwaita are in the runtime
+
+  # Build Linux tray app (optional)
+  - name: remote-juggler-tray
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/golang/bin
+      env:
+        GOPATH: /run/build/remote-juggler-tray/go
+    build-commands:
+      - cd tray/linux && go build -o /app/bin/remote-juggler-tray .
+    sources:
+      - type: git
+        url: https://gitlab.com/tinyland/remote-juggler.git
+        tag: v2.0.0
+
+  # Desktop integration
+  - name: desktop-files
+    buildsystem: simple
+    build-commands:
+      # Install desktop entry
+      - install -Dm644 packaging/remote-juggler-gui.desktop /app/share/applications/dev.tinyland.RemoteJuggler.desktop
+      # Install icon
+      - install -Dm644 assets/remote-juggler.svg /app/share/icons/hicolor/scalable/apps/dev.tinyland.RemoteJuggler.svg
+      # Install metainfo
+      - install -Dm644 packaging/flatpak/dev.tinyland.RemoteJuggler.metainfo.xml /app/share/metainfo/dev.tinyland.RemoteJuggler.metainfo.xml
+    sources:
+      - type: git
+        url: https://gitlab.com/tinyland/remote-juggler.git
+        tag: v2.0.0

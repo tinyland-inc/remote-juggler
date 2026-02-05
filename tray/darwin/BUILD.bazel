@@ -1,0 +1,83 @@
+# RemoteJuggler macOS Tray App BUILD File
+#
+# Swift application for macOS menu bar (MenuBarExtra).
+#
+# Build:
+#   bazelisk build //tray/darwin:RemoteJugglerTray --config=macos
+#
+# Note: Swift targets only build on macOS.
+# Requires Xcode command line tools.
+
+load("@rules_swift//swift:swift.bzl", "swift_binary", "swift_library", "swift_test")
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Platform Check
+# =============================================================================
+
+# Only build on macOS
+config_setting(
+    name = "is_macos",
+    constraint_values = ["@platforms//os:macos"],
+)
+
+# =============================================================================
+# Main Binary
+# =============================================================================
+
+swift_binary(
+    name = "RemoteJugglerTray",
+    srcs = glob(["Sources/**/*.swift"]),
+    module_name = "RemoteJugglerTray",
+    target_compatible_with = select({
+        ":is_macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    # Minimum macOS version for MenuBarExtra
+    copts = [
+        "-target", "arm64-apple-macos13.0",
+    ],
+    linkopts = [
+        "-framework", "AppKit",
+        "-framework", "SwiftUI",
+    ],
+)
+
+# =============================================================================
+# Library (for testing)
+# =============================================================================
+
+swift_library(
+    name = "RemoteJugglerTrayLib",
+    srcs = glob(["Sources/**/*.swift"]),
+    module_name = "RemoteJugglerTrayLib",
+    target_compatible_with = select({
+        ":is_macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# =============================================================================
+# Tests
+# =============================================================================
+
+swift_test(
+    name = "RemoteJugglerTrayTests",
+    srcs = glob(["Tests/**/*.swift"]),
+    deps = [],  # Tests are self-contained with inline test types
+    module_name = "RemoteJugglerTrayTests",
+    target_compatible_with = select({
+        ":is_macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+)
+
+# =============================================================================
+# Package.swift Integration
+# =============================================================================
+
+exports_files([
+    "Package.swift",
+])

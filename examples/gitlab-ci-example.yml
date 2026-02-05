@@ -1,0 +1,303 @@
+# RemoteJuggler GitLab CI Integration Example
+# ============================================
+#
+# This example shows how to use RemoteJuggler in GitLab CI pipelines
+# for automatic identity management when working with multiple Git accounts.
+#
+# Prerequisites:
+# - RemoteJuggler installed on runner (or use Docker image)
+# - SSH keys configured as CI/CD variables
+# - GPG keys configured (optional, for signed commits)
+
+variables:
+  # RemoteJuggler version
+  RJ_VERSION: "2.0.0"
+  # Default identity (can be overridden per-job)
+  RJ_IDENTITY: "ci-deploy"
+
+# ==============================================================================
+# Setup Templates
+# ==============================================================================
+
+.setup-remotejuggler: &setup-remotejuggler
+  before_script:
+    # Install RemoteJuggler if not present
+    - |
+      if ! command -v remote-juggler &>/dev/null; then
+        echo "Installing RemoteJuggler..."
+        curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${RJ_VERSION}
+      fi
+
+    # Configure identity from CI variables
+    - mkdir -p ~/.config/remote-juggler
+    - |
+      cat > ~/.config/remote-juggler/config.json << EOF
+      {
+        "version": "2.0",
+        "identities": {
+          "ci-deploy": {
+            "provider": "gitlab",
+            "username": "${CI_DEPLOY_USER:-gitlab-ci}",
+            "email": "${CI_DEPLOY_EMAIL:-ci@example.com}",
+            "ssh_host": "gitlab.com"
+          }
+        },
+        "settings": {
+          "default_identity": "ci-deploy"
+        }
+      }
+      EOF
+
+    # Setup SSH key from variable
+    - |
+      if [ -n "${SSH_PRIVATE_KEY}" ]; then
+        mkdir -p ~/.ssh
+        echo "${SSH_PRIVATE_KEY}" | tr -d '\r' > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+      fi
+
+    # Switch to configured identity
+    - remote-juggler switch ${RJ_IDENTITY}
+    - remote-juggler status
+
+# ==============================================================================
+# Multi-Identity Pipeline
+# ==============================================================================
+
+stages:
+  - test
+  - build
+  - deploy
+  - release
+
+# Test job - uses default CI identity
+test:
+  stage: test
+  <<: *setup-remotejuggler
+  script:
+    - echo "Running tests with identity:"
+    - git config user.name
+    - git config user.email
+    - make test
+
+# Build job - same identity
+build:
+  stage: build
+  <<: *setup-remotejuggler
+  script:
+    - make release
+  artifacts:
+    paths:
+      - target/release/
+
+# ==============================================================================
+# Cross-Repository Deployment Example
+# ==============================================================================
+
+# Deploy to GitHub Pages (different identity)
+deploy-github:
+  stage: deploy
+  variables:
+    RJ_IDENTITY: "github-deploy"
+    GITHUB_REPO: "github.com:myorg/myproject.github.io.git"
+  before_script:
+    # Extended setup for GitHub identity
+    - |
+      if ! command -v remote-juggler &>/dev/null; then
+        curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${RJ_VERSION}
+      fi
+
+    - mkdir -p ~/.config/remote-juggler
+    - |
+      cat > ~/.config/remote-juggler/config.json << EOF
+      {
+        "version": "2.0",
+        "identities": {
+          "ci-deploy": {
+            "provider": "gitlab",
+            "username": "${CI_DEPLOY_USER}",
+            "email": "${CI_DEPLOY_EMAIL}",
+            "ssh_host": "gitlab.com"
+          },
+          "github-deploy": {
+            "provider": "github",
+            "username": "${GITHUB_USER}",
+            "email": "${GITHUB_EMAIL}",
+            "ssh_host": "github-deploy"
+          }
+        }
+      }
+      EOF
+
+    # Setup both SSH keys
+    - mkdir -p ~/.ssh
+    - echo "${SSH_PRIVATE_KEY}" | tr -d '\r' > ~/.ssh/id_ed25519
+    - echo "${GITHUB_SSH_KEY}" | tr -d '\r' > ~/.ssh/github_deploy
+    - chmod 600 ~/.ssh/id_ed25519 ~/.ssh/github_deploy
+
+    # SSH config for GitHub
+    - |
+      cat >> ~/.ssh/config << EOF
+      Host github-deploy
+        HostName github.com
+        User git
+        IdentityFile ~/.ssh/github_deploy
+        IdentitiesOnly yes
+      EOF
+
+    - ssh-keyscan -H gitlab.com github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+    # Switch to GitHub identity
+    - remote-juggler switch github-deploy
+    - remote-juggler status
+
+  script:
+    - echo "Deploying to GitHub with identity:"
+    - git config user.name
+    - git config user.email
+
+    # Clone and update GitHub Pages repo
+    - git clone git@github-deploy:${GITHUB_REPO} gh-pages
+    - cp -r public/* gh-pages/
+    - cd gh-pages
+    - git add .
+    - git commit -m "Deploy from GitLab CI [skip ci]" || echo "No changes"
+    - git push origin main
+
+  only:
+    - main
+
+# ==============================================================================
+# Signed Release Example
+# ==============================================================================
+
+release:
+  stage: release
+  variables:
+    RJ_IDENTITY: "release-signer"
+  before_script:
+    - |
+      if ! command -v remote-juggler &>/dev/null; then
+        curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${RJ_VERSION}
+      fi
+
+    # Setup GPG key for signing
+    - |
+      if [ -n "${GPG_PRIVATE_KEY}" ]; then
+        echo "${GPG_PRIVATE_KEY}" | base64 -d | gpg --batch --import
+        echo "${GPG_KEY_ID}:6:" | gpg --import-ownertrust
+      fi
+
+    - mkdir -p ~/.config/remote-juggler
+    - |
+      cat > ~/.config/remote-juggler/config.json << EOF
+      {
+        "version": "2.0",
+        "identities": {
+          "release-signer": {
+            "provider": "gitlab",
+            "username": "${CI_DEPLOY_USER}",
+            "email": "${RELEASE_EMAIL}",
+            "ssh_host": "gitlab.com",
+            "gpg": {
+              "key_id": "${GPG_KEY_ID}",
+              "sign_commits": true,
+              "sign_tags": true
+            }
+          }
+        }
+      }
+      EOF
+
+    - mkdir -p ~/.ssh
+    - echo "${SSH_PRIVATE_KEY}" | tr -d '\r' > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+
+    - remote-juggler switch release-signer
+    - remote-juggler status
+
+  script:
+    - echo "Creating signed release..."
+    - git config user.name
+    - git config user.email
+    - git config user.signingkey
+
+    # Create signed tag
+    - |
+      if [ -n "${CI_COMMIT_TAG}" ]; then
+        git tag -s -f "${CI_COMMIT_TAG}" -m "Release ${CI_COMMIT_TAG}"
+        git push origin "${CI_COMMIT_TAG}" --force
+      fi
+
+    # Create release artifacts
+    - make dist
+    - |
+      cd dist/
+      sha256sum *.tar.gz > SHA256SUMS.txt
+      gpg --armor --detach-sign SHA256SUMS.txt
+
+  artifacts:
+    paths:
+      - dist/
+  only:
+    - tags
+
+# ==============================================================================
+# Mirror to Multiple Remotes
+# ==============================================================================
+
+mirror:
+  stage: deploy
+  before_script:
+    - |
+      if ! command -v remote-juggler &>/dev/null; then
+        curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${RJ_VERSION}
+      fi
+
+    # Setup all mirror identities
+    - mkdir -p ~/.ssh ~/.config/remote-juggler
+    - echo "${GITLAB_SSH_KEY}" | tr -d '\r' > ~/.ssh/gitlab_key
+    - echo "${GITHUB_SSH_KEY}" | tr -d '\r' > ~/.ssh/github_key
+    - echo "${BITBUCKET_SSH_KEY}" | tr -d '\r' > ~/.ssh/bitbucket_key
+    - chmod 600 ~/.ssh/*_key
+
+    - |
+      cat > ~/.ssh/config << EOF
+      Host gitlab-mirror
+        HostName gitlab.com
+        User git
+        IdentityFile ~/.ssh/gitlab_key
+        IdentitiesOnly yes
+
+      Host github-mirror
+        HostName github.com
+        User git
+        IdentityFile ~/.ssh/github_key
+        IdentitiesOnly yes
+
+      Host bitbucket-mirror
+        HostName bitbucket.org
+        User git
+        IdentityFile ~/.ssh/bitbucket_key
+        IdentitiesOnly yes
+      EOF
+
+    - ssh-keyscan -H gitlab.com github.com bitbucket.org >> ~/.ssh/known_hosts 2>/dev/null
+
+  script:
+    # Mirror to all remotes
+    - git remote add github git@github-mirror:${GITHUB_ORG}/${CI_PROJECT_NAME}.git || true
+    - git remote add bitbucket git@bitbucket-mirror:${BITBUCKET_ORG}/${CI_PROJECT_NAME}.git || true
+
+    - git push github HEAD:${CI_COMMIT_REF_NAME} --force
+    - git push bitbucket HEAD:${CI_COMMIT_REF_NAME} --force
+
+    # Push tags
+    - git push github --tags
+    - git push bitbucket --tags
+
+  only:
+    - main
+    - tags
