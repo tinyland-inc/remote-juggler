@@ -1,0 +1,122 @@
+# RemoteJuggler SSH Configuration Example
+# ========================================
+#
+# This file demonstrates SSH host aliases for multi-identity setups.
+# Copy relevant sections to ~/.ssh/config
+#
+# The key insight: Each identity uses a unique Host alias that maps
+# to the same HostName (e.g., github.com), but with a different IdentityFile.
+#
+# RemoteJuggler can auto-generate this from your config with:
+#   remote-juggler setup --import-ssh
+
+# ==============================================================================
+# GitHub Personal Account
+# ==============================================================================
+Host github-personal
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_personal_ed25519
+    IdentitiesOnly yes
+    # Optional: Require specific host key algorithm
+    # HostKeyAlgorithms ssh-ed25519
+
+# ==============================================================================
+# GitHub Work Account
+# ==============================================================================
+Host github-work
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_work_ed25519
+    IdentitiesOnly yes
+
+# ==============================================================================
+# GitLab.com Personal
+# ==============================================================================
+Host gitlab-personal
+    HostName gitlab.com
+    User git
+    IdentityFile ~/.ssh/gitlab_personal_ed25519
+    IdentitiesOnly yes
+
+# ==============================================================================
+# GitLab Self-Hosted (Enterprise)
+# ==============================================================================
+Host gitlab-work
+    HostName gitlab.corp.example.com
+    User git
+    IdentityFile ~/.ssh/corp_ed25519
+    IdentitiesOnly yes
+    # Corporate proxy if needed
+    # ProxyCommand nc -x proxy.corp.example.com:1080 %h %p
+
+# ==============================================================================
+# Bitbucket
+# ==============================================================================
+Host bitbucket-client
+    HostName bitbucket.org
+    User git
+    IdentityFile ~/.ssh/bitbucket_client_ed25519
+    IdentitiesOnly yes
+
+# ==============================================================================
+# YubiKey / Hardware Key (FIDO2 resident keys)
+# ==============================================================================
+Host github-yubikey
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_sk
+    IdentitiesOnly yes
+    # FIDO2 keys may need longer timeout
+    ConnectTimeout 30
+
+# ==============================================================================
+# Shared Settings (apply to all hosts)
+# ==============================================================================
+Host *
+    # Reuse connections (faster subsequent operations)
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 600
+
+    # Security best practices
+    HashKnownHosts yes
+    VisualHostKey no
+
+    # Performance
+    Compression yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+
+    # Disable password auth for git hosts
+    PreferredAuthentications publickey
+
+    # macOS Keychain integration (comment out on Linux)
+    # AddKeysToAgent yes
+    # UseKeychain yes
+
+# ==============================================================================
+# Usage Examples
+# ==============================================================================
+#
+# Clone using specific identity:
+#   git clone git@github-personal:myuser/repo.git
+#   git clone git@gitlab-work:company/project.git
+#
+# RemoteJuggler automatically rewrites URLs:
+#   remote-juggler switch personal
+#   git clone git@github.com:myuser/repo.git  # Uses github-personal automatically
+#
+# Check which key is being used:
+#   ssh -T git@github-personal
+#   ssh -T git@gitlab-work
+#
+# Debug connection issues:
+#   ssh -vvv git@github-personal
+
+# ==============================================================================
+# Socket Directory Setup
+# ==============================================================================
+# Create the socket directory for ControlPath:
+#   mkdir -p ~/.ssh/sockets
+#   chmod 700 ~/.ssh/sockets

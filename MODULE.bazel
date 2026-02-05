@@ -1,0 +1,109 @@
+# RemoteJuggler Bazel Module
+#
+# This module defines the Bazel build configuration for RemoteJuggler.
+#
+# Strategy: Bazel for Rust/Go/Swift/C, Nix for Chapel
+# - Chapel CLI: `nix build .#remote-juggler` (no rules_chapel exists)
+# - GUI/Tray/HSM: `bazelisk build //...`
+# - Unified: `just build-all`
+#
+# See docs/ROADMAP_8WEEK.md for full strategy rationale.
+
+module(
+    name = "remote_juggler",
+    version = "2.0.0",
+    compatibility_level = 1,
+)
+
+# =============================================================================
+# Core Dependencies
+# =============================================================================
+
+# Rust toolchain for GTK GUI
+bazel_dep(name = "rules_rust", version = "0.54.1")
+
+# Go toolchain for Linux tray app
+bazel_dep(name = "rules_go", version = "0.50.1")
+
+# Swift toolchain for macOS tray app (when on macOS)
+bazel_dep(name = "rules_swift", version = "2.2.3")
+
+# C/C++ rules for pinentry HSM library
+bazel_dep(name = "rules_cc", version = "0.0.10")
+
+# Python rules for test infrastructure
+bazel_dep(name = "rules_python", version = "0.36.0")
+
+# Proto rules (for potential future MCP proto definitions)
+bazel_dep(name = "rules_proto", version = "6.0.0")
+
+# =============================================================================
+# Testing Dependencies
+# =============================================================================
+
+# GoogleTest for C++ testing
+bazel_dep(name = "googletest", version = "1.14.0")
+
+# Abseil for C++ utilities
+bazel_dep(name = "abseil-cpp", version = "20240116.2")
+
+# =============================================================================
+# Platform Configuration
+# =============================================================================
+
+# Platform definitions for cross-compilation
+bazel_dep(name = "platforms", version = "0.0.10")
+
+# Bazel Skylib utilities
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+
+# =============================================================================
+# Rust Configuration (rules_rust extension)
+# =============================================================================
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2021",
+    versions = ["1.85.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+# Crate universe for Rust dependencies
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+
+crate.from_cargo(
+    name = "crates",
+    cargo_lockfile = "//gtk-gui:Cargo.lock",
+    manifests = ["//gtk-gui:Cargo.toml"],
+)
+use_repo(crate, "crates")
+
+# =============================================================================
+# Go Configuration (rules_go extension)
+# =============================================================================
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.21.6")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//tray/linux:go.mod")
+
+# Gazelle for Go dependency management
+bazel_dep(name = "gazelle", version = "0.39.0")
+
+# =============================================================================
+# Python Configuration (for test infrastructure)
+# =============================================================================
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(python_version = "3.11")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.11",
+    requirements_lock = "//test/e2e:requirements.txt",
+)
+use_repo(pip, "pip")

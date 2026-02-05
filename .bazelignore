@@ -1,0 +1,29 @@
+# Bazel ignore file
+# These directories are not part of the Bazel build
+
+# Nix outputs
+result
+.direnv
+
+# Build artifacts from other build systems
+target
+gtk-gui/target
+tray/darwin/.build
+.mason
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*~
+
+# Documentation build output
+site
+
+# Cache directories
+.cache
+__pycache__
+.pytest_cache
+
+# Git
+.git

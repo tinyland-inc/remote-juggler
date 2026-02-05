@@ -1,0 +1,104 @@
+# RemoteJuggler GTK GUI BUILD File
+#
+# Rust GTK4/Libadwaita GUI for identity management.
+#
+# Build:
+#   bazelisk build //gtk-gui:remote-juggler-gui
+#
+# Test:
+#   bazelisk test //gtk-gui:tests
+#
+# Note: Requires GTK4 and Libadwaita system libraries.
+# On Nix: nix develop (provides GTK deps)
+# On Ubuntu: apt install libgtk-4-dev libadwaita-1-dev
+
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+load("@crates//:defs.bzl", "all_crate_deps")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Main Binary
+# =============================================================================
+
+rust_binary(
+    name = "remote-juggler-gui",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/main.rs",
+    edition = "2021",
+    deps = all_crate_deps(normal = True),
+    rustc_flags = [
+        # Link against system GTK libraries
+        "-C", "link-arg=-lgtk-4",
+        "-C", "link-arg=-ladwaita-1",
+    ],
+    data = [
+        ":resources",
+    ],
+)
+
+# =============================================================================
+# Library (for testing)
+# =============================================================================
+
+rust_library(
+    name = "remote_juggler_gui_lib",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    deps = all_crate_deps(normal = True),
+)
+
+# =============================================================================
+# Tests
+# =============================================================================
+
+rust_test(
+    name = "tests",
+    crate = ":remote_juggler_gui_lib",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ),
+)
+
+rust_test(
+    name = "integration_test",
+    srcs = ["tests/integration_test.rs"],
+    edition = "2021",
+    deps = [
+        "@crates//:serde",
+        "@crates//:serde_json",
+        "@crates//:tempfile",
+        "@crates//:proptest",
+    ] + select({
+        "@platforms//os:linux": [
+            "@crates//:gtk4",
+            "@crates//:libadwaita",
+        ],
+        "//conditions:default": [],
+    }),
+    # Integration tests don't require display by default
+    size = "small",
+)
+
+# =============================================================================
+# Resources
+# =============================================================================
+
+filegroup(
+    name = "resources",
+    srcs = glob([
+        "data/**/*",
+    ]),
+)
+
+# =============================================================================
+# Cargo Integration
+# =============================================================================
+
+# Export Cargo files for crate_universe
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])

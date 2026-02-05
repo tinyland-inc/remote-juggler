@@ -71,7 +71,7 @@ List all configured git identities.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:56-74`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -93,7 +93,7 @@ Detect the git identity for a repository based on its remote URL.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:77-89`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -130,7 +130,7 @@ Switch to a different git identity context.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:92-119`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -157,7 +157,7 @@ Get current git identity context and authentication status.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:122-139`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -190,7 +190,7 @@ Validate SSH key connectivity and credential availability.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:142-165`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -217,7 +217,7 @@ Store a token in the system keychain.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:168-185`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 
@@ -245,7 +245,7 @@ Synchronize managed configuration blocks.
 }
 ```
 
-**Implementation:** `src/remote_juggler/Tools.chpl:188-206`
+**Implementation:** `src/remote_juggler/Tools.chpl`
 
 ---
 

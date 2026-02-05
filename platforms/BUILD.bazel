@@ -1,0 +1,88 @@
+# Platform Definitions for RemoteJuggler
+#
+# These platforms are used for cross-compilation and target-specific builds.
+# Referenced in .bazelrc via --platforms flag.
+
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Linux Platforms
+# =============================================================================
+
+platform(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+platform(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+# =============================================================================
+# macOS Platforms
+# =============================================================================
+
+platform(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+platform(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:arm64",
+    ],
+)
+
+# =============================================================================
+# Constraint Settings
+# =============================================================================
+
+# Custom constraint for HSM availability
+constraint_setting(
+    name = "hsm_backend",
+    default_constraint_value = ":hsm_none",
+)
+
+constraint_value(
+    name = "hsm_tpm",
+    constraint_setting = ":hsm_backend",
+)
+
+constraint_value(
+    name = "hsm_secure_enclave",
+    constraint_setting = ":hsm_backend",
+)
+
+constraint_value(
+    name = "hsm_none",
+    constraint_setting = ":hsm_backend",
+)
+
+# =============================================================================
+# Platform Aliases
+# =============================================================================
+
+# Common aliases for convenience
+alias(
+    name = "linux",
+    actual = ":linux_x86_64",
+)
+
+alias(
+    name = "macos",
+    actual = ":macos_arm64",
+)

@@ -306,6 +306,99 @@ jobs:
         continue-on-error: true
 
   # ===========================================================================
+  # HSM C Library Tests
+  # ===========================================================================
+
+  hsm-unit-tests:
+    name: HSM Unit Tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Build and run HSM unit tests
+        run: |
+          cd pinentry
+          make test
+
+      - name: Upload test binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: hsm-test-binary
+          path: pinentry/test_hsm
+          retention-days: 7
+
+  hsm-integration-tests:
+    name: HSM Integration Tests (Linux)
+    runs-on: ubuntu-latest
+    needs: hsm-unit-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 gnupg gpg-agent
+
+      - name: Build HSM library
+        run: |
+          cd pinentry
+          make all
+
+      - name: Run integration tests
+        run: |
+          cd pinentry
+          chmod +x test_hsm_integration.sh
+          ./test_hsm_integration.sh --verbose
+        continue-on-error: true  # Some tests require hardware
+
+  hsm-macos-tests:
+    name: HSM Tests (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CI Keychain
+        run: |
+          # Create a temporary keychain for CI
+          security create-keychain -p "" ci-keychain.keychain
+          security set-keychain-settings -lut 7200 ci-keychain.keychain
+          security unlock-keychain -p "" ci-keychain.keychain
+          security list-keychains -d user -s ci-keychain.keychain $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s ci-keychain.keychain
+        continue-on-error: true  # Keychain setup may fail in some CI envs
+
+      - name: Build HSM library (Darwin/Keychain backend)
+        run: |
+          cd pinentry
+          make all
+
+      - name: Run HSM unit tests
+        run: |
+          cd pinentry
+          make test
+        continue-on-error: true  # Keychain API may not work fully in CI
+
+      - name: Run basic integration tests
+        run: |
+          cd pinentry
+          chmod +x test_hsm_integration.sh
+          ./test_hsm_integration.sh --skip-gpg --verbose
+        continue-on-error: true  # No SE hardware in CI
+
+      - name: Cleanup CI Keychain
+        if: always()
+        run: |
+          security delete-keychain ci-keychain.keychain 2>/dev/null || true
+
+  # ===========================================================================
   # Summary Job
   # ===========================================================================
 
@@ -320,6 +413,9 @@ jobs:
       - gtk-gui-lint
       - gtk-gui-build
       - gtk-gui-test
+      - hsm-unit-tests
+      - hsm-integration-tests
+      - hsm-macos-tests
     if: always()
     steps:
       - name: Summary
@@ -334,5 +430,8 @@ jobs:
           echo "| GTK GUI Lint | ${{ needs.gtk-gui-lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GTK GUI Build | ${{ needs.gtk-gui-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GTK GUI Tests | ${{ needs.gtk-gui-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| HSM Unit Tests (Linux) | ${{ needs.hsm-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| HSM Integration Tests (Linux) | ${{ needs.hsm-integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| HSM Tests (macOS) | ${{ needs.hsm-macos-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> **Note:** macOS builds and signing are handled by GitLab CI" >> $GITHUB_STEP_SUMMARY

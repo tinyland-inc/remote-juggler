@@ -5,54 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2025-01-15
+## [2.0.0] - 2026-02-05
 
 ### Added
-- Initial release of GitLab Context Switcher
-- Support for switching between personal and work GitLab contexts
-- Automatic git remote management
-- Token-based glab CLI authentication
-- Branch upstream tracking configuration
-- Context state persistence in `.gitlab-context.json`
-- Comprehensive error handling and validation
-- SSH host configuration support
-- Repository access verification
-- Status command for checking current configuration
-- Setup command for initial remote configuration
-- Environment variable based token management
-- Claude command wrapper for easy execution
-- Complete documentation and usage examples
 
-### Features
-- **Context Management**: Switch between personal/work GitLab instances
-- **Authentication**: Automatic token-based glab CLI authentication
-- **Git Integration**: Seamless git remote and upstream branch management
-- **State Persistence**: Remembers last used context across sessions
-- **Verification**: Confirms authentication and repository access
-- **Flexibility**: Configurable contexts via Python dictionary
-- **Security**: Environment variable based token storage
-- **CLI Interface**: Simple command-line interface with status reporting
+**Core Identity Management**
+- Multi-provider git identity switching (GitLab, GitHub, Bitbucket, Azure, Codeberg)
+- Automatic identity detection from repository remote URLs
+- SSH host alias management with managed configuration blocks
+- Git URL rewrite synchronization between SSH config and gitconfig
+
+**MCP Server (Model Context Protocol)**
+- 13 MCP tools for AI agent integration
+- Protocol version 2025-11-25 compliance
+- Tools: `juggler_list_identities`, `juggler_detect_identity`, `juggler_switch`, `juggler_status`, `juggler_validate`, `juggler_store_token`, `juggler_sync_config`, `juggler_gpg_status`, `juggler_pin_store`, `juggler_pin_clear`, `juggler_pin_status`, `juggler_security_mode`, `juggler_setup`
+
+**Hardware Security (Trusted Workstation Mode)**
+- TPM 2.0 integration for Linux (PIN sealed to PCR 7)
+- Secure Enclave integration for macOS (ECIES with P-256)
+- Custom pinentry for gpg-agent with HSM PIN retrieval
+- Three security modes: maximum_security, developer_workflow, trusted_workstation
+
+**GPG/YubiKey Integration**
+- YubiKey detection and management via ykman
+- Touch policy configuration (sig/enc/aut slots)
+- PIN policy management (once/always)
+- Hardware key status in MCP responses
+
+**Platform Applications**
+- GTK4/Libadwaita GUI for Linux desktops
+- Go system tray for Linux with D-Bus singleton
+- Swift MenuBarExtra tray for macOS
+- Desktop notifications on identity switch
+
+**Token Management**
+- System keychain integration (macOS Security.framework, libsecret)
+- Token expiration detection and renewal prompts
+- Provider CLI authentication (glab, gh)
+
+### Architecture
+
+- Chapel 2.6+ for CLI core with MCP/ACP server
+- Rust/GTK4 for Linux GUI
+- Go for Linux system tray
+- Swift/SwiftUI for macOS tray
+- C FFI for TPM 2.0 and Secure Enclave
+- Python for custom pinentry
 
 ### Documentation
-- Comprehensive README.md with setup and usage instructions
-- Detailed docs/gitlab-switch.md for advanced usage
-- Claude command documentation in .claude/commands/
-- Example configuration files and environment templates
-- Troubleshooting guide with common issues and solutions
 
-### Package Structure
-- Pip installable package with entry points
-- MIT license for open source usage
-- Modern Python packaging with pyproject.toml
-- Support for Python 3.8+ with type hints
-- Proper .gitignore for security (excludes .env files)
+- Comprehensive MCP tool schemas
+- Architecture diagrams and data flow documentation
+- Configuration schema reference
+- Trusted Workstation setup guide
 
-## [Unreleased]
+## [1.0.0] - REMOVED
 
-### Planned Features
-- Support for GitLab CE/EE instances
-- Configuration file based context management
-- Multi-repository context switching
-- Integration with popular development tools
-- Shell completion support
-- Enhanced logging and debugging options
+Previous 1.0.0 changelog was from a different project and has been removed.
+RemoteJuggler v2.0.0 is the first public release of the Chapel-based implementation.
+
+---
+
+[2.0.0]: https://gitlab.com/tinyland/projects/remote-juggler/-/releases/v2.0.0

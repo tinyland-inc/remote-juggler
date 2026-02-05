@@ -1,0 +1,66 @@
+# RemoteJuggler Linux Tray App BUILD File
+#
+# Go systray application for Linux desktop notifications.
+#
+# Build:
+#   bazelisk build //tray/linux:remote-juggler-tray
+#
+# Dependencies:
+#   - fyne.io/systray for system tray integration
+#   - D-Bus for notifications
+#
+# Note: Requires GTK development libraries on Linux.
+# On Ubuntu: apt install libgtk-3-dev libappindicator3-dev
+
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Main Binary
+# =============================================================================
+
+go_binary(
+    name = "remote-juggler-tray",
+    embed = [":linux_lib"],
+    visibility = ["//visibility:public"],
+    # CGO is required for systray
+    cgo = True,
+)
+
+# =============================================================================
+# Library
+# =============================================================================
+
+go_library(
+    name = "linux_lib",
+    srcs = ["main.go"],
+    importpath = "gitlab.com/tinyland/projects/remote-juggler/tray/linux",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@io_fyne_systray//:systray",
+        "@com_github_godbus_dbus_v5//:dbus",
+    ],
+)
+
+# =============================================================================
+# Tests
+# =============================================================================
+
+go_test(
+    name = "linux_test",
+    srcs = ["main_test.go"],
+    embed = [":linux_lib"],
+    deps = [],
+    # Unit tests don't require a display
+    size = "small",
+)
+
+# =============================================================================
+# Go Module Files
+# =============================================================================
+
+exports_files([
+    "go.mod",
+    "go.sum",
+])

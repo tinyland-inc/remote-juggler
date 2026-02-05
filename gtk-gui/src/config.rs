@@ -10,6 +10,73 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Security mode for YubiKey PIN handling
+///
+/// Controls how YubiKey PINs are handled during signing operations:
+/// - `MaximumSecurity`: PIN required for every operation (default YubiKey behavior)
+/// - `DeveloperWorkflow`: PIN cached for session (default)
+/// - `TrustedWorkstation`: PIN stored in TPM/SecureEnclave for passwordless signing
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SecurityMode {
+    /// PIN required for every signing operation
+    MaximumSecurity,
+    /// PIN cached for the duration of the session (default)
+    #[default]
+    DeveloperWorkflow,
+    /// PIN stored in hardware security module (TPM/SecureEnclave)
+    TrustedWorkstation,
+}
+
+impl SecurityMode {
+    /// Returns a human-readable display name for the security mode
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            SecurityMode::MaximumSecurity => "Maximum Security",
+            SecurityMode::DeveloperWorkflow => "Developer Workflow",
+            SecurityMode::TrustedWorkstation => "Trusted Workstation",
+        }
+    }
+
+    /// Returns a human-readable description of the security mode
+    #[allow(dead_code)]
+    pub fn description(&self) -> &'static str {
+        match self {
+            SecurityMode::MaximumSecurity => "PIN required for every operation",
+            SecurityMode::DeveloperWorkflow => "PIN cached for session",
+            SecurityMode::TrustedWorkstation => "PIN stored in secure hardware",
+        }
+    }
+
+    /// Returns all security modes in order
+    pub fn all() -> [SecurityMode; 3] {
+        [
+            SecurityMode::MaximumSecurity,
+            SecurityMode::DeveloperWorkflow,
+            SecurityMode::TrustedWorkstation,
+        ]
+    }
+
+    /// Returns the index of this security mode in the all() array
+    pub fn index(&self) -> u32 {
+        match self {
+            SecurityMode::MaximumSecurity => 0,
+            SecurityMode::DeveloperWorkflow => 1,
+            SecurityMode::TrustedWorkstation => 2,
+        }
+    }
+
+    /// Creates a SecurityMode from an index
+    pub fn from_index(index: u32) -> Self {
+        match index {
+            0 => SecurityMode::MaximumSecurity,
+            1 => SecurityMode::DeveloperWorkflow,
+            2 => SecurityMode::TrustedWorkstation,
+            _ => SecurityMode::DeveloperWorkflow, // Default
+        }
+    }
+}
+
 /// GPG signing configuration for an identity
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +89,13 @@ pub struct GpgConfig {
     pub sign_tags: bool,
     #[serde(default)]
     pub auto_signoff: bool,
+    /// Security mode for PIN handling (maximum_security, developer_workflow, trusted_workstation)
+    #[serde(default)]
+    pub security_mode: SecurityMode,
+    /// PIN storage method for trusted_workstation mode (tpm, secure_enclave, keychain, none)
+    /// Auto-detected if empty
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pin_storage_method: Option<String>,
 }
 
 /// A single git identity configuration

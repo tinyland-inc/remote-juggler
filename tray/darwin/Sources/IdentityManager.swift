@@ -5,19 +5,104 @@ import SwiftUI
 
 // MARK: - Models
 
+/// Security mode for YubiKey PIN handling
+///
+/// Controls how YubiKey PINs are handled during signing operations:
+/// - `maximumSecurity`: PIN required for every operation (default YubiKey behavior)
+/// - `developerWorkflow`: PIN cached for session (default)
+/// - `trustedWorkstation`: PIN stored in TPM/SecureEnclave for passwordless signing
+enum SecurityMode: String, Codable, CaseIterable, Identifiable {
+    case maximumSecurity = "maximum_security"
+    case developerWorkflow = "developer_workflow"
+    case trustedWorkstation = "trusted_workstation"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .maximumSecurity:
+            return "Maximum Security"
+        case .developerWorkflow:
+            return "Developer Workflow"
+        case .trustedWorkstation:
+            return "Trusted Workstation"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .maximumSecurity:
+            return "PIN required for every operation"
+        case .developerWorkflow:
+            return "PIN cached for session"
+        case .trustedWorkstation:
+            return "PIN stored in secure hardware"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .maximumSecurity:
+            return "lock.shield.fill"
+        case .developerWorkflow:
+            return "hammer.fill"
+        case .trustedWorkstation:
+            return "desktopcomputer"
+        }
+    }
+}
+
+/// GPG signing configuration
+struct GpgConfig: Codable {
+    var keyId: String = ""
+    var signCommits: Bool = false
+    var signTags: Bool = false
+    var autoSignoff: Bool = false
+    var securityMode: SecurityMode = .developerWorkflow
+    var pinStorageMethod: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case keyId
+        case signCommits
+        case signTags
+        case autoSignoff
+        case securityMode
+        case pinStorageMethod
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keyId = try container.decodeIfPresent(String.self, forKey: .keyId) ?? ""
+        signCommits = try container.decodeIfPresent(Bool.self, forKey: .signCommits) ?? false
+        signTags = try container.decodeIfPresent(Bool.self, forKey: .signTags) ?? false
+        autoSignoff = try container.decodeIfPresent(Bool.self, forKey: .autoSignoff) ?? false
+        securityMode = try container.decodeIfPresent(SecurityMode.self, forKey: .securityMode) ?? .developerWorkflow
+        pinStorageMethod = try container.decodeIfPresent(String.self, forKey: .pinStorageMethod)
+    }
+
+    init() {}
+}
+
 struct Identity: Identifiable, Codable, Equatable {
     let id: String
     let name: String
     let provider: String
     let email: String
     let host: String
+    var gpg: GpgConfig?
 
-    init(id: String? = nil, name: String, provider: String, email: String, host: String) {
+    init(id: String? = nil, name: String, provider: String, email: String, host: String, gpg: GpgConfig? = nil) {
         self.id = id ?? name
         self.name = name
         self.provider = provider
         self.email = email
         self.host = host
+        self.gpg = gpg
+    }
+
+    static func == (lhs: Identity, rhs: Identity) -> Bool {
+        lhs.id == rhs.id && lhs.name == rhs.name && lhs.provider == rhs.provider &&
+        lhs.email == rhs.email && lhs.host == rhs.host
     }
 }
 
@@ -48,6 +133,7 @@ struct Config: Codable {
         var email: String
         var sshKey: String?
         var gpgKey: String?
+        var gpg: GpgConfig?
     }
 
     struct ConfigSettings: Codable {
@@ -55,6 +141,12 @@ struct Config: Codable {
         var autoDetect: Bool?
         var useKeychain: Bool?
         var gpgSign: Bool?
+        /// Default security mode for new identities
+        var defaultSecurityMode: SecurityMode?
+        /// Whether hardware security module is available (runtime detection)
+        var hsmAvailable: Bool?
+        /// Require HSM for trusted_workstation mode
+        var trustedWorkstationRequiresHSM: Bool?
     }
 }
 
@@ -64,12 +156,14 @@ struct Config: Codable {
 class IdentityManager: ObservableObject {
     @Published var identities: [Identity] = []
     @Published var currentIdentity: Identity?
+    @Published var currentSecurityMode: SecurityMode = .developerWorkflow
     @Published var forceMode: Bool = false {
         didSet { saveState() }
     }
     @Published var showNotifications: Bool = true {
         didSet { saveState() }
     }
+    @Published var pinStored: Bool = false
 
     private let configURL: URL
     private let stateURL: URL
@@ -107,6 +201,49 @@ class IdentityManager: ObservableObject {
         }
     }
 
+    /// Set the security mode for YubiKey PIN handling
+    /// - Parameter mode: The security mode to set
+    func setSecurityMode(_ mode: SecurityMode) {
+        Task {
+            await performSetSecurityMode(mode)
+        }
+    }
+
+    /// Store YubiKey PIN in secure storage (Secure Enclave on macOS)
+    /// - Parameters:
+    ///   - identity: The identity name to store the PIN for
+    ///   - pin: The YubiKey PIN to store
+    /// - Returns: True if PIN was stored successfully
+    func storePIN(identity: String, pin: String) async -> Bool {
+        return await performStorePIN(identity: identity, pin: pin)
+    }
+
+    /// Check if a PIN is stored for the given identity
+    /// - Parameter identity: The identity name to check
+    /// - Returns: True if a PIN is stored for this identity
+    func hasPINStored(identity: String) -> Bool {
+        // Check using CLI or keychain query
+        guard FileManager.default.fileExists(atPath: cliPath) else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["gpg-status", "--identity", identity, "--check-pin"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Private Methods
 
     private func loadConfig() {
@@ -121,7 +258,8 @@ class IdentityManager: ObservableObject {
                 name: name,
                 provider: cfg.provider,
                 email: cfg.email,
-                host: cfg.host
+                host: cfg.host,
+                gpg: cfg.gpg
             )
         }.sorted { $0.name < $1.name }
     }
@@ -212,6 +350,129 @@ class IdentityManager: ObservableObject {
         )
 
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private func performSetSecurityMode(_ mode: SecurityMode) async {
+        // Update local state immediately
+        await MainActor.run {
+            self.currentSecurityMode = mode
+        }
+
+        // Call CLI to persist the change
+        guard FileManager.default.fileExists(atPath: cliPath) else {
+            print("CLI not found at \(cliPath)")
+            return
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["config", "set", "security-mode", mode.rawValue]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            if process.terminationStatus == 0 {
+                await MainActor.run {
+                    if self.showNotifications {
+                        self.sendSecurityModeNotification(mode: mode)
+                    }
+                }
+            } else {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                print("Failed to set security mode: \(output)")
+            }
+        } catch {
+            print("CLI execution error: \(error)")
+        }
+    }
+
+    private func performStorePIN(identity: String, pin: String) async -> Bool {
+        guard FileManager.default.fileExists(atPath: cliPath) else {
+            print("CLI not found at \(cliPath)")
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cliPath)
+        process.arguments = ["store-pin", "--identity", identity]
+
+        // Create pipes for stdin, stdout, stderr
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+
+            // Write PIN to stdin
+            let pinData = (pin + "\n").data(using: .utf8)!
+            stdinPipe.fileHandleForWriting.write(pinData)
+            stdinPipe.fileHandleForWriting.closeFile()
+
+            process.waitUntilExit()
+
+            let success = process.terminationStatus == 0
+
+            await MainActor.run {
+                self.pinStored = success
+                if success && self.showNotifications {
+                    self.sendPINStoredNotification(identity: identity)
+                }
+            }
+
+            return success
+        } catch {
+            print("CLI execution error: \(error)")
+            return false
+        }
+    }
+
+    private func sendSecurityModeNotification(mode: SecurityMode) {
+        let content = UNMutableNotificationContent()
+        content.title = "Security Mode Changed"
+        content.body = "\(mode.displayName): \(mode.description)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    private func sendPINStoredNotification(identity: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "YubiKey PIN Stored"
+        content.body = "PIN securely stored for \(identity)"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func refreshPINStatus() {
+        guard let identity = currentIdentity else {
+            pinStored = false
+            return
+        }
+        pinStored = hasPINStored(identity: identity.name)
     }
 
     // MARK: - Preview Support

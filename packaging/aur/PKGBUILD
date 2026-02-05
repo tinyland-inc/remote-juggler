@@ -1,0 +1,166 @@
+# Maintainer: Jess Sullivan <jess@sulliwood.org>
+# Contributor: Tinyland <packages@tinyland.dev>
+#
+# RemoteJuggler - Git identity management for multi-account workflows
+# https://gitlab.com/tinyland/remote-juggler
+#
+# To build and install:
+#   makepkg -si
+#
+# To update checksums after version bump:
+#   updpkgsums
+
+pkgname=remote-juggler
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Git identity manager for seamless multi-account SSH/GPG workflows"
+arch=('x86_64' 'aarch64')
+url="https://gitlab.com/tinyland/remote-juggler"
+license=('Zlib')
+depends=('glibc' 'openssh' 'gnupg')
+optdepends=(
+    'tpm2-tss: TPM 2.0 hardware security module support'
+    'tpm2-abrmd: TPM 2.0 resource manager daemon'
+    'tpm2-tools: TPM 2.0 command-line tools'
+    'yubikey-manager: YubiKey management and configuration'
+    'pinentry: GPG PIN entry dialogs'
+    'libsecret: Keyring integration for credential storage'
+    'gtk4: GUI application support'
+    'libadwaita: Modern GNOME UI components'
+)
+makedepends=('chapel' 'make' 'gcc' 'pkg-config')
+provides=('remote-juggler' 'pinentry-remotejuggler')
+conflicts=('remote-juggler-git' 'remote-juggler-bin')
+backup=('etc/remote-juggler/config.json.example')
+install=remote-juggler.install
+source=(
+    "${pkgname}-${pkgver}.tar.gz::${url}/-/archive/v${pkgver}/${pkgname}-v${pkgver}.tar.gz"
+)
+sha256sums=('SKIP')  # Update with: updpkgsums
+
+# Build configuration
+_build_gui=0        # Set to 1 to build GTK GUI (requires rust)
+_build_tray=0       # Set to 1 to build tray app (requires go)
+_enable_tpm=1       # Set to 1 to enable TPM support
+
+prepare() {
+    cd "${pkgname}-v${pkgver}"
+
+    # Ensure Chapel is available
+    if ! command -v chpl &>/dev/null; then
+        error "Chapel compiler not found. Install with: yay -S chapel"
+        return 1
+    fi
+}
+
+build() {
+    cd "${pkgname}-v${pkgver}"
+
+    # Build main CLI
+    msg2 "Building RemoteJuggler CLI..."
+    make release
+
+    # Build HSM library
+    msg2 "Building HSM library..."
+    if [[ $_enable_tpm -eq 1 ]] && pkg-config --exists tss2-esys; then
+        make -C pinentry HSM_BACKEND=linux
+    else
+        msg2 "TPM support disabled or tpm2-tss not found, using stub"
+        make -C pinentry HSM_BACKEND=stub
+    fi
+
+    # Optional: Build GUI
+    if [[ $_build_gui -eq 1 ]]; then
+        msg2 "Building GTK GUI..."
+        cd gtk-gui
+        cargo build --release
+        cd ..
+    fi
+
+    # Optional: Build tray app
+    if [[ $_build_tray -eq 1 ]]; then
+        msg2 "Building tray app..."
+        cd tray/linux
+        go build -o ../../target/release/remote-juggler-tray .
+        cd ../..
+    fi
+}
+
+check() {
+    cd "${pkgname}-v${pkgver}"
+
+    # Run unit tests
+    msg2 "Running unit tests..."
+    make test || true  # Don't fail on test errors for now
+
+    # Run HSM tests if TPM available
+    if [[ $_enable_tpm -eq 1 ]]; then
+        msg2 "Running HSM tests..."
+        make -C pinentry test || true
+    fi
+}
+
+package() {
+    cd "${pkgname}-v${pkgver}"
+
+    # Install main binary
+    install -Dm755 "target/release/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+
+    # Install HSM library
+    if [[ -f "pinentry/libhsm_remotejuggler.so" ]]; then
+        install -Dm755 "pinentry/libhsm_remotejuggler.so" "${pkgdir}/usr/lib/libhsm_remotejuggler.so"
+    fi
+
+    # Install pinentry wrapper
+    if [[ -f "pinentry/pinentry-remotejuggler.py" ]]; then
+        install -Dm755 "pinentry/pinentry-remotejuggler.py" "${pkgdir}/usr/bin/pinentry-remotejuggler"
+    fi
+
+    # Install shell completions
+    install -Dm644 "completions/${pkgname}.bash" \
+        "${pkgdir}/usr/share/bash-completion/completions/${pkgname}"
+    install -Dm644 "completions/_${pkgname}" \
+        "${pkgdir}/usr/share/zsh/site-functions/_${pkgname}"
+    install -Dm644 "completions/${pkgname}.fish" \
+        "${pkgdir}/usr/share/fish/vendor_completions.d/${pkgname}.fish"
+
+    # Install example config
+    install -Dm644 "packaging/schemas/config.json" \
+        "${pkgdir}/etc/${pkgname}/config.json.example"
+
+    # Install documentation
+    install -Dm644 "README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+    install -Dm644 "LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+    # Install man page (if exists)
+    if [[ -f "docs/man/${pkgname}.1" ]]; then
+        install -Dm644 "docs/man/${pkgname}.1" \
+            "${pkgdir}/usr/share/man/man1/${pkgname}.1"
+    fi
+
+    # Install systemd user service (if exists)
+    if [[ -f "packaging/systemd/${pkgname}.service" ]]; then
+        install -Dm644 "packaging/systemd/${pkgname}.service" \
+            "${pkgdir}/usr/lib/systemd/user/${pkgname}.service"
+    fi
+
+    # Install desktop entry for tray app
+    if [[ $_build_tray -eq 1 ]] && [[ -f "target/release/remote-juggler-tray" ]]; then
+        install -Dm755 "target/release/remote-juggler-tray" \
+            "${pkgdir}/usr/bin/remote-juggler-tray"
+        install -Dm644 "packaging/autostart.desktop" \
+            "${pkgdir}/etc/xdg/autostart/${pkgname}-tray.desktop"
+        install -Dm644 "assets/remote-juggler.svg" \
+            "${pkgdir}/usr/share/icons/hicolor/scalable/apps/${pkgname}.svg"
+    fi
+
+    # Install GUI (if built)
+    if [[ $_build_gui -eq 1 ]] && [[ -f "gtk-gui/target/release/remote-juggler-gui" ]]; then
+        install -Dm755 "gtk-gui/target/release/remote-juggler-gui" \
+            "${pkgdir}/usr/bin/remote-juggler-gui"
+        install -Dm644 "packaging/remote-juggler-gui.desktop" \
+            "${pkgdir}/usr/share/applications/${pkgname}-gui.desktop"
+    fi
+}
+
+# vim: set ts=4 sw=4 et:

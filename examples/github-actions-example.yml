@@ -1,0 +1,327 @@
+# RemoteJuggler GitHub Actions Integration Example
+# =================================================
+#
+# This example shows how to use RemoteJuggler in GitHub Actions workflows
+# for automatic identity management when working with multiple Git accounts.
+#
+# Prerequisites:
+# - SSH keys stored as repository secrets
+# - GPG keys stored as secrets (optional, for signed commits)
+
+name: CI/CD with RemoteJuggler
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+env:
+  RJ_VERSION: "2.0.0"
+
+# ==============================================================================
+# Test and Build Jobs
+# ==============================================================================
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RemoteJuggler
+        run: |
+          curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ env.RJ_VERSION }}
+
+      - name: Configure Identity
+        run: |
+          mkdir -p ~/.config/remote-juggler
+          cat > ~/.config/remote-juggler/config.json << 'EOF'
+          {
+            "version": "2.0",
+            "identities": {
+              "github-ci": {
+                "provider": "github",
+                "username": "${{ github.actor }}",
+                "email": "${{ github.actor }}@users.noreply.github.com",
+                "ssh_host": "github.com"
+              }
+            },
+            "settings": {
+              "default_identity": "github-ci"
+            }
+          }
+          EOF
+
+      - name: Switch Identity
+        run: |
+          remote-juggler switch github-ci
+          remote-juggler status
+
+      - name: Run Tests
+        run: |
+          echo "Testing with identity:"
+          git config user.name
+          git config user.email
+          make test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: make release
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: target/release/
+
+# ==============================================================================
+# Cross-Platform Build Matrix
+# ==============================================================================
+
+  build-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-amd64
+          - os: macos-latest
+            platform: darwin-arm64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RemoteJuggler
+        run: |
+          curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ env.RJ_VERSION }}
+
+      - name: Build for ${{ matrix.platform }}
+        run: |
+          remote-juggler status || echo "Not in identity context"
+          make release
+          mv target/release/remote-juggler target/release/remote-juggler-${{ matrix.platform }}
+
+      - name: Upload Platform Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-${{ matrix.platform }}
+          path: target/release/remote-juggler-${{ matrix.platform }}
+
+# ==============================================================================
+# Deploy to GitLab Mirror (Cross-Provider)
+# ==============================================================================
+
+  mirror-to-gitlab:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install RemoteJuggler
+        run: |
+          curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ env.RJ_VERSION }}
+
+      - name: Setup GitLab SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITLAB_SSH_KEY }}" > ~/.ssh/gitlab_key
+          chmod 600 ~/.ssh/gitlab_key
+          ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+
+          cat >> ~/.ssh/config << 'EOF'
+          Host gitlab-mirror
+            HostName gitlab.com
+            User git
+            IdentityFile ~/.ssh/gitlab_key
+            IdentitiesOnly yes
+          EOF
+
+      - name: Configure GitLab Identity
+        run: |
+          mkdir -p ~/.config/remote-juggler
+          cat > ~/.config/remote-juggler/config.json << 'EOF'
+          {
+            "version": "2.0",
+            "identities": {
+              "gitlab-mirror": {
+                "provider": "gitlab",
+                "username": "${{ secrets.GITLAB_USER }}",
+                "email": "${{ secrets.GITLAB_EMAIL }}",
+                "ssh_host": "gitlab-mirror"
+              }
+            }
+          }
+          EOF
+
+          remote-juggler switch gitlab-mirror
+          remote-juggler status
+
+      - name: Mirror to GitLab
+        run: |
+          git remote add gitlab git@gitlab-mirror:${{ secrets.GITLAB_ORG }}/${{ github.event.repository.name }}.git || true
+          git push gitlab main --force
+          git push gitlab --tags
+
+# ==============================================================================
+# Signed Release
+# ==============================================================================
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build-matrix
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install RemoteJuggler
+        run: |
+          curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ env.RJ_VERSION }}
+
+      - name: Import GPG Key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+          echo "${{ secrets.GPG_KEY_ID }}:6:" | gpg --import-ownertrust
+
+      - name: Configure Release Identity
+        run: |
+          mkdir -p ~/.config/remote-juggler
+          cat > ~/.config/remote-juggler/config.json << 'EOF'
+          {
+            "version": "2.0",
+            "identities": {
+              "release-signer": {
+                "provider": "github",
+                "username": "${{ github.actor }}",
+                "email": "${{ secrets.RELEASE_EMAIL }}",
+                "ssh_host": "github.com",
+                "gpg": {
+                  "key_id": "${{ secrets.GPG_KEY_ID }}",
+                  "sign_commits": true,
+                  "sign_tags": true
+                }
+              }
+            }
+          }
+          EOF
+
+          remote-juggler switch release-signer
+          remote-juggler status
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Release Archives
+        run: |
+          mkdir -p dist/
+          cd artifacts/
+
+          for platform in */; do
+            platform_name="${platform%/}"
+            tar -czf "../dist/${platform_name}.tar.gz" -C "$platform_name" .
+          done
+
+      - name: Sign Release
+        run: |
+          cd dist/
+          sha256sum *.tar.gz > SHA256SUMS.txt
+          gpg --armor --detach-sign SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+            dist/SHA256SUMS.txt.asc
+          generate_release_notes: true
+
+# ==============================================================================
+# Reusable Workflow: RemoteJuggler Setup
+# ==============================================================================
+
+# Save this as .github/workflows/setup-remotejuggler.yml and call with:
+#   uses: ./.github/workflows/setup-remotejuggler.yml
+#   with:
+#     identity: my-identity
+#     version: 2.0.0
+
+# name: Setup RemoteJuggler (Reusable)
+# on:
+#   workflow_call:
+#     inputs:
+#       identity:
+#         required: true
+#         type: string
+#       version:
+#         required: false
+#         type: string
+#         default: "2.0.0"
+#
+# jobs:
+#   setup:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Install RemoteJuggler
+#         run: |
+#           curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ inputs.version }}
+#
+#       - name: Switch Identity
+#         run: |
+#           remote-juggler switch ${{ inputs.identity }}
+#           remote-juggler status
+
+# ==============================================================================
+# Composite Action Example
+# ==============================================================================
+
+# Save this as .github/actions/setup-rj/action.yml:
+#
+# name: Setup RemoteJuggler
+# description: Install and configure RemoteJuggler identity
+# inputs:
+#   identity:
+#     description: Identity to switch to
+#     required: true
+#   version:
+#     description: RemoteJuggler version
+#     default: "2.0.0"
+#   config:
+#     description: JSON config (base64 encoded)
+#     required: false
+#
+# runs:
+#   using: composite
+#   steps:
+#     - name: Install RemoteJuggler
+#       shell: bash
+#       run: |
+#         curl -fsSL https://remote-juggler.dev/install.sh | sh -s -- --version ${{ inputs.version }}
+#
+#     - name: Configure
+#       shell: bash
+#       run: |
+#         if [ -n "${{ inputs.config }}" ]; then
+#           mkdir -p ~/.config/remote-juggler
+#           echo "${{ inputs.config }}" | base64 -d > ~/.config/remote-juggler/config.json
+#         fi
+#
+#     - name: Switch Identity
+#       shell: bash
+#       run: |
+#         remote-juggler switch ${{ inputs.identity }}
+#         remote-juggler status

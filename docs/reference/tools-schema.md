@@ -18,7 +18,7 @@ keywords:
 
 JSON schemas for RemoteJuggler MCP tools.
 
-Source: `src/remote_juggler/Tools.chpl:52-209`
+Source: `src/remote_juggler/Tools.chpl`
 
 ## juggler_list_identities
 
@@ -319,6 +319,221 @@ Synchronize configuration.
 
 ---
 
+## juggler_pin_store
+
+Store YubiKey PIN in hardware security module (TPM/SecureEnclave).
+
+### Schema
+
+```json
+{
+  "name": "juggler_pin_store",
+  "description": "Store a YubiKey PIN in hardware security module (TPM 2.0 on Linux, Secure Enclave on macOS). Enables passwordless GPG signing in trusted_workstation mode.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "identity": {
+        "type": "string",
+        "description": "Identity name to store PIN for"
+      },
+      "pin": {
+        "type": "string",
+        "description": "YubiKey PIN (6-127 characters)"
+      }
+    },
+    "required": ["identity", "pin"]
+  }
+}
+```
+
+### Example
+
+```json
+{
+  "name": "juggler_pin_store",
+  "arguments": {
+    "identity": "work",
+    "pin": "123456"
+  }
+}
+```
+
+---
+
+## juggler_pin_clear
+
+Remove stored PIN from hardware security module.
+
+### Schema
+
+```json
+{
+  "name": "juggler_pin_clear",
+  "description": "Remove stored PIN from hardware security module. Use when rotating PINs or disabling trusted_workstation mode.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "identity": {
+        "type": "string",
+        "description": "Identity name to clear PIN for"
+      }
+    },
+    "required": ["identity"]
+  }
+}
+```
+
+### Example
+
+```json
+{
+  "name": "juggler_pin_clear",
+  "arguments": {
+    "identity": "work"
+  }
+}
+```
+
+---
+
+## juggler_pin_status
+
+Check PIN storage status in hardware security module.
+
+### Schema
+
+```json
+{
+  "name": "juggler_pin_status",
+  "description": "Check PIN storage status in hardware security module. Returns HSM availability, stored identities, and current security mode.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "identity": {
+        "type": "string",
+        "description": "Check specific identity (omit for all identities)"
+      }
+    }
+  }
+}
+```
+
+### Example
+
+```json
+{
+  "name": "juggler_pin_status",
+  "arguments": {}
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hsmAvailable` | boolean | Whether HSM is available |
+| `hsmType` | string | "tpm", "secure_enclave", "keychain", or "none" |
+| `securityMode` | string | Current security mode |
+| `storedIdentities` | array | List of identities with stored PINs |
+
+---
+
+## juggler_security_mode
+
+Get or set the security mode for GPG signing operations.
+
+### Schema
+
+```json
+{
+  "name": "juggler_security_mode",
+  "description": "Get or set the security mode for GPG signing operations. Controls how YubiKey PINs are handled during signing.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": ["maximum_security", "developer_workflow", "trusted_workstation"],
+        "description": "Security mode to set. Omit to get current mode."
+      }
+    }
+  }
+}
+```
+
+### Security Modes
+
+| Mode | Description |
+|------|-------------|
+| `maximum_security` | PIN required for every signing operation |
+| `developer_workflow` | PIN cached by gpg-agent (default TTL) |
+| `trusted_workstation` | PIN stored in HSM, retrieved automatically |
+
+### Example
+
+```json
+{
+  "name": "juggler_security_mode",
+  "arguments": {
+    "mode": "trusted_workstation"
+  }
+}
+```
+
+---
+
+## juggler_setup
+
+Run first-time setup wizard.
+
+### Schema
+
+```json
+{
+  "name": "juggler_setup",
+  "description": "Run first-time setup wizard. Detects SSH hosts, GPG keys, and YubiKey devices to auto-configure identities.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": ["auto", "status", "import_ssh", "import_gpg"],
+        "description": "Setup mode (default: auto)",
+        "default": "auto"
+      },
+      "force": {
+        "type": "boolean",
+        "description": "Overwrite existing configuration",
+        "default": false
+      }
+    }
+  }
+}
+```
+
+### Setup Modes
+
+| Mode | Description |
+|------|-------------|
+| `auto` | Full automatic setup (SSH + GPG + HSM detection) |
+| `status` | Show current setup status without changes |
+| `import_ssh` | Import identities from SSH config only |
+| `import_gpg` | Associate GPG keys with existing identities |
+
+### Example
+
+```json
+{
+  "name": "juggler_setup",
+  "arguments": {
+    "mode": "auto",
+    "force": false
+  }
+}
+```
+
+---
+
 ## juggler_gpg_status
 
 Check GPG/SSH signing readiness including hardware token status.
@@ -376,6 +591,236 @@ Check GPG/SSH signing readiness including hardware token status.
 1. **Pre-commit check**: Call before attempting signed commits to verify hardware token is ready
 2. **Identity validation**: Verify signing configuration is complete
 3. **User guidance**: Get actionable recommendations for signing setup
+
+---
+
+## juggler_yubikey_info
+
+Get YubiKey device information.
+
+### Schema
+
+```json
+{
+  "name": "juggler_yubikey_info",
+  "description": "Get YubiKey device information including serial number, firmware version, form factor, and OpenPGP key slot status. Returns comprehensive device details for diagnostics and configuration.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}
+```
+
+### Example
+
+```json
+{
+  "name": "juggler_yubikey_info",
+  "arguments": {}
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `serialNumber` | string | YubiKey serial number (e.g., "26503492") |
+| `firmware` | string | Firmware version (e.g., "5.4.3") |
+| `formFactor` | string | Device form factor (e.g., "USB-A Keychain") |
+| `sigTouchPolicy` | string | Touch policy for signing: "on", "off", "cached", "fixed" |
+| `sigPinPolicy` | string | PIN policy for signing: "once", "always" |
+| `encTouchPolicy` | string | Touch policy for encryption |
+| `autTouchPolicy` | string | Touch policy for authentication |
+| `sigKeyPresent` | boolean | Whether a signing key is loaded |
+| `encKeyPresent` | boolean | Whether an encryption key is loaded |
+| `autKeyPresent` | boolean | Whether an authentication key is loaded |
+| `version` | string | OpenPGP application version |
+| `pinRetries` | integer | PIN retry counter |
+| `resetRetries` | integer | Reset retry counter |
+| `adminRetries` | integer | Admin PIN retry counter |
+
+### Use Cases
+
+1. **Configuration validation**: Verify YubiKey policies are correctly set for signing
+2. **Device detection**: Check if YubiKey is connected and readable
+3. **Trust Workstation readiness**: Determine if device is configured for automated signing
+
+---
+
+## juggler_yubikey_touch_policy
+
+Get or set YubiKey touch policy for OpenPGP key slots.
+
+### Schema
+
+```json
+{
+  "name": "juggler_yubikey_touch_policy",
+  "description": "Get or set touch policy for YubiKey OpenPGP key slots. Touch policies control whether physical touch is required for signing operations.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "slot": {
+        "type": "string",
+        "enum": ["sig", "enc", "aut"],
+        "description": "OpenPGP key slot (sig=signature, enc=encryption, aut=authentication)"
+      },
+      "policy": {
+        "type": "string",
+        "enum": ["on", "off", "cached"],
+        "description": "Touch policy to set. Omit to get current policy. 'cached' caches touch for 15 seconds."
+      }
+    },
+    "required": ["slot"]
+  }
+}
+```
+
+### Example - Get Current Policy
+
+```json
+{
+  "name": "juggler_yubikey_touch_policy",
+  "arguments": {
+    "slot": "sig"
+  }
+}
+```
+
+### Example - Set Policy
+
+```json
+{
+  "name": "juggler_yubikey_touch_policy",
+  "arguments": {
+    "slot": "sig",
+    "policy": "cached"
+  }
+}
+```
+
+### Touch Policy Values
+
+| Policy | Description | Use Case |
+|--------|-------------|----------|
+| `on` | Touch required for every operation | Maximum security |
+| `off` | No touch required | Automated signing in trusted environment |
+| `cached` | Touch required once, cached for 15 seconds | Balance of security and usability |
+| `fixed` | Cannot be changed (read-only) | Factory-set policy |
+
+### Response
+
+```json
+{
+  "slot": "sig",
+  "currentPolicy": "cached",
+  "allPolicies": {
+    "sig": "cached",
+    "enc": "off",
+    "aut": "off"
+  },
+  "requiresAdminPin": true,
+  "message": "Touch policy updated"
+}
+```
+
+### Notes
+
+- Setting touch policies requires admin PIN on YubiKey
+- "fixed" policies cannot be changed and are read-only
+- Recommended for Trusted Workstation mode: "cached" or "off"
+
+---
+
+## juggler_yubikey_diagnostics
+
+Run YubiKey diagnostic checks.
+
+### Schema
+
+```json
+{
+  "name": "juggler_yubikey_diagnostics",
+  "description": "Run comprehensive YubiKey diagnostic checks including ykman availability, device connectivity, key slot status, and configuration recommendations. Provides actionable guidance for setup issues.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}
+```
+
+### Example
+
+```json
+{
+  "name": "juggler_yubikey_diagnostics",
+  "arguments": {}
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ykmanAvailable` | boolean | Whether ykman CLI tool is installed |
+| `ykmanVersion` | string | ykman version string |
+| `cardPresent` | boolean | Whether YubiKey is connected |
+| `cardStatus` | object | Device info (serial, firmware, form factor) |
+| `keySlotStatus` | object | Status of sig/enc/aut key slots |
+| `touchPolicies` | object | Current touch policies for all slots |
+| `pinPolicy` | string | Current signature PIN policy |
+| `pinRetries` | object | PIN retry counters |
+| `trustedWorkstationReady` | boolean | Whether device is configured for automated signing |
+| `recommendations` | array | List of actionable recommendations |
+| `diagnostics` | array | Detailed diagnostic messages with status |
+
+### Example Response
+
+```json
+{
+  "ykmanAvailable": true,
+  "ykmanVersion": "5.5.0",
+  "cardPresent": true,
+  "cardStatus": {
+    "serial": "26503492",
+    "firmware": "5.4.3",
+    "formFactor": "USB-A Keychain"
+  },
+  "keySlotStatus": {
+    "signature": "present",
+    "encryption": "present",
+    "authentication": "present"
+  },
+  "touchPolicies": {
+    "sig": "cached",
+    "enc": "off",
+    "aut": "off"
+  },
+  "pinPolicy": "once",
+  "pinRetries": {
+    "pin": 3,
+    "reset": 3,
+    "admin": 3
+  },
+  "trustedWorkstationReady": true,
+  "recommendations": [],
+  "diagnostics": [
+    "[OK] ykman installed: 5.5.0",
+    "[OK] YubiKey connected",
+    "[OK] Serial: 26503492",
+    "[OK] Firmware: 5.4.3",
+    "[OK] Signing key present",
+    "[OK] PIN policy: once (optimal for automation)",
+    "[OK] Touch policy: cached (touch cached for 15s)"
+  ]
+}
+```
+
+### Use Cases
+
+1. **Troubleshooting**: Diagnose YubiKey setup issues before attempting signing
+2. **Setup validation**: Verify all components are installed and configured
+3. **Configuration recommendations**: Get actionable steps to optimize for use case
 
 ---
 

@@ -8,6 +8,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TEST_DIR="$PROJECT_ROOT/test/unit"
 BUILD_DIR="$PROJECT_ROOT/target/test"
+HSM_DIR="$PROJECT_ROOT/pinentry"
+
+# HSM compilation flags - include path for hsm.h
+HSM_CCFLAGS="--ccflags=-I$HSM_DIR"
+
+# Check if native HSM library is available
+HSM_LIB="$HSM_DIR/libhsm_remotejuggler.so"
+if [ -f "$HSM_LIB" ]; then
+    HSM_NATIVE_FLAG="-sHSM_NATIVE_AVAILABLE=true"
+    HSM_LDFLAGS="--ldflags=-L$HSM_DIR --ldflags=-lhsm_remotejuggler --ldflags=-Wl,-rpath,$HSM_DIR"
+else
+    HSM_NATIVE_FLAG="-sHSM_NATIVE_AVAILABLE=false"
+    HSM_LDFLAGS=""
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,6 +56,7 @@ for test_file in $TEST_FILES; do
     # Compile test
     # Include both src and src/remote_juggler directories for module resolution
     # Platform-specific linker flags for macOS
+    # HSM flags for native library support
     COMPILE_FAILED=false
     if [ "$(uname -s)" = "Darwin" ]; then
         if ! chpl -o "$BUILD_DIR/$test_name" \
@@ -49,6 +64,9 @@ for test_file in $TEST_FILES; do
              -M "$PROJECT_ROOT/src" \
              -M "$PROJECT_ROOT/src/remote_juggler" \
              --main-module "$test_name" \
+             $HSM_NATIVE_FLAG \
+             $HSM_CCFLAGS \
+             $HSM_LDFLAGS \
              --ldflags="-framework Security -framework CoreFoundation" \
              2>&1; then
             COMPILE_FAILED=true
@@ -59,6 +77,9 @@ for test_file in $TEST_FILES; do
              -M "$PROJECT_ROOT/src" \
              -M "$PROJECT_ROOT/src/remote_juggler" \
              --main-module "$test_name" \
+             $HSM_NATIVE_FLAG \
+             $HSM_CCFLAGS \
+             $HSM_LDFLAGS \
              2>&1; then
             COMPILE_FAILED=true
         fi

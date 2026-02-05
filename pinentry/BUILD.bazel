@@ -1,0 +1,137 @@
+# RemoteJuggler Pinentry/HSM BUILD File
+#
+# C library for TPM/Secure Enclave operations.
+# Python pinentry script for gpg-agent integration.
+#
+# Build:
+#   bazelisk build //pinentry:libhsm_remotejuggler
+#
+# Test:
+#   bazelisk test //pinentry:test_hsm
+#
+# Platform-specific backends:
+#   - Linux: TPM 2.0 via tpm2-tss ESAPI
+#   - macOS: Secure Enclave via Security.framework
+#   - Other: Stub implementation
+
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test", "cc_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Platform Configuration
+# =============================================================================
+
+config_setting(
+    name = "is_linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
+config_setting(
+    name = "is_macos",
+    constraint_values = ["@platforms//os:macos"],
+)
+
+# =============================================================================
+# HSM Library
+# =============================================================================
+
+cc_library(
+    name = "libhsm_remotejuggler",
+    srcs = select({
+        ":is_linux": ["hsm_linux.c"],
+        ":is_macos": ["hsm_darwin.c"],
+        "//conditions:default": ["hsm_stub.c"],
+    }),
+    hdrs = ["hsm.h"],
+    copts = [
+        "-Wall",
+        "-Wextra",
+        "-O2",
+        "-fPIC",
+    ],
+    linkopts = select({
+        ":is_linux": [
+            "-ltss2-esys",
+            "-ltss2-rc",
+            "-ltss2-tctildr",
+        ],
+        ":is_macos": [
+            "-framework", "Security",
+            "-framework", "CoreFoundation",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# HSM Test Binary
+# =============================================================================
+
+cc_test(
+    name = "test_hsm",
+    srcs = ["test_hsm.c"],
+    deps = [":libhsm_remotejuggler"],
+    copts = [
+        "-Wall",
+        "-Wextra",
+    ],
+    linkopts = select({
+        ":is_linux": [
+            "-ltss2-esys",
+            "-ltss2-rc",
+            "-ltss2-tctildr",
+        ],
+        ":is_macos": [
+            "-framework", "Security",
+            "-framework", "CoreFoundation",
+        ],
+        "//conditions:default": [],
+    }),
+    # HSM tests may need TPM or SE access
+    tags = ["requires-hsm"],
+)
+
+# =============================================================================
+# Pinentry Script
+# =============================================================================
+
+py_binary(
+    name = "pinentry-remotejuggler",
+    srcs = ["pinentry-remotejuggler.py"],
+    main = "pinentry-remotejuggler.py",
+    python_version = "PY3",
+    deps = [],
+    data = [":libhsm_remotejuggler"],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+sh_test(
+    name = "test_hsm_integration",
+    srcs = ["test_hsm_integration.sh"],
+    data = [
+        ":libhsm_remotejuggler",
+        ":pinentry-remotejuggler",
+    ],
+    tags = [
+        "requires-hsm",
+        "manual",  # Run manually, not in bazel test //...
+    ],
+)
+
+# =============================================================================
+# Exports
+# =============================================================================
+
+exports_files([
+    "hsm.h",
+    "Makefile",
+    "README.md",
+])

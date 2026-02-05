@@ -1,0 +1,365 @@
+.\" RemoteJuggler - Git identity management for multi-account workflows
+.\" Man page generated for RemoteJuggler v2.0.0
+.\"
+.TH REMOTE-JUGGLER 1 "February 2026" "RemoteJuggler 2.0.0" "User Commands"
+.SH NAME
+remote-juggler \- Git identity management for multi-account workflows
+.SH SYNOPSIS
+.B remote-juggler
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]
+.SH DESCRIPTION
+.B RemoteJuggler
+manages multiple Git identities (SSH keys, GPG keys, user configurations) for
+developers who work across different accounts and organizations. It handles
+identity switching, SSH host aliases, GPG signing configuration, and optional
+hardware security module (HSM) integration for secure PIN storage.
+.PP
+RemoteJuggler supports:
+.IP \(bu 2
+Multiple identities per provider (GitHub, GitLab, Bitbucket)
+.IP \(bu 2
+Automatic identity detection based on repository remote URLs
+.IP \(bu 2
+SSH host alias management for seamless multi-account access
+.IP \(bu 2
+GPG signing configuration (commits and tags)
+.IP \(bu 2
+Trusted Workstation mode with TPM/Secure Enclave PIN storage
+.IP \(bu 2
+MCP (Model Context Protocol) server mode for AI agent integration
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display help information and exit.
+.TP
+.BR \-v ", " \-\-version
+Display version information and exit.
+.TP
+.BR \-\-debug
+Enable debug output for troubleshooting.
+.TP
+.BR \-\-config =\fIPATH\fR
+Use alternate configuration file (default: ~/.config/remote-juggler/config.json).
+.TP
+.BR \-\-mode =\fIMODE\fR
+Run in specified mode: \fIcli\fR (default), \fImcp\fR, or \fIacp\fR.
+.SH COMMANDS
+.SS Identity Management
+.TP
+.B list
+List all configured identities with their providers and status.
+.RS
+.TP
+.B \-\-json
+Output in JSON format for scripting.
+.TP
+.B \-\-verbose
+Show additional details (SSH keys, GPG keys).
+.RE
+.TP
+.B switch \fIIDENTITY\fR
+Switch to the specified identity. Updates git config, SSH agent, and GPG configuration.
+.RS
+.TP
+.B \-\-set\-remote
+Update remote URLs to use identity's SSH host alias.
+.TP
+.B \-\-no\-gpg
+Skip GPG configuration.
+.TP
+.B \-\-quiet
+Suppress status output.
+.RE
+.TP
+.B status
+Show current identity status including git config, SSH, and GPG state.
+.RS
+.TP
+.B \-\-brief
+Show condensed single-line status.
+.TP
+.B \-\-json
+Output in JSON format.
+.RE
+.TP
+.B detect
+Detect the appropriate identity for the current repository based on remote URLs.
+.RS
+.TP
+.B \-\-url =\fIURL\fR
+Detect identity for a specific URL instead of current repo.
+.TP
+.B \-\-quiet
+Output only the identity name.
+.RE
+.TP
+.B validate \fIIDENTITY\fR
+Validate SSH and credential connectivity for the specified identity.
+.RS
+.TP
+.B \-\-check\-gpg
+Also verify GPG key is available.
+.TP
+.B \-\-quiet
+Suppress detailed output, exit with status code only.
+.RE
+.SS Setup and Configuration
+.TP
+.B setup
+Run the first-time setup wizard to configure identities.
+.RS
+.TP
+.B \-\-auto
+Run in automatic mode (non-interactive).
+.TP
+.B \-\-status
+Show current setup status without making changes.
+.TP
+.B \-\-import\-ssh
+Import SSH hosts from ~/.ssh/config only.
+.TP
+.B \-\-import\-gpg
+Import GPG keys only.
+.RE
+.TP
+.B sync\-config
+Synchronize SSH config and gitconfig with RemoteJuggler configuration.
+.RS
+.TP
+.B \-\-dry\-run
+Show what would change without making modifications.
+.TP
+.B \-\-force
+Force sync even if no changes detected.
+.RE
+.SS PIN Management (Trusted Workstation Mode)
+.TP
+.B pin status
+Show PIN storage status and available HSM backend.
+.TP
+.B pin store \fIIDENTITY\fR
+Store GPG PIN securely in TPM (Linux) or Secure Enclave (macOS).
+.TP
+.B pin clear \fIIDENTITY\fR
+Remove stored PIN for the specified identity.
+.SS Security
+.TP
+.B security\-mode \fIMODE\fR
+Set security mode: \fIstandard\fR, \fItrusted_workstation\fR, or \fIhardware_only\fR.
+.TP
+.B gpg\-status
+Show GPG agent status, card information, and signing readiness.
+.RS
+.TP
+.B \-\-identity =\fIIDENTITY\fR
+Check status for specific identity.
+.RE
+.SS Server Modes
+.TP
+.B \-\-mode=mcp
+Run as MCP (Model Context Protocol) server for AI agent integration. Communicates via stdin/stdout using JSON-RPC.
+.TP
+.B \-\-mode=acp
+Run as ACP (Agent Communication Protocol) server.
+.SH CONFIGURATION
+RemoteJuggler uses a JSON configuration file located at:
+.PP
+.RS
+~/.config/remote-juggler/config.json
+.RE
+.PP
+Example minimal configuration:
+.PP
+.RS
+.nf
+{
+  "version": "2.0",
+  "identities": {
+    "personal": {
+      "provider": "github",
+      "username": "myuser",
+      "email": "me@example.com",
+      "ssh_host": "github-personal",
+      "ssh_key": "~/.ssh/github_personal_ed25519"
+    }
+  },
+  "settings": {
+    "default_identity": "personal",
+    "auto_switch": false
+  }
+}
+.fi
+.RE
+.PP
+See
+.B remote-juggler setup
+for interactive configuration or the examples directory for more templates.
+.SH SSH HOST ALIASES
+RemoteJuggler works best with SSH host aliases. Add to ~/.ssh/config:
+.PP
+.RS
+.nf
+Host github-personal
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_personal_ed25519
+    IdentitiesOnly yes
+.fi
+.RE
+.PP
+Then clone using the alias:
+.PP
+.RS
+git clone git@github-personal:user/repo.git
+.RE
+.SH TRUSTED WORKSTATION MODE
+For passwordless GPG signing with hardware keys (YubiKey), RemoteJuggler can
+store your PIN securely in:
+.IP \(bu 2
+TPM 2.0 (Linux) - PIN sealed to PCR 7 (Secure Boot state)
+.IP \(bu 2
+Secure Enclave (macOS) - ECIES encryption with biometric unlock
+.PP
+Enable with:
+.PP
+.RS
+remote-juggler security-mode trusted_workstation
+.br
+remote-juggler pin store my-identity
+.RE
+.PP
+The custom pinentry will retrieve the PIN automatically when GPG requests it.
+.SH MCP INTEGRATION
+RemoteJuggler provides MCP tools for AI agents:
+.PP
+.RS
+.nf
+juggler_list_identities    - List configured identities
+juggler_switch             - Switch identity context
+juggler_status             - Get current status
+juggler_detect_identity    - Detect identity for repo
+juggler_validate           - Validate connectivity
+juggler_gpg_status         - Check signing readiness
+juggler_store_token        - Store provider token
+juggler_sync_config        - Sync SSH/git config
+juggler_setup              - Run setup wizard
+.fi
+.RE
+.PP
+Start MCP server:
+.PP
+.RS
+remote-juggler --mode=mcp
+.RE
+.SH ENVIRONMENT
+.TP
+.B REMOTE_JUGGLER_CONFIG
+Override default configuration file path.
+.TP
+.B REMOTE_JUGGLER_DEBUG
+Enable debug output (set to 1 or true).
+.TP
+.B REMOTE_JUGGLER_HSM_DEBUG
+Enable HSM/TPM debug output.
+.TP
+.B GPG_TTY
+Required for GPG pinentry. Usually set to $(tty).
+.TP
+.B SSH_AUTH_SOCK
+SSH agent socket for key management.
+.SH FILES
+.TP
+.I ~/.config/remote-juggler/config.json
+Main configuration file.
+.TP
+.I ~/.config/remote-juggler/identities/
+Per-identity override files.
+.TP
+.I ~/.ssh/config
+SSH host alias definitions (managed section).
+.TP
+.I ~/.gitconfig
+Git URL rewrites (managed section).
+.TP
+.I /usr/local/bin/pinentry-remotejuggler
+Custom pinentry for Trusted Workstation mode (optional).
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+General error or invalid arguments.
+.TP
+.B 2
+Configuration error.
+.TP
+.B 3
+Identity not found.
+.TP
+.B 4
+SSH/GPG validation failed.
+.TP
+.B 5
+HSM/TPM error.
+.SH EXAMPLES
+.PP
+List all identities:
+.RS
+remote-juggler list
+.RE
+.PP
+Switch to work identity:
+.RS
+remote-juggler switch work-gitlab
+.RE
+.PP
+Clone with automatic identity:
+.RS
+remote-juggler switch personal
+.br
+git clone git@github.com:myuser/repo.git
+.RE
+.PP
+Validate SSH connectivity:
+.RS
+remote-juggler validate personal
+.RE
+.PP
+Store PIN in TPM/Secure Enclave:
+.RS
+remote-juggler pin store work-yubikey
+.RE
+.PP
+Run as MCP server:
+.RS
+remote-juggler --mode=mcp
+.RE
+.PP
+Debug identity detection:
+.RS
+remote-juggler --debug detect
+.RE
+.SH SEE ALSO
+.BR git (1),
+.BR ssh (1),
+.BR ssh-agent (1),
+.BR gpg (1),
+.BR gpg-agent (1),
+.BR pinentry (1)
+.PP
+Project homepage: https://remote-juggler.dev
+.br
+GitLab: https://gitlab.com/tinyland/remote-juggler
+.SH BUGS
+Report bugs at: https://gitlab.com/tinyland/remote-juggler/-/issues
+.PP
+Security issues: security@tinyland.dev
+.SH AUTHORS
+RemoteJuggler was created by the Tinyland team.
+.PP
+Contributors are listed in the CONTRIBUTORS file.
+.SH COPYRIGHT
+Copyright \(co 2024-2026 Tinyland.
+.PP
+Licensed under the MIT License. See LICENSE file for details.

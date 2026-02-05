@@ -43,7 +43,7 @@ remote-juggler list [--provider=<provider>]
 | Email | Git user.email |
 | GPG | Whether GPG signing is configured |
 
-**Implementation:** `src/remote_juggler.chpl:413-427`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -68,7 +68,7 @@ remote-juggler detect [<path>]
 3. Match against configured identities by host field
 4. Return matched identity with confidence level
 
-**Implementation:** `src/remote_juggler.chpl:429-461`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -95,7 +95,7 @@ remote-juggler to <identity>  # alias
 4. Configure GPG signing key (if configured)
 5. Authenticate with provider CLI (glab/gh) if token available
 
-**Implementation:** `src/remote_juggler.chpl:464-518`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -120,7 +120,7 @@ remote-juggler validate <identity>
 3. GPG key existence (if configured)
 4. GPG registration with provider (if `--gpgSign`)
 
-**Implementation:** `src/remote_juggler.chpl:520-597`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -142,7 +142,7 @@ remote-juggler status
 - Repository information (if in a git repo)
 - Last switch timestamp
 
-**Implementation:** `src/remote_juggler.chpl:599-622`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -165,7 +165,7 @@ remote-juggler config show [<section>]
 | `ssh-hosts` | Managed SSH hosts |
 | `rewrites` | Git URL rewrites |
 
-**Implementation:** `src/remote_juggler.chpl:650-715`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -179,7 +179,7 @@ remote-juggler config import
 
 Parses `~/.ssh/config` for git-related hosts (those pointing to known git providers or containing "git" in hostname).
 
-**Implementation:** `src/remote_juggler.chpl:799-818`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -199,7 +199,7 @@ Updates managed sections in `~/.ssh/config` and `~/.gitconfig` marked with:
 # END REMOTE-JUGGLER MANAGED
 ```
 
-**Implementation:** `src/remote_juggler.chpl:820-839`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -219,7 +219,7 @@ Prompts for token input (hidden). Token is stored with service name format:
 remote-juggler.<provider>.<identity>
 ```
 
-**Implementation:** `src/remote_juggler.chpl:876-923`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -233,7 +233,7 @@ remote-juggler token get <identity>
 
 Shows first 4 and last 4 characters of the token.
 
-**Implementation:** `src/remote_juggler.chpl:925-957`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -245,7 +245,7 @@ Remove a token from Keychain.
 remote-juggler token clear <identity>
 ```
 
-**Implementation:** `src/remote_juggler.chpl:959-986`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -262,7 +262,7 @@ Checks each identity for:
 - Environment variable
 - CLI authentication (glab/gh)
 
-**Implementation:** `src/remote_juggler.chpl:988-1006`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -278,7 +278,7 @@ remote-juggler gpg status
 
 Lists available GPG keys and per-identity configuration.
 
-**Implementation:** `src/remote_juggler.chpl:1030-1072`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -292,7 +292,7 @@ remote-juggler gpg configure <identity>
 
 Attempts to find GPG key matching the identity's email address.
 
-**Implementation:** `src/remote_juggler.chpl:1074-1108`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -306,7 +306,7 @@ remote-juggler gpg verify
 
 Checks provider settings pages for GPG key registration.
 
-**Implementation:** `src/remote_juggler.chpl:1110-1136`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -327,7 +327,7 @@ Shows all Host entries from `~/.ssh/config` with:
 - Port (if non-default)
 - ProxyJump (if configured)
 
-**Implementation:** `src/remote_juggler.chpl:1159-1184`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -341,7 +341,7 @@ remote-juggler debug git-config
 
 Shows `insteadOf` URL rewrite rules and user configuration.
 
-**Implementation:** `src/remote_juggler.chpl:1186-1212`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 
@@ -355,7 +355,7 @@ remote-juggler debug keychain
 
 Performs store/retrieve/delete test cycle to verify Keychain integration.
 
-**Implementation:** `src/remote_juggler.chpl:1214-1258`
+**Implementation:** `src/remote_juggler.chpl`
 
 ---
 

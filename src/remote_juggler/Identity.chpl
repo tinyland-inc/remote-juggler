@@ -109,13 +109,19 @@ prototype module Identity {
   // In-memory identity registry (loaded from config file)
   private var identityRegistry: map(string, GitIdentity);
   private var registryLoaded: bool = false;
+  // When true, clearIdentities() prevents auto-reload (for testing)
+  private var registryCleared: bool = false;
 
   /*
    * Ensure the identity registry is loaded from config file.
    * This is called automatically by functions that access the registry.
+   * If clearIdentities() was called, auto-reload is skipped to allow
+   * tests to work with a clean slate.
    */
   proc ensureRegistryLoaded() {
     if registryLoaded then return;
+    // If registry was explicitly cleared, don't auto-reload from config
+    if registryCleared then return;
 
     // Load identities from GlobalConfig
     const identities = GlobalConfig.loadIdentities();
@@ -134,11 +140,25 @@ prototype module Identity {
   }
 
   /*
-   * Clear all registered identities
+   * Clear all registered identities.
+   * Sets registryCleared flag to prevent auto-reload from config file,
+   * enabling test isolation.
    */
   proc clearIdentities() {
     identityRegistry.clear();
     registryLoaded = false;
+    registryCleared = true;
+  }
+
+  /*
+   * Reset the identity registry to initial state.
+   * Unlike clearIdentities(), this allows auto-reload from config file.
+   * Use this when you want to reload identities from the config file.
+   */
+  proc resetIdentityRegistry() {
+    identityRegistry.clear();
+    registryLoaded = false;
+    registryCleared = false;
   }
 
   /*

@@ -1,2 +1,14 @@
 # E2E Test Dependencies
+# Install: pip install -r test/e2e/requirements.txt
+
+# Core testing framework
 pytest>=7.0.0
+pytest-timeout>=2.2.0
+pytest-xdist>=3.5.0  # Parallel test execution
+
+# For subprocess testing
+pexpect>=4.9.0  # Interactive process testing (pinentry)
+
+# Type checking (optional, for development)
+# mypy>=1.8.0
+# types-all>=1.0.0

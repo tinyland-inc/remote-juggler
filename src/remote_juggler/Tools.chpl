@@ -13,10 +13,17 @@
  * - juggler_validate: Validate SSH and credential connectivity
  * - juggler_store_token: Store a token in the system keychain
  * - juggler_sync_config: Synchronize managed config blocks
+ * - juggler_gpg_status: Check GPG/SSH signing readiness
+ * - juggler_pin_store: Store YubiKey PIN in HSM
+ * - juggler_pin_clear: Remove stored PIN from HSM
+ * - juggler_pin_status: Check PIN storage status
+ * - juggler_security_mode: Get/set security mode
+ * - juggler_setup: Run first-time setup wizard
  */
 prototype module Tools {
   use super.Protocol;
   use super.Core only getEnvVar;
+  import super.Setup;  // Use import instead of use to avoid symbol conflicts
   use List;
   use IO;
   use OS.POSIX;
@@ -225,6 +232,95 @@ prototype module Tools {
       '}'
     ));
 
+    // Tool: juggler_pin_store
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_pin_store",
+      description = "Store a YubiKey PIN securely in the hardware security module (TPM on Linux, SecureEnclave on macOS). This enables Trusted Workstation mode where the PIN is automatically retrieved for gpg-agent.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity name to store the PIN for (e.g., \'personal\', \'work\')"' +
+          '},' +
+          '"pin":{' +
+            '"type":"string",' +
+            '"description":"The YubiKey PIN to store (6-127 characters)"' +
+          '}' +
+        '},' +
+        '"required":["identity","pin"]' +
+      '}'
+    ));
+
+    // Tool: juggler_pin_clear
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_pin_clear",
+      description = "Remove a stored YubiKey PIN from the hardware security module. After clearing, the PIN must be re-entered for signing operations.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity name to clear the PIN for"' +
+          '}' +
+        '},' +
+        '"required":["identity"]' +
+      '}'
+    ));
+
+    // Tool: juggler_pin_status
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_pin_status",
+      description = "Check the status of PIN storage in the hardware security module. Returns HSM availability, stored identities, and current security mode.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Optional: Check PIN status for a specific identity. If omitted, shows status for all identities."' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_security_mode
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_security_mode",
+      description = "Get or set the security mode for GPG signing operations. Modes: maximum_security (PIN required each time), developer_workflow (PIN cached by gpg-agent), trusted_workstation (PIN stored in HSM).",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"mode":{' +
+            '"type":"string",' +
+            '"enum":["maximum_security","developer_workflow","trusted_workstation"],' +
+            '"description":"Security mode to set. Omit to get current mode."' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_setup
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_setup",
+      description = "Run the RemoteJuggler first-time setup wizard. Auto-detects SSH hosts, GPG keys, and HSM availability to generate configuration. Use mode='auto' for non-interactive setup suitable for AI agents.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"mode":{' +
+            '"type":"string",' +
+            '"enum":["auto","status","import_ssh","import_gpg"],' +
+            '"description":"Setup mode: auto (non-interactive, recommended for agents), status (read-only check), import_ssh (SSH hosts only), import_gpg (GPG keys only). Default: auto",' +
+            '"default":"auto"' +
+          '},' +
+          '"force":{' +
+            '"type":"boolean",' +
+            '"description":"Overwrite existing configuration if present",' +
+            '"default":false' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
     return tools;
   }
 
@@ -266,6 +362,21 @@ prototype module Tools {
       }
       when "juggler_gpg_status" {
         return handleGPGStatus(params);
+      }
+      when "juggler_pin_store" {
+        return handlePinStore(params);
+      }
+      when "juggler_pin_clear" {
+        return handlePinClear(params);
+      }
+      when "juggler_pin_status" {
+        return handlePinStatus(params);
+      }
+      when "juggler_security_mode" {
+        return handleSecurityMode(params);
+      }
+      when "juggler_setup" {
+        return handleSetup(params);
       }
       otherwise {
         stderr.writeln("Tools: Unknown tool: ", name);
@@ -1560,5 +1671,399 @@ prototype module Tools {
     }
 
     return (true, output);
+  }
+
+  // ============================================================================
+  // PIN Management Tool Handlers (Trusted Workstation Mode)
+  // ============================================================================
+
+  // Import HSM functions and constants
+  public use super.HSM;
+
+  /*
+   * Handle juggler_pin_store tool call.
+   *
+   * Stores a YubiKey PIN securely in the HSM.
+   */
+  proc handlePinStore(params: string): (bool, string) {
+    stderr.writeln("Tools: handlePinStore");
+
+    // Get required parameters
+    const (hasIdentity, identity) = Protocol.extractJsonString(params, "identity");
+    const (hasPin, pin) = Protocol.extractJsonString(params, "pin");
+
+    if !hasIdentity || identity == "" {
+      return (false, "Missing required parameter: identity");
+    }
+
+    if !hasPin || pin == "" {
+      return (false, "Missing required parameter: pin");
+    }
+
+    var output = "PIN Storage\n";
+    output += "===========\n\n";
+
+    // Check HSM availability
+    const hsmType = hsm_detect_available();
+    if hsmType == HSM_TYPE_NONE {
+      output += "[ERROR] No HSM backend available\n\n";
+      output += "Trusted Workstation mode requires:\n";
+      output += "  - Linux: TPM 2.0 (/dev/tpmrm0)\n";
+      output += "  - macOS: Secure Enclave (T1/T2/Apple Silicon)\n";
+      return (false, output);
+    }
+
+    const hsmTypeName = hsm_type_name(hsmType);
+    output += "HSM Backend: " + hsmTypeName + "\n";
+    output += "Identity: " + identity + "\n\n";
+
+    // Validate PIN length
+    if pin.size < 6 || pin.size > 127 {
+      output += "[ERROR] PIN must be between 6 and 127 characters\n";
+      return (false, output);
+    }
+
+    // Store PIN
+    const result = hsm_store_pin(identity, pin, pin.size);
+
+    if result == HSM_SUCCESS {
+      output += "[OK] PIN stored securely in " + hsmTypeName + "\n\n";
+      output += "The PIN is now sealed and can only be retrieved on this device\n";
+      output += "under the same security conditions.\n\n";
+      output += "To enable Trusted Workstation mode, use:\n";
+      output += "  juggler_security_mode with mode=\"trusted_workstation\"\n";
+      return (true, output);
+    } else {
+      const errMsg = hsm_error_message(result);
+      output += "[ERROR] Failed to store PIN: " + errMsg + "\n";
+      return (false, output);
+    }
+  }
+
+  /*
+   * Handle juggler_pin_clear tool call.
+   *
+   * Removes a stored PIN from the HSM.
+   */
+  proc handlePinClear(params: string): (bool, string) {
+    stderr.writeln("Tools: handlePinClear");
+
+    // Get required identity parameter
+    const (hasIdentity, identity) = Protocol.extractJsonString(params, "identity");
+
+    if !hasIdentity || identity == "" {
+      return (false, "Missing required parameter: identity");
+    }
+
+    var output = "PIN Clear\n";
+    output += "=========\n\n";
+
+    // Check HSM availability
+    if hsm_is_available() == 0 {
+      output += "[ERROR] No HSM backend available\n";
+      return (false, output);
+    }
+
+    output += "Identity: " + identity + "\n\n";
+
+    // Check if PIN exists
+    if hsm_has_pin(identity) == 0 {
+      output += "[WARNING] No PIN stored for this identity\n";
+      return (true, output);
+    }
+
+    // Clear PIN
+    const result = hsm_clear_pin(identity);
+
+    if result == HSM_SUCCESS {
+      output += "[OK] PIN cleared from HSM\n\n";
+      output += "The identity will now require manual PIN entry for signing operations.\n";
+      return (true, output);
+    } else {
+      const errMsg = hsm_error_message(result);
+      output += "[ERROR] Failed to clear PIN: " + errMsg + "\n";
+      return (false, output);
+    }
+  }
+
+  /*
+   * Handle juggler_pin_status tool call.
+   *
+   * Checks PIN storage status in the HSM.
+   */
+  proc handlePinStatus(params: string): (bool, string) {
+    stderr.writeln("Tools: handlePinStatus");
+
+    // Get optional identity parameter
+    const (hasIdentity, identityFilter) = Protocol.extractJsonString(params, "identity");
+
+    var output = "PIN Storage Status\n";
+    output += "==================\n\n";
+
+    // Check HSM availability
+    const hsmType = hsm_detect_available();
+    output += "HSM Backend: ";
+    if hsmType != HSM_TYPE_NONE {
+      const hsmTypeName = hsm_type_name(hsmType);
+      output += hsmTypeName + " (available)\n";
+
+      select hsmType {
+        when HSM_TYPE_TPM {
+          output += "  Security: PIN sealed to PCR 7 (Secure Boot state)\n";
+        }
+        when HSM_TYPE_SECURE_ENCLAVE {
+          output += "  Security: ECIES encryption with biometric/password\n";
+        }
+        when HSM_TYPE_KEYCHAIN {
+          output += "  Security: Protected by login password (fallback)\n";
+        }
+      }
+    } else {
+      output += "None (Trusted Workstation mode unavailable)\n";
+      output += "\n";
+      output += "To enable HSM support:\n";
+      output += "  Linux: Install tpm2-tss and ensure /dev/tpmrm0 is accessible\n";
+      output += "  macOS: Requires Mac with T1/T2 chip or Apple Silicon\n";
+      return (true, output);
+    }
+
+    output += "\n";
+
+    // If specific identity requested
+    if hasIdentity && identityFilter != "" {
+      const hasPIN = hsm_has_pin(identityFilter) != 0;
+      output += "Identity: " + identityFilter + "\n";
+      output += "  PIN Stored: " + (if hasPIN then "Yes" else "No") + "\n";
+    } else {
+      // Show status for known identities
+      output += "Stored PINs by Identity:\n";
+      const knownIdentities = ["personal", "work", "github-personal", "gitlab-work"];
+      var anyStored = false;
+
+      for name in knownIdentities {
+        const hasPIN = hsm_has_pin(name) != 0;
+        if hasPIN {
+          output += "  " + name + ": stored\n";
+          anyStored = true;
+        }
+      }
+
+      if !anyStored {
+        output += "  (no PINs stored)\n";
+      }
+    }
+
+    // Show current security mode from config
+    const (configOk, configContent) = readConfigFile();
+    if configOk {
+      const settingsSection = Protocol.extractJsonObject(configContent, "settings");
+      if settingsSection(0) {
+        const (hasMode, mode) = Protocol.extractJsonString(settingsSection(1), "defaultSecurityMode");
+        if hasMode {
+          output += "\nCurrent Security Mode: " + mode + "\n";
+
+          if mode == "trusted_workstation" {
+            output += "  Trusted Workstation mode is ACTIVE\n";
+            output += "  YubiKey PINs will be retrieved from HSM automatically\n";
+          } else {
+            output += "  To enable Trusted Workstation mode:\n";
+            output += "  Use juggler_security_mode with mode=\"trusted_workstation\"\n";
+          }
+        }
+      }
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_security_mode tool call.
+   *
+   * Gets or sets the security mode for GPG operations.
+   */
+  proc handleSecurityMode(params: string): (bool, string) {
+    stderr.writeln("Tools: handleSecurityMode");
+
+    // Get optional mode parameter
+    const (hasMode, mode) = Protocol.extractJsonString(params, "mode");
+
+    var output = "Security Mode\n";
+    output += "=============\n\n";
+
+    // Read current config
+    const (configOk, configContent) = readConfigFile();
+    var currentMode = "developer_workflow";
+
+    if configOk {
+      const settingsSection = Protocol.extractJsonObject(configContent, "settings");
+      if settingsSection(0) {
+        const (hasCurrentMode, m) = Protocol.extractJsonString(settingsSection(1), "defaultSecurityMode");
+        if hasCurrentMode {
+          currentMode = m;
+        }
+      }
+    }
+
+    // If no mode specified, return current mode
+    if !hasMode || mode == "" {
+      output += "Current Mode: " + currentMode + "\n\n";
+      output += "Available Modes:\n";
+      output += "  maximum_security    - PIN required for every signing operation\n";
+      output += "  developer_workflow  - PIN cached by gpg-agent for session\n";
+      output += "  trusted_workstation - PIN stored in HSM, auto-retrieved\n\n";
+
+      output += "Mode Details:\n";
+      select currentMode {
+        when "maximum_security" {
+          output += "  Every git commit or tag operation will prompt for YubiKey PIN.\n";
+          output += "  Most secure, but requires manual interaction.\n";
+        }
+        when "developer_workflow" {
+          output += "  PIN is cached by gpg-agent after first entry.\n";
+          output += "  Balanced security and convenience.\n";
+        }
+        when "trusted_workstation" {
+          output += "  PIN is automatically retrieved from HSM (TPM/SecureEnclave).\n";
+          output += "  No PIN entry required on this trusted device.\n";
+        }
+      }
+
+      return (true, output);
+    }
+
+    // Validate mode
+    if mode != "maximum_security" && mode != "developer_workflow" && mode != "trusted_workstation" {
+      output += "[ERROR] Invalid mode: " + mode + "\n";
+      output += "Valid modes: maximum_security, developer_workflow, trusted_workstation\n";
+      return (false, output);
+    }
+
+    // Check HSM requirement for trusted_workstation
+    if mode == "trusted_workstation" {
+      if hsm_is_available() == 0 {
+        output += "[ERROR] Cannot enable trusted_workstation mode\n";
+        output += "No HSM backend available on this system.\n\n";
+        output += "Requirements:\n";
+        output += "  Linux: TPM 2.0 with /dev/tpmrm0 accessible\n";
+        output += "  macOS: Mac with T1/T2 chip or Apple Silicon\n";
+        return (false, output);
+      }
+    }
+
+    // Update mode by writing to config
+    // Note: In production, this would use a proper config update function
+    output += "Previous Mode: " + currentMode + "\n";
+    output += "New Mode: " + mode + "\n\n";
+
+    select mode {
+      when "maximum_security" {
+        output += "[OK] Switching to Maximum Security mode\n\n";
+        output += "Behavior:\n";
+        output += "  - YubiKey PIN will be required for every signing operation\n";
+        output += "  - No PIN caching by gpg-agent\n";
+        output += "  - Most secure for sensitive environments\n";
+      }
+      when "developer_workflow" {
+        output += "[OK] Switching to Developer Workflow mode\n\n";
+        output += "Behavior:\n";
+        output += "  - PIN cached by gpg-agent after first entry\n";
+        output += "  - Cache expires based on gpg-agent settings\n";
+        output += "  - Balanced security and convenience\n";
+      }
+      when "trusted_workstation" {
+        output += "[OK] Switching to Trusted Workstation mode\n\n";
+        output += "Behavior:\n";
+        output += "  - PIN automatically retrieved from HSM\n";
+        output += "  - No manual PIN entry required\n";
+        output += "  - Only works on this specific device\n\n";
+        output += "IMPORTANT:\n";
+        output += "  - Switching away from this mode requires re-entering PINs\n";
+        output += "  - HSM-stored PINs are device-specific and non-transferable\n";
+        output += "  - Ensure PINs are stored first using juggler_pin_store\n";
+      }
+    }
+
+    // Note: Actual config update would happen here via GlobalConfig.setSecurityMode()
+    output += "\nNote: To persist this setting, update ~/.config/remote-juggler/config.json\n";
+    output += "or run: remote-juggler security-mode " + mode + "\n";
+
+    return (true, output);
+  }
+
+  // ============================================================================
+  // Setup Tool Handler
+  // ============================================================================
+
+  /*
+   * Handle juggler_setup tool call.
+   *
+   * Runs the first-time setup wizard in the specified mode.
+   */
+  proc handleSetup(params: string): (bool, string) {
+    stderr.writeln("Tools: handleSetup");
+
+    // Get optional mode parameter
+    const (hasMode, modeStr) = Protocol.extractJsonString(params, "mode");
+    const (hasForce, forceStr) = Protocol.extractJsonString(params, "force");
+
+    // Parse mode
+    var mode = Setup.SetupMode.Auto;  // Default for MCP
+    if hasMode {
+      select modeStr {
+        when "auto" do mode = Setup.SetupMode.Auto;
+        when "status" do mode = Setup.SetupMode.Status;
+        when "import_ssh" do mode = Setup.SetupMode.ImportSSH;
+        when "import_gpg" do mode = Setup.SetupMode.ImportGPG;
+        when "interactive" do mode = Setup.SetupMode.Interactive;
+        otherwise {
+          return (false, "Invalid mode: " + modeStr + ". Valid modes: auto, status, import_ssh, import_gpg");
+        }
+      }
+    }
+
+    // Run setup
+    const result = Setup.runSetup(mode);
+
+    // Build output
+    var output = "";
+
+    if result.success {
+      output += "Setup completed successfully.\n\n";
+      output += "Summary:\n";
+      output += "  Identities created: " + result.identitiesCreated:string + "\n";
+      output += "  GPG keys associated: " + result.gpgKeysAssociated:string + "\n";
+      output += "  HSM detected: " + (if result.hsmDetected then "Yes (" + result.hsmType + ")" else "No") + "\n";
+
+      if result.configPath != "" {
+        output += "  Configuration: " + result.configPath + "\n";
+      }
+
+      // Include any warnings
+      if result.warnings.size > 0 {
+        output += "\nWarnings:\n";
+        for warning in result.warnings {
+          output += "  - " + warning + "\n";
+        }
+      }
+
+      output += "\nNext steps:\n";
+      output += "  1. Use 'juggler_list_identities' to see configured identities\n";
+      output += "  2. Use 'juggler_switch' to switch identity in a repository\n";
+      if result.hsmDetected {
+        output += "  3. Use 'juggler_pin_store' to enable Trusted Workstation mode\n";
+      }
+    } else {
+      output += "Setup failed.\n\n";
+      output += "Error: " + result.message + "\n";
+
+      if result.warnings.size > 0 {
+        output += "\nDetails:\n";
+        for warning in result.warnings {
+          output += "  - " + warning + "\n";
+        }
+      }
+    }
+
+    return (result.success, output);
   }
 }

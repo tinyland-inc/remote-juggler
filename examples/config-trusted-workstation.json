@@ -1,0 +1,58 @@
+{
+  "$schema": "../packaging/schemas/config.json",
+  "version": "2.0",
+  "identities": {
+    "work-yubikey": {
+      "provider": "gitlab",
+      "instance": "https://gitlab.company.com",
+      "username": "jsmith",
+      "email": "john.smith@company.com",
+      "ssh_host": "gitlab-work",
+      "ssh_key": "~/.ssh/work_ed25519_sk",
+      "gpg": {
+        "key_id": "YUBIKEY123456789",
+        "sign_commits": true,
+        "sign_tags": true,
+        "card_serial": "12345678"
+      }
+    },
+    "personal-yubikey": {
+      "provider": "github",
+      "username": "johnsmith",
+      "email": "john@personal.dev",
+      "ssh_host": "github-personal",
+      "ssh_key": "~/.ssh/personal_ed25519_sk",
+      "gpg": {
+        "key_id": "YUBIKEY987654321",
+        "sign_commits": true,
+        "sign_tags": true,
+        "card_serial": "87654321"
+      }
+    }
+  },
+  "url_rewrites": {
+    "work-yubikey": {
+      "match": "gitlab.company.com:",
+      "rewrite": "gitlab-work:"
+    },
+    "personal-yubikey": {
+      "match": "github.com:johnsmith/",
+      "rewrite": "github-personal:johnsmith/"
+    }
+  },
+  "settings": {
+    "default_identity": "work-yubikey",
+    "auto_switch": true,
+    "security_mode": "trusted_workstation",
+    "shell_integration": true,
+    "debug": false
+  },
+  "trusted_workstation": {
+    "enabled": true,
+    "hsm_backend": "auto",
+    "pin_cache_ttl": 28800,
+    "require_user_presence": false,
+    "gpg_agent_integration": true,
+    "custom_pinentry": true
+  }
+}

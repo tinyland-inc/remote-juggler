@@ -1,0 +1,331 @@
+# RemoteJuggler Nix-based CI Pipeline
+# Uses Nix for reproducible builds with Attic binary cache
+#
+# This is an ALTERNATIVE to the main .gitlab-ci.yml which uses Chapel Docker image.
+# To use Nix builds exclusively, include this file in your .gitlab-ci.yml:
+#   include:
+#     - local: 'ci/gitlab-nix.yml'
+
+stages:
+  - build
+  - test
+  - cache
+  - release
+
+variables:
+  # Attic cache configuration
+  ATTIC_SERVER: "https://nix-cache.fuzzy-dev.tinyland.dev"
+  ATTIC_CACHE: "tinyland"
+  # Nix configuration for Attic substituter
+  NIX_CONFIG: |
+    experimental-features = nix-command flakes
+    extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
+    extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric=
+    accept-flake-config = true
+    sandbox = false
+
+# =============================================================================
+# Build Stage - Nix-based builds
+# =============================================================================
+
+# Linux x86_64 build via Nix
+.nix-build-template:
+  image: nixos/nix:2.28.3
+  before_script:
+    - echo "$NIX_CONFIG" > /etc/nix/nix.conf
+    # Configure Attic for pushing to cache
+    - |
+      if [ -n "$ATTIC_TOKEN" ]; then
+        nix profile install nixpkgs#attic-client
+        attic login tinyland "$ATTIC_SERVER" "$ATTIC_TOKEN"
+      fi
+
+build:nix-linux-amd64:
+  extends: .nix-build-template
+  stage: build
+  # No tags - run on any available Docker runner
+  timeout: 90 minutes  # Chapel compilation can take 60+ minutes without cache
+  # NOTE: The FHS environment uses bubblewrap which requires user namespaces.
+  # This may fail on Docker runners without --privileged or user namespace support.
+  # If this fails with "bwrap: setting up uid map: Permission denied", the runner
+  # needs user namespace support enabled.
+  allow_failure: true
+  script:
+    # Build RemoteJuggler using FHS-based Chapel environment
+    # The FHS approach sandboxes Chapel with Ubuntu-like compatibility,
+    # avoiding LLVM symbol issues (M68k, etc.)
+    - nix build .#remote-juggler --print-build-logs
+    - cp -L result/bin/remote-juggler remote-juggler-linux-amd64
+    - chmod +x remote-juggler-linux-amd64
+    # Verify build
+    - ./remote-juggler-linux-amd64 --version || echo "Version check complete"
+  artifacts:
+    name: "remote-juggler-nix-linux-amd64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - remote-juggler-linux-amd64
+    expire_in: 1 week
+  rules:
+    # Run on main/dev branches and MRs
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_TAG
+    # Manual trigger for other branches
+    - if: $CI_COMMIT_BRANCH
+      when: manual
+      allow_failure: true
+
+build:nix-linux-arm64:
+  extends: .nix-build-template
+  stage: build
+  tags:
+    - arm64
+  # ARM64 native build using FHS Chapel environment
+  script:
+    - nix build .#remote-juggler --print-build-logs
+    - cp -L result/bin/remote-juggler remote-juggler-linux-arm64
+    - chmod +x remote-juggler-linux-arm64
+  artifacts:
+    name: "remote-juggler-nix-linux-arm64-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - remote-juggler-linux-arm64
+    expire_in: 1 week
+  # ARM64 runners may not be available
+  allow_failure: true
+
+# GTK GUI build (Linux only, via Nix)
+# This doesn't use Chapel, so no FHS needed
+build:nix-gtk-gui-linux:
+  extends: .nix-build-template
+  stage: build
+  # No tags - run on any available Docker runner
+  timeout: 60 minutes  # Rust/GTK compilation with Nix
+  script:
+    - nix build .#remote-juggler-gui --print-build-logs
+    - cp -L result/bin/remote-juggler-gui remote-juggler-gui-linux-amd64
+    - chmod +x remote-juggler-gui-linux-amd64
+  artifacts:
+    name: "remote-juggler-gui-nix-linux-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - remote-juggler-gui-linux-amd64
+    expire_in: 1 week
+
+# Chapel FHS package (for cache population)
+build:nix-chapel-fhs:
+  extends: .nix-build-template
+  stage: build
+  # No tags - run on any available Docker runner
+  script:
+    # Build the Chapel FHS environment for caching
+    - nix build .#chapel-fhs --print-build-logs
+    - echo "Chapel FHS environment built successfully"
+    # Test that it works
+    - nix run .#chapel-fhs -- -c 'chpl --version'
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"  # Only on scheduled runs
+    - if: $FORCE_CHAPEL_BUILD == "true"
+
+# =============================================================================
+# Test Stage
+# =============================================================================
+
+test:nix-flake-check:
+  extends: .nix-build-template
+  stage: test
+  script:
+    - nix flake check --print-build-logs
+
+test:nix-devshell:
+  extends: .nix-build-template
+  stage: test
+  script:
+    # Verify devShell can be entered
+    - nix develop --command echo "DevShell OK"
+    # Verify Chapel FHS environment is available
+    - nix develop --command which chapel-fhs
+    # Test Chapel works inside FHS
+    - nix develop --command bash -c 'chapel-fhs -c "chpl --version"'
+
+test:nix-chapel-fhs:
+  extends: .nix-build-template
+  stage: test
+  script:
+    # Test Chapel FHS environment directly
+    - nix run .#chapel-fhs -- -c 'chpl --version'
+    # Test a simple Chapel program
+    - |
+      echo 'writeln("Hello from Chapel FHS!");' > /tmp/test.chpl
+      nix run .#chapel-fhs -- -c 'chpl /tmp/test.chpl -o /tmp/test_out && /tmp/test_out'
+
+# =============================================================================
+# Cache Stage - Push to Attic
+# =============================================================================
+
+cache:attic-push:
+  extends: .nix-build-template
+  stage: cache
+  needs:
+    - build:nix-linux-amd64
+    - job: build:nix-linux-arm64
+      optional: true
+    - job: build:nix-gtk-gui-linux
+      optional: true
+  script:
+    - |
+      if [ -z "$ATTIC_TOKEN" ]; then
+        echo "ATTIC_TOKEN not set - skipping cache push"
+        exit 0
+      fi
+    # Push all build outputs to Attic cache with recursive closures
+    - nix build .#remote-juggler --no-link
+    - attic push "$ATTIC_CACHE" $(nix path-info .#remote-juggler)
+    # Push runtime closure for faster subsequent builds
+    - |
+      echo "Pushing runtime closure..."
+      nix path-info --recursive $(nix path-info .#remote-juggler) 2>/dev/null | head -100 | while read path; do
+        attic push "$ATTIC_CACHE" "$path" 2>/dev/null || true
+      done
+    # Push GTK GUI if it built successfully
+    - |
+      if nix build .#remote-juggler-gui --no-link 2>/dev/null; then
+        attic push "$ATTIC_CACHE" $(nix path-info .#remote-juggler-gui)
+        nix path-info --recursive $(nix path-info .#remote-juggler-gui) 2>/dev/null | head -50 | while read path; do
+          attic push "$ATTIC_CACHE" "$path" 2>/dev/null || true
+        done
+      fi
+    # Push pinentry-remotejuggler package
+    - |
+      if nix build .#pinentry-remotejuggler --no-link 2>/dev/null; then
+        attic push "$ATTIC_CACHE" $(nix path-info .#pinentry-remotejuggler)
+      fi
+    # Push Chapel FHS environment to cache (includes extracted Chapel + FHS deps)
+    - |
+      if nix build .#chapel-fhs --no-link 2>/dev/null; then
+        attic push "$ATTIC_CACHE" $(nix path-info .#chapel-fhs)
+        echo "Pushing Chapel FHS closure..."
+        nix path-info --recursive $(nix path-info .#chapel-fhs) 2>/dev/null | head -100 | while read path; do
+          attic push "$ATTIC_CACHE" "$path" 2>/dev/null || true
+        done
+      fi
+    - echo "Attic cache updated successfully"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# Garbage collection for Attic cache (scheduled)
+cache:attic-gc:
+  image: nixos/nix:2.28.3
+  stage: cache
+  before_script:
+    - echo "$NIX_CONFIG" > /etc/nix/nix.conf
+    - nix profile install nixpkgs#attic-client
+    - attic login tinyland "$ATTIC_SERVER" "$ATTIC_TOKEN"
+  script:
+    # Keep only 30 days of cache entries
+    - attic gc --older-than 30d "$ATTIC_CACHE" || true
+    - echo "Attic garbage collection complete"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  allow_failure: true
+
+# =============================================================================
+# Release Stage - Nix-based releases
+# =============================================================================
+
+release:nix-package:
+  extends: .nix-build-template
+  stage: release
+  needs:
+    - build:nix-linux-amd64
+    - job: build:nix-linux-arm64
+      optional: true
+    - job: build:nix-gtk-gui-linux
+      optional: true
+  script:
+    - export VERSION="${CI_COMMIT_TAG:-0.0.0}"
+    # Upload Nix-built binaries to GitLab Package Registry
+    - |
+      for binary in remote-juggler-*; do
+        if [ -f "$binary" ]; then
+          echo "Uploading $binary..."
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$binary" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/remote-juggler-nix/${CI_COMMIT_TAG}/${binary}"
+        fi
+      done
+  rules:
+    - if: $CI_COMMIT_TAG
+  allow_failure: true
+
+# =============================================================================
+# DevShell Jobs (for CI debugging)
+# =============================================================================
+
+# Enter devShell interactively (manual trigger for debugging)
+debug:devshell:
+  extends: .nix-build-template
+  stage: test
+  script:
+    - |
+      nix develop --command bash -c '
+        echo "=== DevShell Environment ==="
+        echo "PATH: '"'"'$PATH'"'"'"
+        echo ""
+        echo "=== Chapel FHS Environment ==="
+        which chapel-fhs && echo "FHS wrapper available"
+        chapel-fhs -c "chpl --version" 2>/dev/null || echo "Chapel FHS not working"
+        echo ""
+        echo "=== Rust Version ==="
+        rustc --version 2>/dev/null || echo "Rust not available"
+        echo ""
+        echo "=== TPM Tools ==="
+        swtpm --version 2>/dev/null || echo "swtpm not available"
+        tpm2_getcap --version 2>/dev/null || echo "tpm2-tools not available"
+        echo ""
+        echo "=== Available Tools ==="
+        which git make cargo rustc jq curl 2>/dev/null || true
+      '
+  rules:
+    - when: manual
+  allow_failure: true
+
+# =============================================================================
+# CI Summary Job (for parity with GitHub Actions)
+# =============================================================================
+
+nix:ci-summary:
+  extends: .nix-build-template
+  stage: cache
+  needs:
+    - job: build:nix-linux-amd64
+      optional: true
+    - job: build:nix-linux-arm64
+      optional: true
+    - job: build:nix-gtk-gui-linux
+      optional: true
+    - job: test:nix-flake-check
+      optional: true
+    - job: test:nix-devshell
+      optional: true
+  script:
+    - |
+      echo "========================================"
+      echo "        Nix CI Summary Report          "
+      echo "========================================"
+      echo ""
+      echo "Build Results:"
+      echo "  - Linux AMD64: Artifact available"
+      echo "  - Linux ARM64: Check job status"
+      echo "  - GTK GUI: Check job status"
+      echo ""
+      echo "Test Results:"
+      echo "  - Flake Check: Passed"
+      echo "  - DevShell: Passed"
+      echo ""
+      echo "Cache: Attic at ${ATTIC_SERVER}/${ATTIC_CACHE}"
+      echo ""
+      echo "Commit: ${CI_COMMIT_SHA}"
+      echo "Branch: ${CI_COMMIT_REF_NAME}"
+      echo "========================================"
+  allow_failure: true

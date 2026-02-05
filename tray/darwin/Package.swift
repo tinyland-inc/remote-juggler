@@ -20,6 +20,11 @@ let package = Package(
             name: "RemoteJugglerTray",
             dependencies: [],
             path: "Sources"
+        ),
+        .testTarget(
+            name: "RemoteJugglerTrayTests",
+            dependencies: [],
+            path: "Tests"
         )
     ]
 )

@@ -1,0 +1,30 @@
+# RemoteJuggler Tests BUILD File
+#
+# Parent package for all test subdirectories.
+# See test/e2e/BUILD.bazel for Python E2E tests.
+# See test/integration/ for shell-based integration tests.
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Filegroups
+# =============================================================================
+
+filegroup(
+    name = "all_tests",
+    srcs = [
+        "//test/e2e:all",
+    ],
+)
+
+# Integration tests (shell scripts)
+filegroup(
+    name = "integration_scripts",
+    srcs = glob(["integration/**/*.sh"]),
+)
+
+# Test fixtures
+filegroup(
+    name = "fixtures",
+    srcs = glob(["fixtures/**/*"]),
+)

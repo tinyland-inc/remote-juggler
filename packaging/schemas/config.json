@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://remote-juggler.dev/schemas/config.json",
+  "title": "RemoteJuggler Configuration",
+  "description": "Configuration schema for RemoteJuggler git identity management",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": [
+        "2.0.0"
+      ]
+    },
+    "setupCompleted": {
+      "type": "boolean",
+      "description": "Whether the initial setup wizard has been run",
+      "default": false
+    },
+    "setupVersion": {
+      "type": "string",
+      "description": "Version of RemoteJuggler that performed setup",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "setupDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when setup was completed"
+    },
+    "detectedSources": {
+      "type": "object",
+      "description": "Information about auto-detected configuration sources",
+      "properties": {
+        "sshConfig": {
+          "type": "boolean",
+          "description": "Whether SSH config was parsed"
+        },
+        "gitConfig": {
+          "type": "boolean",
+          "description": "Whether git config was parsed"
+        },
+        "gpgKeys": {
+          "type": "array",
+          "description": "GPG key IDs that were detected",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hsmType": {
+          "type": "string",
+          "enum": [
+            "tpm",
+            "secure_enclave",
+            "keychain",
+            "none"
+          ],
+          "description": "Detected hardware security module type"
+        }
+      }
+    },
+    "identities": {
+      "type": "object",
+      "description": "Named git identities",
+      "additionalProperties": {
+        "$ref": "#/$defs/identity"
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Global settings",
+      "properties": {
+        "autoDetect": {
+          "type": "boolean",
+          "description": "Auto-detect identity from repository remote URL",
+          "default": true
+        },
+        "gpgSign": {
+          "type": "boolean",
+          "description": "Enable GPG signing by default",
+          "default": false
+        },
+        "defaultSecurityMode": {
+          "type": "string",
+          "enum": [
+            "maximum_security",
+            "developer_workflow",
+            "trusted_workstation"
+          ],
+          "description": "Default security mode for GPG operations",
+          "default": "developer_workflow"
+        },
+        "hsmAvailable": {
+          "type": "boolean",
+          "description": "Whether an HSM is available on this system",
+          "default": false
+        },
+        "useKeychain": {
+          "type": "boolean",
+          "description": "Store credentials in system keychain",
+          "default": true
+        },
+        "defaultProvider": {
+          "type": "string",
+          "enum": [
+            "gitlab",
+            "github",
+            "bitbucket",
+            "azure"
+          ],
+          "description": "Default git provider when not specified"
+        },
+        "showNotifications": {
+          "type": "boolean",
+          "description": "Show desktop notifications on identity switch",
+          "default": true
+        }
+      }
+    },
+    "organizationMappings": {
+      "type": "object",
+      "description": "Map git organization/group paths to identities",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Identity name to use for this organization"
+      },
+      "examples": [
+        {
+          "tinyland": "personal",
+          "bates": "work",
+          "jesssullivan": "github-personal"
+        }
+      ]
+    },
+    "urlRewrites": {
+      "type": "array",
+      "description": "URL rewrite rules for git remotes",
+      "items": {
+        "$ref": "#/$defs/urlRewrite"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "identities"
+  ],
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "description": "A git identity configuration",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "gitlab",
+            "github",
+            "bitbucket",
+            "azure",
+            "codeberg",
+            "other"
+          ],
+          "description": "Git hosting provider"
+        },
+        "host": {
+          "type": "string",
+          "description": "SSH host alias (from ~/.ssh/config)",
+          "examples": [
+            "gitlab-personal",
+            "gitlab-work",
+            "github.com"
+          ]
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Actual hostname of the git server",
+          "examples": [
+            "gitlab.com",
+            "github.com"
+          ]
+        },
+        "user": {
+          "type": "string",
+          "description": "SSH user (usually 'git')",
+          "default": "git"
+        },
+        "identityFile": {
+          "type": "string",
+          "description": "Path to SSH private key",
+          "examples": [
+            "~/.ssh/id_ed25519_personal"
+          ]
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Git user.email for commits",
+          "examples": [
+            "jess@sulliwood.org"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "Git user.name for commits",
+          "examples": [
+            "Jess Sullivan"
+          ]
+        },
+        "gpg": {
+          "$ref": "#/$defs/gpgConfig"
+        },
+        "credentialSource": {
+          "type": "string",
+          "enum": [
+            "keychain",
+            "env",
+            "cli",
+            "none"
+          ],
+          "description": "Where to retrieve API tokens from",
+          "default": "keychain"
+        },
+        "organizations": {
+          "type": "array",
+          "description": "Git organizations/groups associated with this identity",
+          "items": {
+            "type": "string"
+          },
+          "examples": [
+            [
+              "tinyland",
+              "sulliwood"
+            ]
+          ]
+        }
+      },
+      "required": [
+        "provider",
+        "host",
+        "hostname"
+      ]
+    },
+    "gpgConfig": {
+      "type": "object",
+      "description": "GPG/SSH signing configuration",
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "description": "GPG key ID or 'auto' for automatic detection",
+          "examples": [
+            "ABC123DEF456",
+            "auto"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "gpg",
+            "ssh",
+            "x509"
+          ],
+          "description": "Signing format (gpg, ssh, or x509)",
+          "default": "gpg"
+        },
+        "sshKeyPath": {
+          "type": "string",
+          "description": "Path to SSH signing key (when format=ssh)",
+          "examples": [
+            "~/.ssh/id_ed25519_sk"
+          ]
+        },
+        "hardwareKey": {
+          "type": "boolean",
+          "description": "Whether the signing key is on a hardware token (YubiKey)",
+          "default": false
+        },
+        "touchPolicy": {
+          "type": "string",
+          "enum": [
+            "on",
+            "off",
+            "cached",
+            "fixed"
+          ],
+          "description": "YubiKey touch policy for this key"
+        },
+        "pinStored": {
+          "type": "boolean",
+          "description": "Whether PIN is stored in HSM for this identity",
+          "default": false
+        }
+      }
+    },
+    "urlRewrite": {
+      "type": "object",
+      "description": "Git URL rewrite rule",
+      "properties": {
+        "match": {
+          "type": "string",
+          "description": "URL pattern to match (prefix or regex)",
+          "examples": [
+            "git@gitlab.com:tinyland/"
+          ]
+        },
+        "replace": {
+          "type": "string",
+          "description": "Replacement URL pattern",
+          "examples": [
+            "git@gitlab-personal:tinyland/"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "description": "Identity to use for matching URLs"
+        }
+      },
+      "required": [
+        "match",
+        "replace"
+      ]
+    }
+  },
+  "examples": [
+    {
+      "version": "2.0.0",
+      "setupCompleted": true,
+      "setupVersion": "2.0.0",
+      "setupDate": "2026-02-01T12:00:00Z",
+      "detectedSources": {
+        "sshConfig": true,
+        "gitConfig": true,
+        "gpgKeys": [
+          "ABC123DEF456"
+        ],
+        "hsmType": "tpm"
+      },
+      "identities": {
+        "personal": {
+          "provider": "gitlab",
+          "host": "gitlab-personal",
+          "hostname": "gitlab.com",
+          "user": "git",
+          "identityFile": "~/.ssh/id_ed25519_personal",
+          "email": "jess@sulliwood.org",
+          "name": "Jess Sullivan",
+          "gpg": {
+            "keyId": "ABC123DEF456",
+            "format": "gpg",
+            "hardwareKey": true,
+            "touchPolicy": "cached",
+            "pinStored": true
+          },
+          "credentialSource": "keychain",
+          "organizations": [
+            "tinyland",
+            "sulliwood"
+          ]
+        },
+        "work": {
+          "provider": "gitlab",
+          "host": "gitlab-work",
+          "hostname": "gitlab.com",
+          "user": "git",
+          "identityFile": "~/.ssh/id_ed25519_work",
+          "email": "jsullivan2@bates.edu",
+          "name": "Jess Sullivan",
+          "gpg": {
+            "keyId": "DEF789GHI012",
+            "format": "gpg",
+            "hardwareKey": false
+          },
+          "credentialSource": "keychain",
+          "organizations": [
+            "bates"
+          ]
+        },
+        "github-personal": {
+          "provider": "github",
+          "host": "github.com",
+          "hostname": "github.com",
+          "user": "git",
+          "identityFile": "~/.ssh/id_ed25519_github",
+          "email": "jess@sulliwood.org",
+          "name": "Jess Sullivan",
+          "gpg": {
+            "keyId": "ABC123DEF456",
+            "format": "ssh",
+            "sshKeyPath": "~/.ssh/id_ed25519_sk",
+            "hardwareKey": true,
+            "touchPolicy": "on"
+          },
+          "credentialSource": "cli",
+          "organizations": [
+            "jesssullivan"
+          ]
+        }
+      },
+      "settings": {
+        "autoDetect": true,
+        "gpgSign": true,
+        "defaultSecurityMode": "trusted_workstation",
+        "hsmAvailable": true,
+        "useKeychain": true,
+        "defaultProvider": "gitlab",
+        "showNotifications": true
+      },
+      "organizationMappings": {
+        "tinyland": "personal",
+        "sulliwood": "personal",
+        "bates": "work",
+        "jesssullivan": "github-personal"
+      },
+      "urlRewrites": [
+        {
+          "match": "git@gitlab.com:tinyland/",
+          "replace": "git@gitlab-personal:tinyland/",
+          "identity": "personal"
+        },
+        {
+          "match": "git@gitlab.com:bates/",
+          "replace": "git@gitlab-work:bates/",
+          "identity": "work"
+        }
+      ]
+    }
+  ]
+}
