@@ -202,8 +202,13 @@ module Setup {
   proc detectSSHHosts(): list(DetectedSSHHost) {
     var hosts: list(DetectedSSHHost);
 
-    // Parse SSH config
-    const sshHosts = Config.parseSSHConfig();
+    // Parse SSH config (return empty list on failure)
+    var sshHosts: list(Config.SSHHost);
+    try {
+      sshHosts = Config.parseSSHConfig();
+    } catch {
+      return hosts;
+    }
 
     for host in sshHosts {
       // Skip wildcard and local hosts

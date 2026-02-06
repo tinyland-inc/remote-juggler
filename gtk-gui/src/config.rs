@@ -113,6 +113,9 @@ pub struct Identity {
     pub organizations: Vec<String>,
     #[serde(default)]
     pub gpg: GpgConfig,
+    /// KeePassXC entry path for this identity's credentials
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keepassxc_entry: Option<String>,
 }
 
 impl Identity {
@@ -492,6 +495,7 @@ mod tests {
             credential_source: "none".to_string(),
             organizations: vec![],
             gpg: GpgConfig::default(),
+            keepassxc_entry: None,
         };
 
         assert_eq!(identity.display_name(), "testuser (github)");
@@ -509,6 +513,7 @@ mod tests {
             credential_source: "none".to_string(),
             organizations: vec![],
             gpg: GpgConfig::default(),
+            keepassxc_entry: None,
         };
 
         let security_key = Identity {
@@ -521,6 +526,7 @@ mod tests {
             credential_source: "none".to_string(),
             organizations: vec![],
             gpg: GpgConfig::default(),
+            keepassxc_entry: None,
         };
 
         assert!(!regular.is_security_key());

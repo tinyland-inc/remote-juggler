@@ -150,6 +150,7 @@ fn arb_identity() -> impl Strategy<Value = Identity> {
                     credential_source: credential_source.to_string(),
                     organizations,
                     gpg,
+                    keepassxc_entry: None,
                 }
             },
         )

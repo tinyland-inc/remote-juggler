@@ -34,6 +34,8 @@ mod imp {
     #[derive(Default)]
     pub struct RemoteJugglerWindow {
         config: RefCell<Option<Config>>,
+        content_box: RefCell<Option<gtk4::Box>>,
+        scrolled: RefCell<Option<gtk4::ScrolledWindow>>,
     }
 
     #[glib::object_subclass]
@@ -56,6 +58,14 @@ mod imp {
 
             // Build UI
             self.build_ui();
+
+            // Reload config when window gains focus
+            let imp = self.downgrade();
+            window.connect_is_active_notify(move |_win| {
+                if let Some(imp) = imp.upgrade() {
+                    imp.reload_config_and_ui();
+                }
+            });
         }
     }
 
@@ -76,6 +86,15 @@ mod imp {
             }
         }
 
+        fn reload_config_and_ui(&self) {
+            self.load_config();
+            // Rebuild the content inside the scrolled window
+            if let Some(ref scrolled) = *self.scrolled.borrow() {
+                let main_box = self.build_main_content();
+                scrolled.set_child(Some(&main_box));
+            }
+        }
+
         fn build_ui(&self) {
             let window = self.obj();
 
@@ -90,6 +109,17 @@ mod imp {
             let scrolled = gtk4::ScrolledWindow::new();
             scrolled.set_vexpand(true);
 
+            // Build main content
+            let main_box = self.build_main_content();
+            scrolled.set_child(Some(&main_box));
+
+            *self.scrolled.borrow_mut() = Some(scrolled.clone());
+
+            vbox.append(&scrolled);
+            window.set_content(Some(&vbox));
+        }
+
+        fn build_main_content(&self) -> gtk4::Box {
             // Create main content box
             let main_box = gtk4::Box::new(gtk4::Orientation::Vertical, 12);
             main_box.set_margin_top(24);
@@ -97,10 +127,16 @@ mod imp {
             main_box.set_margin_start(24);
             main_box.set_margin_end(24);
 
-            // Add status page when no identity is selected
             let config = self.config.borrow();
             if let Some(config) = config.as_ref() {
                 let profiles = config.profiles();
+
+                // Status label for feedback
+                let status_label = gtk4::Label::new(None);
+                status_label.set_wrap(true);
+                status_label.set_xalign(0.0);
+                status_label.add_css_class("dim-label");
+                status_label.set_visible(false);
 
                 // Create profile selector group
                 let profile_group = adw::PreferencesGroup::new();
@@ -124,6 +160,53 @@ mod imp {
                     {
                         profile_row.set_selected(pos as u32);
                     }
+                }
+
+                // Wire profile ComboRow handler (2a)
+                {
+                    let profiles_for_handler = profiles.clone();
+                    let status_clone = status_label.clone();
+                    let imp_weak = self.downgrade();
+                    profile_row.connect_selected_notify(move |row| {
+                        let selected = row.selected() as usize;
+                        if selected >= profiles_for_handler.len() {
+                            return;
+                        }
+                        let profile = &profiles_for_handler[selected];
+                        // Use default variant (prefer FIDO2)
+                        let identity_name = profile
+                            .default_variant()
+                            .map(|v| v.identity_name.clone())
+                            .unwrap_or_else(|| profile.name.clone());
+
+                        let status = status_clone.clone();
+                        let name = identity_name.clone();
+                        let imp = imp_weak.clone();
+                        status.set_text(&format!("Switching to {}...", &name));
+                        status.set_visible(true);
+                        status.remove_css_class("error");
+                        status.remove_css_class("success");
+
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_async("switch", &name).await;
+                            match result {
+                                Ok(msg) => {
+                                    status.set_text(&format!("Switched to {}", &name));
+                                    status.add_css_class("success");
+                                    tracing::info!("Switched identity: {} - {}", &name, msg);
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Failed: {}", e));
+                                    status.add_css_class("error");
+                                    tracing::error!("Switch failed: {}", e);
+                                }
+                            }
+                            // Reload config after switch
+                            if let Some(imp) = imp.upgrade() {
+                                imp.load_config();
+                            }
+                        });
+                    });
                 }
 
                 profile_group.add(&profile_row);
@@ -158,11 +241,59 @@ mod imp {
                             }
                         }
 
+                        // Wire variant ComboRow handler (2b)
+                        {
+                            let variants_for_handler: Vec<String> = profile
+                                .variants
+                                .iter()
+                                .map(|v| v.identity_name.clone())
+                                .collect();
+                            let status_clone = status_label.clone();
+                            let imp_weak = self.downgrade();
+                            variant_row.connect_selected_notify(move |row| {
+                                let selected = row.selected() as usize;
+                                if selected >= variants_for_handler.len() {
+                                    return;
+                                }
+                                let identity_name = &variants_for_handler[selected];
+                                let status = status_clone.clone();
+                                let name = identity_name.clone();
+                                let imp = imp_weak.clone();
+                                status.set_text(&format!("Switching to variant {}...", &name));
+                                status.set_visible(true);
+                                status.remove_css_class("error");
+                                status.remove_css_class("success");
+
+                                glib::spawn_future_local(async move {
+                                    let result = run_cli_async("switch", &name).await;
+                                    match result {
+                                        Ok(_) => {
+                                            status.set_text(&format!(
+                                                "Switched to variant {}",
+                                                &name
+                                            ));
+                                            status.add_css_class("success");
+                                        }
+                                        Err(e) => {
+                                            status.set_text(&format!("Failed: {}", e));
+                                            status.add_css_class("error");
+                                        }
+                                    }
+                                    if let Some(imp) = imp.upgrade() {
+                                        imp.load_config();
+                                    }
+                                });
+                            });
+                        }
+
                         profile_group.add(&variant_row);
                     }
                 }
 
                 main_box.append(&profile_group);
+
+                // Status feedback label
+                main_box.append(&status_label);
 
                 // Add current profile details if available
                 if let Some(ref profile) = current_profile {
@@ -328,17 +459,241 @@ mod imp {
                 main_box.append(&security_group);
                 main_box.append(&pin_group);
 
-                // Connect security mode change handler
-                let pin_group_clone = pin_group.clone();
-                security_mode_row.connect_selected_notify(move |row| {
-                    let selected = row.selected();
-                    let mode = SecurityMode::from_index(selected);
-                    let show = mode == SecurityMode::TrustedWorkstation;
-                    pin_group_clone.set_visible(show);
+                // Wire security mode change handler (2c)
+                {
+                    let pin_group_clone = pin_group.clone();
+                    let status_clone = status_label.clone();
+                    security_mode_row.connect_selected_notify(move |row| {
+                        let selected = row.selected();
+                        let mode = SecurityMode::from_index(selected);
+                        let show = mode == SecurityMode::TrustedWorkstation;
+                        pin_group_clone.set_visible(show);
 
-                    // Log the change (actual config save would be implemented here)
-                    tracing::info!("Security mode changed to: {}", mode.display_name());
-                });
+                        // Call CLI to persist the security mode change
+                        let mode_str = match mode {
+                            SecurityMode::MaximumSecurity => "maximum_security",
+                            SecurityMode::DeveloperWorkflow => "developer_workflow",
+                            SecurityMode::TrustedWorkstation => "trusted_workstation",
+                        };
+                        let status = status_clone.clone();
+                        let mode_display = mode.display_name().to_string();
+                        let mode_arg = mode_str.to_string();
+                        status.set_visible(true);
+                        status.remove_css_class("error");
+                        status.remove_css_class("success");
+                        status.set_text(&format!("Setting security mode to {}...", &mode_display));
+
+                        glib::spawn_future_local(async move {
+                            let result =
+                                run_cli_async("security-mode", &mode_arg).await;
+                            match result {
+                                Ok(_) => {
+                                    status.set_text(&format!(
+                                        "Security mode: {}",
+                                        &mode_display
+                                    ));
+                                    status.add_css_class("success");
+                                    tracing::info!("Security mode changed to: {}", &mode_display);
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Failed: {}", e));
+                                    status.add_css_class("error");
+                                    tracing::error!("Security mode change failed: {}", e);
+                                }
+                            }
+                        });
+                    });
+                }
+
+                // ============================================================
+                // KeePassXC Key Store Group
+                // ============================================================
+                let keys_group = adw::PreferencesGroup::new();
+                keys_group.set_title("Key Store (KeePassXC)");
+                keys_group.set_description(Some("Credential authority for secrets management"));
+
+                // Key store status row
+                let keys_status_row = adw::ActionRow::new();
+                keys_status_row.set_title("Key Store");
+                let keys_status_label = gtk4::Label::new(Some("Checking..."));
+                keys_status_label.add_css_class("dim-label");
+                keys_status_row.add_suffix(&keys_status_label);
+                keys_group.add(&keys_status_row);
+
+                // Check key store status async
+                {
+                    let label = keys_status_label.clone();
+                    glib::spawn_future_local(async move {
+                        let result = run_cli_async("keys", "status").await;
+                        match result {
+                            Ok(output) => {
+                                if output.contains("Auto-Unlock:   ready") || output.contains("Auto-Unlock: ready") {
+                                    label.set_text("Unlocked");
+                                    label.remove_css_class("dim-label");
+                                    label.add_css_class("success");
+                                } else if output.contains("Exists:      yes") || output.contains("Exists: yes") {
+                                    label.set_text("Locked");
+                                    label.remove_css_class("dim-label");
+                                    label.add_css_class("warning");
+                                } else {
+                                    label.set_text("Not initialized");
+                                }
+                            }
+                            Err(_) => {
+                                label.set_text("Unavailable");
+                            }
+                        }
+                    });
+                }
+
+                // Initialize key store button row
+                let init_row = adw::ActionRow::new();
+                init_row.set_title("Initialize Key Store");
+                init_row.set_subtitle("Create a new kdbx credential database");
+                let init_button = gtk4::Button::with_label("Initialize");
+                init_button.set_valign(gtk4::Align::Center);
+                init_button.add_css_class("suggested-action");
+                init_row.add_suffix(&init_button);
+                init_row.set_activatable_widget(Some(&init_button));
+                keys_group.add(&init_row);
+
+                // Wire init button
+                {
+                    let status_clone = status_label.clone();
+                    let keys_label = keys_status_label.clone();
+                    init_button.connect_clicked(move |button| {
+                        button.set_sensitive(false);
+                        let status = status_clone.clone();
+                        let klabel = keys_label.clone();
+                        let btn = button.clone();
+                        status.set_text("Initializing key store...");
+                        status.set_visible(true);
+                        status.remove_css_class("error");
+                        status.remove_css_class("success");
+
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_async("keys", "init").await;
+                            match result {
+                                Ok(_) => {
+                                    status.set_text("Key store initialized");
+                                    status.add_css_class("success");
+                                    klabel.set_text("Ready");
+                                    klabel.remove_css_class("dim-label");
+                                    klabel.add_css_class("success");
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Init failed: {}", e));
+                                    status.add_css_class("error");
+                                }
+                            }
+                            btn.set_sensitive(true);
+                        });
+                    });
+                }
+
+                // Search entry row
+                let search_row = adw::ActionRow::new();
+                search_row.set_title("Search Keys");
+                search_row.set_subtitle("Fuzzy search across all stored credentials");
+                let search_entry = gtk4::Entry::new();
+                search_entry.set_placeholder_text(Some("Search..."));
+                search_entry.set_hexpand(true);
+                search_entry.set_valign(gtk4::Align::Center);
+                search_row.add_suffix(&search_entry);
+                search_row.set_activatable_widget(Some(&search_entry));
+                keys_group.add(&search_row);
+
+                // Search results label (hidden initially)
+                let search_results_label = gtk4::Label::new(None);
+                search_results_label.set_wrap(true);
+                search_results_label.set_xalign(0.0);
+                search_results_label.add_css_class("dim-label");
+                search_results_label.add_css_class("monospace");
+                search_results_label.set_visible(false);
+
+                // Wire search entry activate
+                {
+                    let results_label = search_results_label.clone();
+                    search_entry.connect_activate(move |entry| {
+                        let query = entry.text().to_string();
+                        if query.is_empty() {
+                            return;
+                        }
+                        let label = results_label.clone();
+                        label.set_text("Searching...");
+                        label.set_visible(true);
+
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_args_async(vec!["keys".into(), "search".into(), query]).await;
+                            match result {
+                                Ok(output) => {
+                                    label.set_text(&output);
+                                }
+                                Err(e) => {
+                                    label.set_text(&format!("Search error: {}", e));
+                                }
+                            }
+                        });
+                    });
+                }
+
+                // Ingest .env row
+                let ingest_row = adw::ActionRow::new();
+                ingest_row.set_title("Ingest .env File");
+                ingest_row.set_subtitle("Import environment variables into key store");
+                let ingest_button = gtk4::Button::with_label("Choose File");
+                ingest_button.set_valign(gtk4::Align::Center);
+                ingest_row.add_suffix(&ingest_button);
+                ingest_row.set_activatable_widget(Some(&ingest_button));
+                keys_group.add(&ingest_row);
+
+                // Wire ingest button to open file chooser
+                {
+                    let status_clone = status_label.clone();
+                    let window_ref = self.obj().clone();
+                    ingest_button.connect_clicked(move |_button| {
+                        let dialog = gtk4::FileDialog::new();
+                        dialog.set_title("Select .env file");
+                        let filter = gtk4::FileFilter::new();
+                        filter.add_pattern("*.env");
+                        filter.add_pattern(".env*");
+                        filter.set_name(Some("Environment files"));
+                        let filters = gio::ListStore::new::<gtk4::FileFilter>();
+                        filters.append(&filter);
+                        dialog.set_filters(Some(&filters));
+
+                        let status = status_clone.clone();
+                        dialog.open(Some(&window_ref), gio::Cancellable::NONE, move |result| {
+                            if let Ok(file) = result {
+                                if let Some(path) = file.path() {
+                                    let path_str = path.to_string_lossy().to_string();
+                                    let st = status.clone();
+                                    st.set_text(&format!("Ingesting {}...", &path_str));
+                                    st.set_visible(true);
+                                    st.remove_css_class("error");
+                                    st.remove_css_class("success");
+
+                                    glib::spawn_future_local(async move {
+                                        let result = run_cli_args_async(vec!["keys".into(), "ingest".into(), path_str.clone()]).await;
+                                        match result {
+                                            Ok(output) => {
+                                                st.set_text(&format!("Ingested: {}", output.lines().last().unwrap_or("done")));
+                                                st.add_css_class("success");
+                                            }
+                                            Err(e) => {
+                                                st.set_text(&format!("Ingest failed: {}", e));
+                                                st.add_css_class("error");
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    });
+                }
+
+                main_box.append(&keys_group);
+                main_box.append(&search_results_label);
 
                 // Connect store PIN button handler
                 let pin_entry_clone = pin_entry.clone();
@@ -400,9 +755,40 @@ mod imp {
                 main_box.append(&status_page);
             }
 
-            scrolled.set_child(Some(&main_box));
-            vbox.append(&scrolled);
-            window.set_content(Some(&vbox));
+            main_box
+        }
+    }
+
+    /// Run a remote-juggler CLI command asynchronously with two args
+    async fn run_cli_async(command: &str, arg: &str) -> Result<String, String> {
+        run_cli_args_async(vec![command.to_string(), arg.to_string()]).await
+    }
+
+    /// Run a remote-juggler CLI command asynchronously with arbitrary args
+    async fn run_cli_args_async(args: Vec<String>) -> Result<String, String> {
+        let result = gio::spawn_blocking(move || {
+            let output = Command::new("remote-juggler")
+                .args(&args)
+                .output();
+
+            match output {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                    if output.status.success() {
+                        Ok(stdout)
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        Err(format!("{}", stderr))
+                    }
+                }
+                Err(e) => Err(format!("Failed to execute command: {}", e)),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(inner_result) => inner_result,
+            Err(e) => Err(format!("Task join error: {:?}", e)),
         }
     }
 

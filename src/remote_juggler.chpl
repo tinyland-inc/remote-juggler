@@ -15,6 +15,7 @@ prototype module remote_juggler {
   use Time;
   use CTypes;
   use Path;
+  use FileSystem;
 
   // Include and re-export submodules
   // These are located in src/remote_juggler/ directory
@@ -36,6 +37,7 @@ prototype module remote_juggler {
   include module HSM;
   include module TrustedWorkstation;
   include module Setup;
+  include module KeePassXC;
 
   // Public re-exports for external consumers
   public use Core;
@@ -55,6 +57,7 @@ prototype module remote_juggler {
   public use YubiKey;
   public use HSM;
   public use TrustedWorkstation;
+  public use KeePassXC;
 
   // ==========================================================================
   // ANSI Color/Formatting Helpers
@@ -227,6 +230,16 @@ prototype module remote_juggler {
     writeln("    trusted-workstation disable <n> Disable mode for identity");
     writeln("    trusted-workstation status [n]  Show current TWS status");
     writeln("    trusted-workstation verify <n>  Verify mode is working (test sign)");
+    writeln();
+
+    writeln("  ", bold("Key Store (KeePassXC):"));
+    writeln("    keys init         Bootstrap a new kdbx credential database");
+    writeln("    keys status       Show key store status");
+    writeln("    keys search <q>   Fuzzy search across all entries");
+    writeln("    keys get <path>   Retrieve a secret by entry path");
+    writeln("    keys store <path> Store a secret at entry path");
+    writeln("    keys list [group] List entries in a group");
+    writeln("    keys ingest <f>   Ingest a .env file into the key store");
     writeln();
 
     writeln("  ", bold("Debug:"));
@@ -1514,6 +1527,7 @@ prototype module remote_juggler {
       when "security-mode" do handleSecurityMode(subArgs);
       when "yubikey", "yk" do handleYubiKey(subArgs);
       when "trusted-workstation", "tws" do handleTrustedWorkstationCmd(subArgs);
+      when "keys", "kdbx" do handleKeys(subArgs);
       when "unseal-pin" do handleUnsealPin(subArgs);
       when "help", "--help", "-h" do printUsage();
       when "version", "--version", "-v" {
@@ -2560,6 +2574,443 @@ prototype module remote_juggler {
       writeln("  - Check YubiKey is connected");
       writeln("  - Verify PIN is stored: remote-juggler pin status ", name);
       writeln("  - Check gpg-agent: remote-juggler trusted-workstation status");
+    }
+  }
+
+  // ==========================================================================
+  // Key Store (KeePassXC) Command Handlers
+  // ==========================================================================
+
+  // Handle 'keys' subcommands
+  proc handleKeys(args: list(string)) {
+    if args.size < 1 {
+      // Default to status
+      handleKeysStatus();
+      return;
+    }
+
+    const subcommand = args[0];
+    const subArgs = if args.size > 1 then sublist(args, 1) else new list(string);
+
+    select subcommand {
+      when "init" do handleKeysInit();
+      when "status" do handleKeysStatus();
+      when "search", "find" do handleKeysSearch(subArgs);
+      when "get" do handleKeysGet(subArgs);
+      when "store", "set", "add" do handleKeysStore(subArgs);
+      when "list", "ls" do handleKeysList(subArgs);
+      when "ingest", "import" do handleKeysIngest(subArgs);
+      otherwise {
+        printError("Unknown keys subcommand: " + subcommand);
+        writeln("Available: init, status, search, get, store, list, ingest");
+      }
+    }
+  }
+
+  // Handle 'keys init' - Bootstrap a new kdbx database
+  proc handleKeysInit() {
+    printDebug("Initializing key store");
+
+    writeln(bold("Initializing KeePassXC Key Store"));
+    writeln("==================================");
+    writeln();
+
+    // Check keepassxc-cli
+    if !KeePassXC.isAvailable() {
+      printError("keepassxc-cli not found in PATH");
+      writeln();
+      writeln("Install KeePassXC to use the key store:");
+      writeln("  dnf install keepassxc          # Fedora/RHEL");
+      writeln("  apt install keepassxc          # Debian/Ubuntu");
+      writeln("  brew install keepassxc         # macOS");
+      return;
+    }
+
+    writeln(green("[OK]"), " keepassxc-cli found");
+
+    const dbPath = KeePassXC.getDatabasePath();
+    writeln("Database path: ", dbPath);
+    writeln();
+
+    // Check HSM availability
+    const hsmType = hsm_detect_available();
+    if hsmType != HSM_TYPE_NONE {
+      writeln(green("[OK]"), " HSM available: ", hsm_type_name(hsmType));
+    } else {
+      printWarning("No HSM available - master password will be shown (store it securely!)");
+    }
+
+    // Check YubiKey
+    if KeePassXC.isYubiKeyPresent() {
+      writeln(green("[OK]"), " YubiKey detected");
+    } else {
+      printWarning("No YubiKey detected - auto-unlock will require YubiKey presence");
+    }
+
+    writeln();
+    writeln("Bootstrapping database...");
+    writeln();
+
+    const (success, message) = KeePassXC.bootstrapDatabase(dbPath);
+
+    if success {
+      printSuccess("Key store initialized");
+      writeln();
+      writeln(message);
+      writeln();
+
+      // Try to import existing credentials
+      writeln("Importing existing credentials from environment...");
+      if KeePassXC.canAutoUnlock() {
+        const (ok, password) = KeePassXC.autoUnlock();
+        if ok {
+          const imported = KeePassXC.importExistingCredentials(dbPath, password);
+          if imported > 0 {
+            printSuccess("Imported " + imported:string + " credentials");
+          } else {
+            writeln(dim("No existing credentials found to import"));
+          }
+        }
+      }
+
+      writeln();
+      writeln("Next steps:");
+      writeln("  remote-juggler keys status           # Check key store status");
+      writeln("  remote-juggler keys ingest ~/path/.env # Ingest .env file");
+      writeln("  remote-juggler keys search <query>    # Search entries");
+    } else {
+      printError("Failed to initialize key store");
+      writeln(message);
+    }
+  }
+
+  // Handle 'keys status' - Show key store status
+  proc handleKeysStatus() {
+    printDebug("Showing key store status");
+
+    writeln(bold("KeePassXC Key Store Status"));
+    writeln("==========================");
+    writeln();
+
+    // keepassxc-cli availability
+    write("keepassxc-cli: ");
+    if KeePassXC.isAvailable() {
+      writeln(green("installed"));
+    } else {
+      writeln(red("NOT FOUND"));
+      writeln();
+      writeln("Install KeePassXC to use the key store.");
+      return;
+    }
+
+    // Database
+    const dbPath = KeePassXC.getDatabasePath();
+    writeln("Database:      ", dbPath);
+    write("  Exists:      ");
+    if KeePassXC.databaseExists() {
+      writeln(green("yes"));
+    } else {
+      writeln(dim("no"));
+      writeln();
+      writeln("Run 'remote-juggler keys init' to create a new key store.");
+      return;
+    }
+
+    // HSM
+    const hsmType = hsm_detect_available();
+    write("HSM Backend:   ");
+    if hsmType != HSM_TYPE_NONE {
+      writeln(green(hsm_type_name(hsmType)));
+    } else {
+      writeln(dim("none"));
+    }
+
+    // Master password sealed
+    write("Master Sealed: ");
+    const hasMaster = hsm_has_pin(KeePassXC.KDBX_HSM_IDENTITY) != 0;
+    if hasMaster {
+      writeln(green("yes"));
+    } else {
+      writeln(dim("no"));
+    }
+
+    // YubiKey
+    write("YubiKey:       ");
+    if KeePassXC.isYubiKeyPresent() {
+      writeln(green("present"));
+    } else {
+      writeln(yellow("not detected"));
+    }
+
+    // Auto-unlock readiness
+    write("Auto-Unlock:   ");
+    if KeePassXC.canAutoUnlock() {
+      writeln(green("ready"));
+    } else {
+      writeln(dim("not available"));
+    }
+
+    // Entry summary (if accessible)
+    if KeePassXC.canAutoUnlock() {
+      const (ok, password) = KeePassXC.autoUnlock();
+      if ok {
+        writeln();
+        writeln(bold("Entries:"));
+        const (listOk, entries) = KeePassXC.listEntries(dbPath, "RemoteJuggler", password);
+        if listOk {
+          for entry in entries {
+            writeln("  ", entry);
+          }
+        }
+      }
+    }
+  }
+
+  // Handle 'keys search <query>' - Fuzzy search across all entries
+  proc handleKeysSearch(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing search query");
+      writeln("Usage: remote-juggler keys search <query>");
+      return;
+    }
+
+    const query = args[0];
+    printDebug("Searching key store for: " + query);
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const results = KeePassXC.search(dbPath, query, password);
+
+    if results.size == 0 {
+      writeln(dim("No entries found matching '"), query, dim("'"));
+      return;
+    }
+
+    writeln(bold("Search Results for '"), query, bold("':"));
+    writeln();
+
+    for result in results {
+      const scoreStr = if result.score >= 100 then green("[exact]")
+                       else if result.score >= 50 then cyan("[partial]")
+                       else dim("[fuzzy]");
+
+      writeln("  ", scoreStr, " ", bold(result.title));
+      writeln("         ", dim(result.entryPath));
+    }
+
+    writeln();
+    writeln(dim("Found "), results.size:string, dim(" result(s)"));
+    writeln(dim("Use 'remote-juggler keys get <path>' to retrieve a secret"));
+  }
+
+  // Handle 'keys get <path>' - Retrieve a secret by entry path
+  proc handleKeysGet(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing entry path");
+      writeln("Usage: remote-juggler keys get <entry-path>");
+      writeln("Example: remote-juggler keys get RemoteJuggler/API/PERPLEXITY_API_KEY");
+      return;
+    }
+
+    const entryPath = args[0];
+    printDebug("Getting entry: " + entryPath);
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (found, value) = KeePassXC.getEntry(dbPath, entryPath, password);
+
+    if found {
+      // Output just the value (useful for piping)
+      writeln(value);
+    } else {
+      printError("Entry not found: " + entryPath);
+      writeln();
+      writeln("Use 'remote-juggler keys search <query>' to find entries.");
+    }
+  }
+
+  // Handle 'keys store <path>' - Store a secret at entry path
+  proc handleKeysStore(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing entry path");
+      writeln("Usage: remote-juggler keys store <entry-path> [--value <value>]");
+      writeln("If --value is not provided, reads from stdin.");
+      return;
+    }
+
+    const entryPath = args[0];
+    printDebug("Storing entry: " + entryPath);
+
+    // Check for --value flag
+    var value = "";
+    var hasValueFlag = false;
+    for i in 1..<args.size {
+      if args[i] == "--value" && i + 1 < args.size {
+        value = args[i + 1];
+        hasValueFlag = true;
+        break;
+      }
+    }
+
+    if !hasValueFlag {
+      // Read value from stdin
+      writeln("Enter value for ", bold(entryPath), " (input hidden):");
+      write("> ");
+      if !stdin.readLine(value) {
+        printError("Failed to read value");
+        return;
+      }
+      value = value.strip();
+    }
+
+    if value == "" {
+      printError("Value cannot be empty");
+      return;
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    if KeePassXC.setEntry(dbPath, entryPath, password, value) {
+      printSuccess("Stored entry: " + entryPath);
+    } else {
+      printError("Failed to store entry: " + entryPath);
+    }
+  }
+
+  // Handle 'keys list [group]' - List entries in a group
+  proc handleKeysList(args: list(string)) {
+    const group = if args.size > 0 then args[0] else "RemoteJuggler";
+    printDebug("Listing entries in: " + group);
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (listOk, entries) = KeePassXC.listEntries(dbPath, group, password);
+
+    if !listOk {
+      printError("Failed to list entries in: " + group);
+      return;
+    }
+
+    writeln(bold("Entries in "), bold(group), bold(":"));
+    writeln();
+
+    if entries.size == 0 {
+      writeln(dim("  (empty)"));
+    } else {
+      for entry in entries {
+        if entry.endsWith("/") {
+          // Group
+          writeln("  ", blue(entry));
+        } else {
+          // Entry
+          writeln("  ", entry);
+        }
+      }
+    }
+
+    writeln();
+    writeln(dim(entries.size:string + " item(s)"));
+  }
+
+  // Handle 'keys ingest <path>' - Ingest a .env file
+  proc handleKeysIngest(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing file path");
+      writeln("Usage: remote-juggler keys ingest <path-to-.env-file>");
+      return;
+    }
+
+    const envFilePath = expandPath(args[0]);
+    printDebug("Ingesting .env file: " + envFilePath);
+
+    // Check file exists
+    try {
+      if !FileSystem.exists(envFilePath) {
+        printError("File not found: " + envFilePath);
+        return;
+      }
+    } catch {
+      printError("Cannot access file: " + envFilePath);
+      return;
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    writeln("Ingesting: ", bold(envFilePath));
+    writeln();
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated) = KeePassXC.ingestEnvFile(dbPath, envFilePath, password);
+
+    if added > 0 || updated > 0 {
+      printSuccess("Ingested .env file");
+      if added > 0 {
+        writeln("  Added:   ", green(added:string), " entries");
+      }
+      if updated > 0 {
+        writeln("  Updated: ", cyan(updated:string), " entries");
+      }
+    } else {
+      writeln(dim("No new or changed entries found in "), envFilePath);
     }
   }
 

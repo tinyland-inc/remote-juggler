@@ -175,6 +175,9 @@ prototype module GlobalConfig {
     var defaultSecurityMode: string = "developer_workflow";
     var hsmAvailable: bool = false;
     var trustedWorkstationRequiresHSM: bool = true;
+    var useKeePassXC: bool = false;
+    var keepassxcDatabase: string = "~/.remotejuggler/keys.kdbx";
+    var keepassxcAutoUnlock: bool = true;
 
     /*
       Initialize with default values.
@@ -190,6 +193,9 @@ prototype module GlobalConfig {
       this.defaultSecurityMode = "developer_workflow";
       this.hsmAvailable = false;
       this.trustedWorkstationRequiresHSM = true;
+      this.useKeePassXC = false;
+      this.keepassxcDatabase = "~/.remotejuggler/keys.kdbx";
+      this.keepassxcAutoUnlock = true;
     }
 
     /*
@@ -1131,7 +1137,10 @@ prototype module GlobalConfig {
     json += '    "verboseLogging": ' + cfg.settings.verboseLogging:string + ',\n';
     json += '    "defaultSecurityMode": "' + cfg.settings.defaultSecurityMode + '",\n';
     json += '    "hsmAvailable": ' + cfg.settings.hsmAvailable:string + ',\n';
-    json += '    "trustedWorkstationRequiresHSM": ' + cfg.settings.trustedWorkstationRequiresHSM:string + '\n';
+    json += '    "trustedWorkstationRequiresHSM": ' + cfg.settings.trustedWorkstationRequiresHSM:string + ',\n';
+    json += '    "useKeePassXC": ' + cfg.settings.useKeePassXC:string + ',\n';
+    json += '    "keepassxcDatabase": "' + escapeJSON(cfg.settings.keepassxcDatabase) + '",\n';
+    json += '    "keepassxcAutoUnlock": ' + cfg.settings.keepassxcAutoUnlock:string + '\n';
     json += '  },\n';
     json += '\n';
 
@@ -1167,6 +1176,9 @@ prototype module GlobalConfig {
     }
     if identity.keychainService != "" {
       json += indent + '  "keychainService": "' + escapeJSON(identity.keychainService) + '",\n';
+    }
+    if identity.keePassEntry != "" {
+      json += indent + '  "keePassEntry": "' + escapeJSON(identity.keePassEntry) + '",\n';
     }
 
     // Organizations array
@@ -1374,6 +1386,9 @@ prototype module GlobalConfig {
         gpgConfig.pinStorageMethod = extractJSONString(gpgSection, "pinStorageMethod", "");
       }
 
+      // Parse keePassEntry if present
+      const keePassEntry = extractJSONString(identityJSON, "keePassEntry", "");
+
       // Create identity with parsed values
       var identity = new GitIdentity(
         identityName,
@@ -1385,6 +1400,7 @@ prototype module GlobalConfig {
       );
       identity.sshKeyPath = sshKeyPath;
       identity.gpg = gpgConfig;
+      identity.keePassEntry = keePassEntry;
 
       // Only add valid identities (must have name, host, user)
       if identity.isValid() {
