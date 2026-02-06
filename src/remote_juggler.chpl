@@ -3236,13 +3236,7 @@ prototype module remote_juggler {
 
     if discoverTypes == "env" || discoverTypes == "all" {
       // Ensure Discovered group exists
-      try {
-        var p = spawn(["keepassxc-cli", "mkdir", dbPath, "RemoteJuggler/Discovered"],
-                      stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
-        p.stdin.write(password + "\n");
-        p.stdin.close();
-        p.wait();
-      } catch { }
+      KeePassXC.ensureGroup(dbPath, "RemoteJuggler/Discovered", password);
 
       const envDiscovered = KeePassXC.discoverEnvCredentials(dbPath, password);
       writeln("  Environment variables: ", green(envDiscovered:string), " credential(s)");

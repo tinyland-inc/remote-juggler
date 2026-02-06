@@ -1425,6 +1425,23 @@ prototype module KeePassXC {
   // ============================================================================
 
   /*
+   * Ensure a group exists in the database (create if missing).
+   *
+   * :arg dbPath: Path to the kdbx file
+   * :arg group: Group path to create
+   * :arg password: Master password
+   */
+  proc ensureGroup(dbPath: string, group: string, password: string) {
+    try {
+      var p = spawn(["keepassxc-cli", "mkdir", dbPath, group],
+                    stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
+      p.stdin.write(password + "\n");
+      p.stdin.close();
+      p.wait();
+    } catch { }
+  }
+
+  /*
    * Generate a random password of the given length.
    *
    * Uses /dev/urandom for entropy.
@@ -1498,13 +1515,7 @@ prototype module KeePassXC {
     }
 
     // Ensure Discovered group exists
-    try {
-      var p = spawn(["keepassxc-cli", "mkdir", dbPath, "RemoteJuggler/Discovered"],
-                    stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
-      p.stdin.write(password + "\n");
-      p.stdin.close();
-      p.wait();
-    } catch { }
+    ensureGroup(dbPath, "RemoteJuggler/Discovered", password);
 
     // Also discover pattern-matched credential env vars
     imported += discoverEnvCredentials(dbPath, password);
