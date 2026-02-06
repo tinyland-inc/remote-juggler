@@ -236,10 +236,16 @@ prototype module remote_juggler {
     writeln("    keys init         Bootstrap a new kdbx credential database");
     writeln("    keys status       Show key store status");
     writeln("    keys search <q>   Fuzzy search across all entries");
+    writeln("    keys search <q> --json  Search with JSON output");
+    writeln("    keys resolve <q>  Search and retrieve in one step");
     writeln("    keys get <path>   Retrieve a secret by entry path");
     writeln("    keys store <path> Store a secret at entry path");
+    writeln("    keys delete <p>   Delete an entry by path");
     writeln("    keys list [group] List entries in a group");
     writeln("    keys ingest <f>   Ingest a .env file into the key store");
+    writeln("    keys crawl [dirs] Crawl directories for .env files");
+    writeln("    keys discover     Auto-discover credentials (env, ssh)");
+    writeln("    keys export <grp> Export group as .env or JSON");
     writeln();
 
     writeln("  ", bold("Debug:"));
@@ -2597,13 +2603,18 @@ prototype module remote_juggler {
       when "init" do handleKeysInit();
       when "status" do handleKeysStatus();
       when "search", "find" do handleKeysSearch(subArgs);
+      when "resolve" do handleKeysResolve(subArgs);
       when "get" do handleKeysGet(subArgs);
       when "store", "set", "add" do handleKeysStore(subArgs);
+      when "delete", "rm" do handleKeysDelete(subArgs);
       when "list", "ls" do handleKeysList(subArgs);
       when "ingest", "import" do handleKeysIngest(subArgs);
+      when "crawl" do handleKeysCrawl(subArgs);
+      when "discover" do handleKeysDiscover(subArgs);
+      when "export", "dump-env" do handleKeysExport(subArgs);
       otherwise {
         printError("Unknown keys subcommand: " + subcommand);
-        writeln("Available: init, status, search, get, store, list, ingest");
+        writeln("Available: init, status, search, resolve, get, store, delete, list, ingest, crawl, discover, export");
       }
     }
   }
@@ -2771,12 +2782,23 @@ prototype module remote_juggler {
   proc handleKeysSearch(args: list(string)) {
     if args.size < 1 {
       printError("Missing search query");
-      writeln("Usage: remote-juggler keys search <query>");
+      writeln("Usage: remote-juggler keys search <query> [--json] [--group <group>]");
       return;
     }
 
     const query = args[0];
     printDebug("Searching key store for: " + query);
+
+    // Parse flags
+    var jsonOutput = false;
+    var groupFilter = "";
+    for i in 1..<args.size {
+      if args[i] == "--json" {
+        jsonOutput = true;
+      } else if args[i] == "--group" && i + 1 < args.size {
+        groupFilter = args[i + 1];
+      }
+    }
 
     // Auto-unlock
     if !KeePassXC.canAutoUnlock() {
@@ -2792,7 +2814,27 @@ prototype module remote_juggler {
     }
 
     const dbPath = KeePassXC.getDatabasePath();
-    const results = KeePassXC.search(dbPath, query, password);
+    const results = KeePassXC.search(dbPath, query, password, groupFilter);
+
+    if jsonOutput {
+      // Structured JSON output for scripting
+      var json = '{"query":"' + query.replace('"', '\\"') + '"';
+      if groupFilter != "" then json += ',"group":"' + groupFilter + '"';
+      json += ',"count":' + results.size:string + ',"results":[';
+      var first = true;
+      for result in results {
+        if !first then json += ",";
+        json += '{"entryPath":"' + result.entryPath.replace('"', '\\"') + '"';
+        json += ',"title":"' + result.title.replace('"', '\\"') + '"';
+        json += ',"score":' + result.score:string;
+        json += ',"matchContext":"' + result.matchContext.replace('"', '\\"') + '"';
+        json += ',"matchField":"' + result.matchField + '"}';
+        first = false;
+      }
+      json += "]}";
+      writeln(json);
+      return;
+    }
 
     if results.size == 0 {
       writeln(dim("No entries found matching '"), query, dim("'"));
@@ -2804,16 +2846,72 @@ prototype module remote_juggler {
 
     for result in results {
       const scoreStr = if result.score >= 100 then green("[exact]")
-                       else if result.score >= 50 then cyan("[partial]")
-                       else dim("[fuzzy]");
+                       else if result.score >= 70 then green("[substring]")
+                       else if result.score >= 60 then cyan("[boundary]")
+                       else if result.score >= 40 then cyan("[fuzzy]")
+                       else dim("[weak]");
 
       writeln("  ", scoreStr, " ", bold(result.title));
       writeln("         ", dim(result.entryPath));
+      if result.matchField != "path" {
+        writeln("         ", dim("(" + result.matchContext + ")"));
+      }
     }
 
     writeln();
     writeln(dim("Found "), results.size:string, dim(" result(s)"));
     writeln(dim("Use 'remote-juggler keys get <path>' to retrieve a secret"));
+    writeln(dim("Or  'remote-juggler keys resolve <query>' for one-step search+get"));
+  }
+
+  // Handle 'keys resolve <query>' - Search and retrieve in one step
+  proc handleKeysResolve(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing search query");
+      writeln("Usage: remote-juggler keys resolve <query> [--group <group>] [--threshold <n>]");
+      return;
+    }
+
+    const query = args[0];
+    printDebug("Resolving key store query: " + query);
+
+    // Parse flags
+    var groupFilter = "";
+    var threshold = 40;
+    for i in 1..<args.size {
+      if args[i] == "--group" && i + 1 < args.size {
+        groupFilter = args[i + 1];
+      } else if args[i] == "--threshold" && i + 1 < args.size {
+        try { threshold = args[i + 1]:int; } catch { }
+      }
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (found, entryPath, value) = KeePassXC.resolve(dbPath, query, password, groupFilter, threshold);
+
+    if found {
+      // Output just the value (useful for piping, like keys get)
+      writeln(value);
+    } else {
+      if entryPath != "" {
+        printError("Best match '" + entryPath + "' scored below threshold (" + threshold:string + ")");
+      } else {
+        printError("No entries found matching '" + query + "'");
+      }
+    }
   }
 
   // Handle 'keys get <path>' - Retrieve a secret by entry path
@@ -3012,6 +3110,200 @@ prototype module remote_juggler {
       }
     } else {
       writeln(dim("No new or changed entries found in "), envFilePath);
+    }
+  }
+
+  // Handle 'keys delete <path>' - Delete an entry from the key store
+  proc handleKeysDelete(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing entry path");
+      writeln("Usage: remote-juggler keys delete <entry-path>");
+      return;
+    }
+
+    const entryPath = args[0];
+    printDebug("Deleting entry: " + entryPath);
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+
+    // Confirm entry exists before deleting
+    const (existsOk, _) = KeePassXC.getEntry(dbPath, entryPath, password);
+    if !existsOk {
+      printError("Entry not found: " + entryPath);
+      writeln("Use 'remote-juggler keys search <query>' to find entries.");
+      return;
+    }
+
+    if KeePassXC.deleteEntry(dbPath, entryPath, password) {
+      printSuccess("Deleted entry: " + entryPath);
+    } else {
+      printError("Failed to delete entry: " + entryPath);
+    }
+  }
+
+  // Handle 'keys crawl [dirs]' - Crawl directories for .env files
+  proc handleKeysCrawl(args: list(string)) {
+    printDebug("Crawling for .env files");
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    // Parse optional --dirs flag
+    var dirs: list(string);
+    for i in 0..<args.size {
+      if args[i] == "--dirs" {
+        // Collect remaining args as directories
+        for j in i+1..<args.size {
+          dirs.pushBack(expandPath(args[j]));
+        }
+        break;
+      } else {
+        // Positional args are directories
+        dirs.pushBack(expandPath(args[i]));
+      }
+    }
+
+    writeln("Crawling for .env files...");
+    writeln();
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (filesFound, totalAdded, totalUpdated) = KeePassXC.crawlEnvFiles(dbPath, password, dirs);
+
+    if filesFound > 0 {
+      printSuccess("Crawl complete");
+      writeln("  Files found: ", green(filesFound:string));
+      writeln("  Added:       ", green(totalAdded:string), " entries");
+      writeln("  Updated:     ", cyan(totalUpdated:string), " entries");
+    } else {
+      writeln(dim("No .env files found"));
+    }
+  }
+
+  // Handle 'keys discover [--types env|ssh|all]' - Auto-discover credentials
+  proc handleKeysDiscover(args: list(string)) {
+    printDebug("Discovering credentials");
+
+    // Parse --types flag
+    var discoverTypes = "all";
+    for i in 0..<args.size {
+      if args[i] == "--types" && i + 1 < args.size {
+        discoverTypes = args[i + 1];
+        break;
+      }
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    writeln("Discovering credentials...");
+    writeln();
+
+    var totalDiscovered = 0;
+
+    if discoverTypes == "env" || discoverTypes == "all" {
+      // Ensure Discovered group exists
+      try {
+        var p = spawn(["keepassxc-cli", "mkdir", dbPath, "RemoteJuggler/Discovered"],
+                      stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
+        p.stdin.write(password + "\n");
+        p.stdin.close();
+        p.wait();
+      } catch { }
+
+      const envDiscovered = KeePassXC.discoverEnvCredentials(dbPath, password);
+      writeln("  Environment variables: ", green(envDiscovered:string), " credential(s)");
+      totalDiscovered += envDiscovered;
+    }
+
+    if discoverTypes == "ssh" || discoverTypes == "all" {
+      const sshDiscovered = KeePassXC.discoverSSHKeys(dbPath, password);
+      writeln("  SSH keys:              ", green(sshDiscovered:string), " key(s)");
+      totalDiscovered += sshDiscovered;
+    }
+
+    writeln();
+    if totalDiscovered > 0 {
+      printSuccess("Discovered " + totalDiscovered:string + " credential(s)");
+    } else {
+      writeln(dim("No new credentials discovered"));
+    }
+  }
+
+  // Handle 'keys export <group> [--format env|json]' - Export group entries
+  proc handleKeysExport(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing group path");
+      writeln("Usage: remote-juggler keys export <group> [--format env|json]");
+      writeln("Example: remote-juggler keys export RemoteJuggler/API --format env");
+      return;
+    }
+
+    const group = args[0];
+    printDebug("Exporting group: " + group);
+
+    // Parse --format flag
+    var format = "env";
+    for i in 1..<args.size {
+      if args[i] == "--format" && i + 1 < args.size {
+        format = args[i + 1];
+        break;
+      }
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (exportOk, content) = KeePassXC.exportEntries(dbPath, group, password, format);
+
+    if exportOk {
+      writeln(content);
+    } else {
+      printError("Failed to export entries from: " + group);
     }
   }
 

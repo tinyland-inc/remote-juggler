@@ -125,22 +125,173 @@ prototype module KeePassXCTests {
 
       // Default init
       const r1 = new SearchResult();
-      if r1.entryPath != "" || r1.title != "" || r1.score != 0 {
+      if r1.entryPath != "" || r1.title != "" || r1.score != 0 || r1.matchField != "path" {
         writeln("  FAIL: default init has non-empty fields");
         allPass = false;
       }
 
-      // Parameterized init
+      // Parameterized init (4 args)
       const r2 = new SearchResult(
         entryPath = "RemoteJuggler/API/TEST",
         title = "TEST",
         matchContext = "exact",
         score = 100
       );
-      if r2.entryPath != "RemoteJuggler/API/TEST" || r2.score != 100 {
-        writeln("  FAIL: parameterized init incorrect");
+      if r2.entryPath != "RemoteJuggler/API/TEST" || r2.score != 100 || r2.matchField != "path" {
+        writeln("  FAIL: parameterized init (4 args) incorrect");
         allPass = false;
       }
+
+      // Parameterized init (5 args with matchField)
+      const r3 = new SearchResult(
+        entryPath = "RemoteJuggler/API/TEST",
+        title = "TEST",
+        matchContext = "username match",
+        matchField = "username",
+        score = 70
+      );
+      if r3.matchField != "username" || r3.score != 70 {
+        writeln("  FAIL: parameterized init (5 args) incorrect");
+        allPass = false;
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 10: levenshteinDistance
+    {
+      writeln("Test 10: levenshteinDistance computes correct edit distances");
+      var allPass = true;
+
+      // Same strings
+      if levenshteinDistance("hello", "hello") != 0 {
+        writeln("  FAIL: same strings should have distance 0");
+        allPass = false;
+      }
+
+      // Empty strings
+      if levenshteinDistance("", "hello") != 5 {
+        writeln("  FAIL: empty vs 'hello' should be 5");
+        allPass = false;
+      }
+      if levenshteinDistance("hello", "") != 5 {
+        writeln("  FAIL: 'hello' vs empty should be 5");
+        allPass = false;
+      }
+
+      // Single edit
+      if levenshteinDistance("hello", "hallo") != 1 {
+        writeln("  FAIL: 'hello' vs 'hallo' should be 1");
+        allPass = false;
+      }
+
+      // Insertion
+      if levenshteinDistance("hello", "helllo") != 1 {
+        writeln("  FAIL: 'hello' vs 'helllo' should be 1");
+        allPass = false;
+      }
+
+      // Deletion
+      if levenshteinDistance("hello", "helo") != 1 {
+        writeln("  FAIL: 'hello' vs 'helo' should be 1");
+        allPass = false;
+      }
+
+      // Multiple edits
+      if levenshteinDistance("kitten", "sitting") != 3 {
+        writeln("  FAIL: 'kitten' vs 'sitting' should be 3, got ", levenshteinDistance("kitten", "sitting"));
+        allPass = false;
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 11: fuzzyScore scoring tiers
+    {
+      writeln("Test 11: fuzzyScore returns correct scoring tiers");
+      var allPass = true;
+
+      // Exact match = 100
+      const exactScore = fuzzyScore("perplexity", "PERPLEXITY");
+      if exactScore != 100 {
+        writeln("  FAIL: exact (case-insensitive) should be 100, got ", exactScore);
+        allPass = false;
+      }
+
+      // Substring match = 70
+      const subScore = fuzzyScore("perplx", "PERPLEXITY_API_KEY");
+      if subScore != 70 {
+        writeln("  FAIL: substring 'perplx' in 'PERPLEXITY_API_KEY' should be 70, got ", subScore);
+        allPass = false;
+      }
+
+      // No match = 0 for very different strings
+      const noScore = fuzzyScore("zzzzz", "PERPLEXITY");
+      if noScore != 0 {
+        writeln("  FAIL: unrelated strings should score 0, got ", noScore);
+        allPass = false;
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 12: wordBoundaryMatch
+    {
+      writeln("Test 12: wordBoundaryMatch matches word initials");
+      var allPass = true;
+
+      // "gt" should match "gitlab_token" (G_T boundaries)
+      if !wordBoundaryMatch("gt", "gitlab_token") {
+        writeln("  FAIL: 'gt' should match 'gitlab_token'");
+        allPass = false;
+      }
+
+      // "pak" should match "perplexity_api_key" (P_A_K boundaries)
+      if !wordBoundaryMatch("pak", "perplexity_api_key") {
+        writeln("  FAIL: 'pak' should match 'perplexity_api_key'");
+        allPass = false;
+      }
+
+      // Empty query should not match
+      if wordBoundaryMatch("", "gitlab_token") {
+        writeln("  FAIL: empty query should not match");
+        allPass = false;
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 13: isEnvFile pattern matching
+    {
+      writeln("Test 13: isEnvFile matches .env file patterns");
+      var allPass = true;
+
+      if !isEnvFile(".env") { writeln("  FAIL: .env"); allPass = false; }
+      if !isEnvFile(".env.local") { writeln("  FAIL: .env.local"); allPass = false; }
+      if !isEnvFile(".env.production") { writeln("  FAIL: .env.production"); allPass = false; }
+      if !isEnvFile("app.env") { writeln("  FAIL: app.env"); allPass = false; }
+      if isEnvFile("README.md") { writeln("  FAIL: README.md matched"); allPass = false; }
+      if isEnvFile("envfile") { writeln("  FAIL: envfile matched"); allPass = false; }
 
       if allPass {
         writeln("  PASS");

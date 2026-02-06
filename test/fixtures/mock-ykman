@@ -1,0 +1,26 @@
+#!/bin/sh
+# Mock ykman for CI testing.
+# Prepend this directory to PATH to simulate YubiKey presence.
+#
+# Usage in tests:
+#   export PATH="$(dirname "$0"):$PATH"
+#   # Now isYubiKeyPresent() will return true
+
+case "$1" in
+  info)
+    echo "Device type: YubiKey 5 NFC"
+    echo "Serial number: 12345678"
+    echo "Firmware version: 5.4.3"
+    echo "Form factor: Keychain (USB-A)"
+    echo "Enabled USB interfaces: OTP, FIDO, CCID"
+    exit 0
+    ;;
+  list)
+    echo "YubiKey 5 NFC (5.4.3) [OTP+FIDO+CCID] Serial: 12345678"
+    exit 0
+    ;;
+  *)
+    echo "Usage: ykman [OPTIONS] COMMAND [ARGS]..."
+    exit 0
+    ;;
+esac

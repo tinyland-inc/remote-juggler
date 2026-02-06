@@ -451,7 +451,7 @@ prototype module Tools {
     // Tool: juggler_keys_search
     tools.pushBack(new ToolDefinition(
       name = "juggler_keys_search",
-      description = "Fuzzy search across all entries in the KeePassXC key store. Searches titles, paths, and metadata. Returns ranked results without exposing secret values.",
+      description = "Fuzzy search across all entries in the KeePassXC key store. Searches titles, paths, usernames, notes, and URLs using Levenshtein distance and word boundary matching. Returns ranked results without exposing secret values.",
       inputSchema = '{' +
         '"type":"object",' +
         '"properties":{' +
@@ -462,6 +462,11 @@ prototype module Tools {
           '"group":{' +
             '"type":"string",' +
             '"description":"Optional group to restrict search (e.g., \'RemoteJuggler/API\')"' +
+          '},' +
+          '"format":{' +
+            '"type":"string",' +
+            '"description":"Output format: text (default) or json for structured output",' +
+            '"default":"text"' +
           '}' +
         '},' +
         '"required":["query"]' +
@@ -547,6 +552,105 @@ prototype module Tools {
       inputSchema = '{' +
         '"type":"object",' +
         '"properties":{}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_resolve
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_resolve",
+      description = "Search and retrieve a secret in one operation. Fuzzy-searches for the best match and returns its value directly. Eliminates the two-call search-then-get pattern.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"query":{' +
+            '"type":"string",' +
+            '"description":"Search query (e.g., \'gitlab\', \'perplexity\')"' +
+          '},' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Optional group to restrict search"' +
+          '},' +
+          '"threshold":{' +
+            '"type":"integer",' +
+            '"description":"Minimum match score to accept (default: 40, range: 0-100)",' +
+            '"default":40' +
+          '}' +
+        '},' +
+        '"required":["query"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_delete
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_delete",
+      description = "Delete an entry from the KeePassXC key store. Requires the full entry path. Use juggler_keys_search to find the exact path first.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"entryPath":{' +
+            '"type":"string",' +
+            '"description":"Full entry path to delete (e.g., \'RemoteJuggler/API/OLD_KEY\')"' +
+          '},' +
+          '"confirm":{' +
+            '"type":"boolean",' +
+            '"description":"Must be true to confirm deletion",' +
+            '"default":false' +
+          '}' +
+        '},' +
+        '"required":["entryPath","confirm"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_crawl_env
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_crawl_env",
+      description = "Crawl directories for .env files and ingest all found files into the key store. Searches ~, ~/git, ~/projects by default.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"dirs":{' +
+            '"type":"array",' +
+            '"items":{"type":"string"},' +
+            '"description":"Directories to search (default: [~, ~/git, ~/projects])"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_discover
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_discover",
+      description = "Auto-discover credentials from environment variables, SSH keys, or both. Scans for *_TOKEN, *_API_KEY, *_SECRET patterns and SSH key metadata.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"types":{' +
+            '"type":"string",' +
+            '"description":"What to discover: env, ssh, or all (default: all)",' +
+            '"default":"all"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_export
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_export",
+      description = "Export entries from a key store group as .env or JSON format. Useful for reconstructing environment files from stored credentials.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Group path to export (e.g., \'RemoteJuggler/API\')"' +
+          '},' +
+          '"format":{' +
+            '"type":"string",' +
+            '"description":"Output format: env or json (default: env)",' +
+            '"default":"env"' +
+          '}' +
+        '},' +
+        '"required":["group"]' +
       '}'
     ));
 
@@ -648,6 +752,21 @@ prototype module Tools {
       }
       when "juggler_keys_init" {
         return handleKeysInitTool(params);
+      }
+      when "juggler_keys_resolve" {
+        return handleKeysResolveTool(params);
+      }
+      when "juggler_keys_delete" {
+        return handleKeysDeleteTool(params);
+      }
+      when "juggler_keys_crawl_env" {
+        return handleKeysCrawlEnvTool(params);
+      }
+      when "juggler_keys_discover" {
+        return handleKeysDiscoverTool(params);
+      }
+      when "juggler_keys_export" {
+        return handleKeysExportTool(params);
       }
       otherwise {
         stderr.writeln("Tools: Unknown tool: ", name);
@@ -3009,6 +3128,14 @@ prototype module Tools {
       return (false, "Missing required parameter: query");
     }
 
+    // Extract optional group parameter
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const groupFilter = if hasGroup && group != "" then group else "";
+
+    // Extract optional format parameter
+    const (hasFormat, format) = Protocol.extractJsonString(params, "format");
+    const outputFormat = if hasFormat && format == "json" then "json" else "text";
+
     // Auto-unlock
     if !KeePassXC.canAutoUnlock() {
       return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
@@ -3020,24 +3147,51 @@ prototype module Tools {
     }
 
     const dbPath = KeePassXC.getDatabasePath();
-    const results = KeePassXC.search(dbPath, query, password);
+    const results = KeePassXC.search(dbPath, query, password, groupFilter);
 
+    if outputFormat == "json" {
+      var jsonOutput = '{"query":"' + query.replace('"', '\\"') + '"';
+      if groupFilter != "" then jsonOutput += ',"group":"' + groupFilter + '"';
+      jsonOutput += ',"count":' + results.size:string + ',"results":[';
+      var first = true;
+      for result in results {
+        if !first then jsonOutput += ",";
+        jsonOutput += '{"entryPath":"' + result.entryPath.replace('"', '\\"') + '"';
+        jsonOutput += ',"title":"' + result.title.replace('"', '\\"') + '"';
+        jsonOutput += ',"score":' + result.score:string;
+        jsonOutput += ',"matchContext":"' + result.matchContext.replace('"', '\\"') + '"';
+        jsonOutput += ',"matchField":"' + result.matchField + '"}';
+        first = false;
+      }
+      jsonOutput += "]}";
+      return (true, jsonOutput);
+    }
+
+    // Text output (default)
     var output = "Key Store Search Results\n";
     output += "========================\n\n";
     output += "Query: " + query + "\n";
+    if groupFilter != "" then output += "Group: " + groupFilter + "\n";
     output += "Results: " + results.size:string + "\n\n";
 
     if results.size == 0 {
       output += "No entries found matching '" + query + "'.\n";
+      output += "Try juggler_keys_resolve for fuzzy matching with value retrieval.\n";
     } else {
       for result in results {
         const matchType = if result.score >= 100 then "[exact]"
-                         else if result.score >= 50 then "[partial]"
-                         else "[fuzzy]";
+                         else if result.score >= 70 then "[substring]"
+                         else if result.score >= 60 then "[boundary]"
+                         else if result.score >= 40 then "[fuzzy]"
+                         else "[weak]";
         output += matchType + " " + result.title + "\n";
         output += "  Path: " + result.entryPath + "\n";
+        if result.matchField != "path" {
+          output += "  Matched: " + result.matchContext + "\n";
+        }
       }
       output += "\nUse juggler_keys_get with entryPath to retrieve a secret.\n";
+      output += "Or use juggler_keys_resolve for one-step search+get.\n";
     }
 
     return (true, output);
@@ -3244,10 +3398,221 @@ prototype module Tools {
       output += "  1. Use juggler_keys_search to find entries\n";
       output += "  2. Use juggler_keys_ingest_env to import .env files\n";
       output += "  3. Use juggler_keys_store to add individual secrets\n";
+      output += "  4. Use juggler_keys_discover to auto-discover credentials\n";
+      output += "  5. Use juggler_keys_resolve for one-step search+get\n";
     } else {
       output += "[ERROR] " + message + "\n";
     }
 
     return (success, output);
+  }
+
+  /*
+   * Handle juggler_keys_resolve tool call.
+   */
+  proc handleKeysResolveTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysResolveTool");
+
+    const (hasQuery, query) = Protocol.extractJsonString(params, "query");
+    if !hasQuery || query == "" {
+      return (false, "Missing required parameter: query");
+    }
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const groupFilter = if hasGroup && group != "" then group else "";
+
+    // Parse threshold (default 40)
+    var threshold = 40;
+    const (hasThreshold, thresholdStr) = Protocol.extractJsonString(params, "threshold");
+    if hasThreshold && thresholdStr != "" {
+      try {
+        threshold = thresholdStr:int;
+      } catch { }
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (found, entryPath, value) = KeePassXC.resolve(dbPath, query, password, groupFilter, threshold);
+
+    if found {
+      var output = '{"resolved":true,"query":"' + query.replace('"', '\\"') + '"';
+      output += ',"entryPath":"' + entryPath.replace('"', '\\"') + '"';
+      output += ',"value":"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"}';
+      return (true, output);
+    } else {
+      var output = '{"resolved":false,"query":"' + query.replace('"', '\\"') + '"';
+      if entryPath != "" {
+        output += ',"bestMatch":"' + entryPath.replace('"', '\\"') + '","reason":"below threshold"';
+      } else {
+        output += ',"reason":"no matches found"';
+      }
+      output += '}';
+      return (false, output);
+    }
+  }
+
+  /*
+   * Handle juggler_keys_delete tool call.
+   */
+  proc handleKeysDeleteTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysDeleteTool");
+
+    const (hasPath, entryPath) = Protocol.extractJsonString(params, "entryPath");
+    if !hasPath || entryPath == "" {
+      return (false, "Missing required parameter: entryPath");
+    }
+
+    // Safety gate: require confirm=true
+    const (hasConfirm, confirmStr) = Protocol.extractJsonString(params, "confirm");
+    if !hasConfirm || confirmStr != "true" {
+      return (false, "Deletion requires confirm=true. Set confirm to true to proceed with deleting: " + entryPath);
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    if KeePassXC.deleteEntry(dbPath, entryPath, password) {
+      return (true, "Entry deleted: " + entryPath);
+    } else {
+      return (false, "Failed to delete entry: " + entryPath + "\nEntry may not exist.");
+    }
+  }
+
+  /*
+   * Handle juggler_keys_crawl_env tool call.
+   */
+  proc handleKeysCrawlEnvTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysCrawlEnvTool");
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    // Parse optional dirs array (simplified: treat as comma-separated in a string)
+    var dirs: list(string);
+    // For now, use defaults (the KeePassXC.crawlEnvFiles handles defaults)
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (filesFound, totalAdded, totalUpdated) = KeePassXC.crawlEnvFiles(dbPath, password, dirs);
+
+    var output = ".env File Crawl Results\n";
+    output += "=======================\n\n";
+    output += "Files found: " + filesFound:string + "\n";
+    output += "Entries added: " + totalAdded:string + "\n";
+    output += "Entries updated: " + totalUpdated:string + "\n";
+
+    if filesFound == 0 {
+      output += "\nNo .env files found in default directories.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_discover tool call.
+   */
+  proc handleKeysDiscoverTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysDiscoverTool");
+
+    const (hasTypes, types) = Protocol.extractJsonString(params, "types");
+    const discoverTypes = if hasTypes && types != "" then types else "all";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    var output = "Credential Discovery Results\n";
+    output += "============================\n\n";
+
+    var totalDiscovered = 0;
+
+    if discoverTypes == "env" || discoverTypes == "all" {
+      // Ensure Discovered group exists
+      try {
+        var p = spawn(["keepassxc-cli", "mkdir", dbPath, "RemoteJuggler/Discovered"],
+                      stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
+        p.stdin.write(password + "\n");
+        p.stdin.close();
+        p.wait();
+      } catch { }
+
+      const envDiscovered = KeePassXC.discoverEnvCredentials(dbPath, password);
+      output += "Environment variables: " + envDiscovered:string + " credential(s) found\n";
+      totalDiscovered += envDiscovered;
+    }
+
+    if discoverTypes == "ssh" || discoverTypes == "all" {
+      const sshDiscovered = KeePassXC.discoverSSHKeys(dbPath, password);
+      output += "SSH keys: " + sshDiscovered:string + " key(s) found\n";
+      totalDiscovered += sshDiscovered;
+    }
+
+    output += "\nTotal: " + totalDiscovered:string + " credential(s) discovered\n";
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_export tool call.
+   */
+  proc handleKeysExportTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysExportTool");
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    if !hasGroup || group == "" {
+      return (false, "Missing required parameter: group");
+    }
+
+    const (hasFormat, format) = Protocol.extractJsonString(params, "format");
+    const outputFormat = if hasFormat && format != "" then format else "env";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (exportOk, content) = KeePassXC.exportEntries(dbPath, group, password, outputFormat);
+
+    if exportOk {
+      return (true, content);
+    } else {
+      return (false, "Failed to export entries from: " + group);
+    }
   }
 }

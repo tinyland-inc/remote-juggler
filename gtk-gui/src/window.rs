@@ -6,7 +6,7 @@
 //! secondary selection within each profile.
 
 use gtk4::prelude::*;
-use gtk4::{gio, glib};
+use gtk4::{gdk, gio, glib};
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
@@ -688,6 +688,206 @@ mod imp {
                                     });
                                 }
                             }
+                        });
+                    });
+                }
+
+                // Get/Copy credential row
+                let get_row = adw::ActionRow::new();
+                get_row.set_title("Get Credential");
+                get_row.set_subtitle("Retrieve and copy a secret to clipboard");
+                let get_entry = gtk4::Entry::new();
+                get_entry.set_placeholder_text(Some("Entry path..."));
+                get_entry.set_hexpand(true);
+                get_entry.set_valign(gtk4::Align::Center);
+                let copy_button = gtk4::Button::with_label("Copy");
+                copy_button.set_valign(gtk4::Align::Center);
+                get_row.add_suffix(&get_entry);
+                get_row.add_suffix(&copy_button);
+                keys_group.add(&get_row);
+
+                // Wire copy button
+                {
+                    let entry_clone = get_entry.clone();
+                    let status_clone = status_label.clone();
+                    copy_button.connect_clicked(move |_| {
+                        let path = entry_clone.text().to_string();
+                        if path.is_empty() {
+                            return;
+                        }
+                        let status = status_clone.clone();
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_args_async(vec!["keys".into(), "get".into(), path]).await;
+                            match result {
+                                Ok(value) => {
+                                    let display = gdk::Display::default().unwrap();
+                                    let clipboard = display.clipboard();
+                                    clipboard.set_text(&value.trim());
+                                    status.set_text("Copied to clipboard");
+                                    status.set_visible(true);
+                                    status.remove_css_class("error");
+                                    status.add_css_class("success");
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Get failed: {}", e));
+                                    status.set_visible(true);
+                                    status.remove_css_class("success");
+                                    status.add_css_class("error");
+                                }
+                            }
+                        });
+                    });
+                }
+
+                // Store credential row
+                let store_row = adw::ActionRow::new();
+                store_row.set_title("Store Credential");
+                store_row.set_subtitle("Store a new secret in the key store");
+                let store_path_entry = gtk4::Entry::new();
+                store_path_entry.set_placeholder_text(Some("Path (e.g. RemoteJuggler/API/KEY)"));
+                store_path_entry.set_hexpand(true);
+                store_path_entry.set_valign(gtk4::Align::Center);
+                let store_value_entry = gtk4::PasswordEntry::new();
+                store_value_entry.set_placeholder_text(Some("Secret value"));
+                store_value_entry.set_hexpand(true);
+                store_value_entry.set_valign(gtk4::Align::Center);
+                store_value_entry.set_show_peek_icon(true);
+                let store_cred_button = gtk4::Button::with_label("Store");
+                store_cred_button.set_valign(gtk4::Align::Center);
+                store_cred_button.add_css_class("suggested-action");
+                store_row.add_suffix(&store_path_entry);
+                store_row.add_suffix(&store_value_entry);
+                store_row.add_suffix(&store_cred_button);
+                keys_group.add(&store_row);
+
+                // Wire store credential button
+                {
+                    let path_clone = store_path_entry.clone();
+                    let value_clone = store_value_entry.clone();
+                    let status_clone = status_label.clone();
+                    store_cred_button.connect_clicked(move |button| {
+                        let path = path_clone.text().to_string();
+                        let value = value_clone.text().to_string();
+                        if path.is_empty() || value.is_empty() {
+                            return;
+                        }
+                        button.set_sensitive(false);
+                        let btn = button.clone();
+                        let status = status_clone.clone();
+                        let pc = path_clone.clone();
+                        let vc = value_clone.clone();
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_args_async(vec![
+                                "keys".into(), "store".into(), path.clone(),
+                                "--value".into(), value,
+                            ]).await;
+                            match result {
+                                Ok(_) => {
+                                    status.set_text(&format!("Stored: {}", path));
+                                    status.set_visible(true);
+                                    status.remove_css_class("error");
+                                    status.add_css_class("success");
+                                    pc.set_text("");
+                                    vc.set_text("");
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Store failed: {}", e));
+                                    status.set_visible(true);
+                                    status.remove_css_class("success");
+                                    status.add_css_class("error");
+                                }
+                            }
+                            btn.set_sensitive(true);
+                        });
+                    });
+                }
+
+                // Delete credential row
+                let delete_row = adw::ActionRow::new();
+                delete_row.set_title("Delete Credential");
+                delete_row.set_subtitle("Remove an entry from the key store");
+                let delete_entry = gtk4::Entry::new();
+                delete_entry.set_placeholder_text(Some("Entry path..."));
+                delete_entry.set_hexpand(true);
+                delete_entry.set_valign(gtk4::Align::Center);
+                let delete_button = gtk4::Button::with_label("Delete");
+                delete_button.set_valign(gtk4::Align::Center);
+                delete_button.add_css_class("destructive-action");
+                delete_row.add_suffix(&delete_entry);
+                delete_row.add_suffix(&delete_button);
+                keys_group.add(&delete_row);
+
+                // Wire delete button
+                {
+                    let entry_clone = delete_entry.clone();
+                    let status_clone = status_label.clone();
+                    delete_button.connect_clicked(move |_| {
+                        let path = entry_clone.text().to_string();
+                        if path.is_empty() {
+                            return;
+                        }
+                        let status = status_clone.clone();
+                        let ec = entry_clone.clone();
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_args_async(vec![
+                                "keys".into(), "delete".into(), path.clone(),
+                            ]).await;
+                            match result {
+                                Ok(_) => {
+                                    status.set_text(&format!("Deleted: {}", path));
+                                    status.set_visible(true);
+                                    status.remove_css_class("error");
+                                    status.add_css_class("success");
+                                    ec.set_text("");
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Delete failed: {}", e));
+                                    status.set_visible(true);
+                                    status.remove_css_class("success");
+                                    status.add_css_class("error");
+                                }
+                            }
+                        });
+                    });
+                }
+
+                // Discover credentials button row
+                let discover_row = adw::ActionRow::new();
+                discover_row.set_title("Discover Credentials");
+                discover_row.set_subtitle("Auto-discover env vars and SSH keys");
+                let discover_button = gtk4::Button::with_label("Discover");
+                discover_button.set_valign(gtk4::Align::Center);
+                discover_row.add_suffix(&discover_button);
+                discover_row.set_activatable_widget(Some(&discover_button));
+                keys_group.add(&discover_row);
+
+                // Wire discover button
+                {
+                    let status_clone = status_label.clone();
+                    discover_button.connect_clicked(move |button| {
+                        button.set_sensitive(false);
+                        let btn = button.clone();
+                        let status = status_clone.clone();
+                        status.set_text("Discovering credentials...");
+                        status.set_visible(true);
+                        status.remove_css_class("error");
+                        status.remove_css_class("success");
+
+                        glib::spawn_future_local(async move {
+                            let result = run_cli_args_async(vec![
+                                "keys".into(), "discover".into(), "--types".into(), "all".into(),
+                            ]).await;
+                            match result {
+                                Ok(output) => {
+                                    status.set_text(&output.lines().last().unwrap_or("Done"));
+                                    status.add_css_class("success");
+                                }
+                                Err(e) => {
+                                    status.set_text(&format!("Discovery failed: {}", e));
+                                    status.add_css_class("error");
+                                }
+                            }
+                            btn.set_sensitive(true);
                         });
                     });
                 }
