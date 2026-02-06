@@ -78,7 +78,7 @@ if [ -f "$BINARY" ]; then
     echo "  Wrote CLI help to docs/snippets/cli-help.txt"
 else
     echo "  Warning: Binary not found, skipping CLI help generation"
-    echo "  Run 'make build' or 'make release' first"
+    echo "  Run 'just build' or 'just release' first"
 fi
 
 # Copy example configuration

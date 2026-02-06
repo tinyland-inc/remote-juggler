@@ -28,7 +28,7 @@ optdepends=(
     'gtk4: GUI application support'
     'libadwaita: Modern GNOME UI components'
 )
-makedepends=('chapel' 'make' 'gcc' 'pkg-config')
+makedepends=('chapel' 'just' 'make' 'gcc' 'pkg-config')
 provides=('remote-juggler' 'pinentry-remotejuggler')
 conflicts=('remote-juggler-git' 'remote-juggler-bin')
 backup=('etc/remote-juggler/config.json.example')
@@ -58,7 +58,7 @@ build() {
 
     # Build main CLI
     msg2 "Building RemoteJuggler CLI..."
-    make release
+    just release
 
     # Build HSM library
     msg2 "Building HSM library..."
@@ -91,7 +91,7 @@ check() {
 
     # Run unit tests
     msg2 "Running unit tests..."
-    make test || true  # Don't fail on test errors for now
+    just test || true  # Don't fail on test errors for now
 
     # Run HSM tests if TPM available
     if [[ $_enable_tpm -eq 1 ]]; then

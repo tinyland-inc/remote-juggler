@@ -100,11 +100,11 @@ modules:
         CHPL_TARGET_PLATFORM: linux64
     build-commands:
       # Build CLI
-      - make release PREFIX=/app
+      - just release
       # Build HSM library
       - make -C pinentry HSM_BACKEND=linux PREFIX=/app
       # Install
-      - make install PREFIX=/app
+      - just install-binary
       - make -C pinentry install PREFIX=/app
     sources:
       - type: git

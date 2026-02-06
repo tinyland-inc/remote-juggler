@@ -178,8 +178,8 @@ cd "$REPO_ROOT"
 TEST_FAILED=0
 
 # Chapel tests
-if command -v chpl &>/dev/null && [[ -f "Makefile" ]]; then
-    make test 2>/dev/null || TEST_FAILED=1
+if command -v just &>/dev/null && [[ -f "justfile" ]]; then
+    just test 2>/dev/null || TEST_FAILED=1
 fi
 
 # Rust tests

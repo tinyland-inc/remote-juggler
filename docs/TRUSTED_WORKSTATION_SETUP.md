@@ -76,8 +76,8 @@ make test
 
 # Build main Chapel binary
 cd ..
-make clean
-make release
+just clean
+just release
 
 # Verify HSM is detected
 ./target/release/remote_juggler pin status
@@ -88,10 +88,10 @@ make release
 
 ```bash
 # Install to ~/.local/bin (user-wide)
-make install
+just install
 
 # Or install system-wide
-sudo make install PREFIX=/usr/local
+sudo just install PREFIX=/usr/local
 
 # Verify installation
 which remote-juggler
@@ -133,8 +133,8 @@ make test
 
 # Build main Chapel binary
 cd ..
-make clean
-make release
+just clean
+just release
 
 # Verify SE is detected
 ./target/release/remote_juggler pin status
@@ -145,7 +145,7 @@ make release
 
 ```bash
 # Install to ~/.local/bin
-make install
+just install
 
 # Or via Homebrew (if tap exists)
 # brew install tinyland/tap/remote-juggler

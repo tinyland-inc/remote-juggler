@@ -96,9 +96,48 @@ var (
 	identities          []Identity
 	globalState         GlobalState
 	configDir           string
-	cliPath                          = "/usr/local/bin/remote-juggler"
+	cliPath             string
 	currentSecurityMode SecurityMode = SecurityModeDeveloper
 )
+
+// findCLI searches for the remote-juggler binary in common locations
+func findCLI() string {
+	// Check common installation paths in order of preference
+	searchPaths := []string{
+		// Check PATH first (handles ~/.local/bin if in PATH)
+		"remote-juggler",
+	}
+
+	// Add explicit paths as fallbacks
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		searchPaths = append(searchPaths,
+			filepath.Join(home, ".local", "bin", "remote-juggler"),
+			filepath.Join(home, "bin", "remote-juggler"),
+		)
+	}
+	searchPaths = append(searchPaths,
+		"/usr/local/bin/remote-juggler",
+		"/usr/bin/remote-juggler",
+	)
+
+	for _, path := range searchPaths {
+		// For bare command name, use LookPath
+		if !filepath.IsAbs(path) && !contains(path, string(filepath.Separator)) {
+			if fullPath, err := exec.LookPath(path); err == nil {
+				return fullPath
+			}
+			continue
+		}
+		// For absolute paths, check if file exists and is executable
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path
+		}
+	}
+
+	// Fallback to PATH lookup (will fail gracefully if not found)
+	return "remote-juggler"
+}
 
 func main() {
 	// Ensure single instance via D-Bus
@@ -110,6 +149,7 @@ func main() {
 
 	// Initialize paths
 	configDir = getConfigDir()
+	cliPath = findCLI()
 
 	// Run the systray
 	systray.Run(onReady, onExit)
@@ -377,7 +417,7 @@ func acquireDBusName() bool {
 	}
 
 	reply, err := conn.RequestName(
-		"dev.tinyland.RemoteJuggler",
+		"dev.tinyland.RemoteJuggler.Tray",
 		dbus.NameFlagDoNotQueue,
 	)
 	if err != nil {
@@ -396,8 +436,8 @@ func activateExistingInstance() {
 	defer conn.Close()
 
 	// Send activation signal to existing instance
-	obj := conn.Object("dev.tinyland.RemoteJuggler", "/dev/tinyland/RemoteJuggler")
-	obj.Call("dev.tinyland.RemoteJuggler.Activate", 0)
+	obj := conn.Object("dev.tinyland.RemoteJuggler.Tray", "/dev/tinyland/RemoteJuggler/Tray")
+	obj.Call("dev.tinyland.RemoteJuggler.Tray.Activate", 0)
 }
 
 // Desktop notifications via D-Bus

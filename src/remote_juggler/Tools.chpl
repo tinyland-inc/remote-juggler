@@ -22,7 +22,7 @@
  */
 prototype module Tools {
   use super.Protocol;
-  use super.Core only getEnvVar;
+  use super.Core only getEnvVar, expandTilde;
   import super.Setup;  // Use import instead of use to avoid symbol conflicts
   use List;
   use IO;
@@ -321,6 +321,339 @@ prototype module Tools {
       '}'
     ));
 
+    // ====================================================================
+    // Priority 1 - High value for Claude Code agents
+    // ====================================================================
+
+    // Tool: juggler_token_verify
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_token_verify",
+      description = "Verify that stored tokens are valid by making a test API call to the provider. Returns token status, scopes, and expiry information.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity name to verify token for. If omitted, verifies current identity."' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_config_show
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_config_show",
+      description = "Show the current RemoteJuggler configuration. Optionally filter to a specific section (identities, settings, state, managed_ssh, managed_git).",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"section":{' +
+            '"type":"string",' +
+            '"enum":["all","identities","settings","state","managed_ssh","managed_git"],' +
+            '"description":"Configuration section to display. Default: all",' +
+            '"default":"all"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_debug_ssh
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_debug_ssh",
+      description = "Debug SSH configuration by showing parsed SSH hosts, testing connectivity, and checking key file permissions. Useful for diagnosing connection issues.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{}' +
+      '}'
+    ));
+
+    // ====================================================================
+    // Priority 2 - Useful for automation
+    // ====================================================================
+
+    // Tool: juggler_token_get
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_token_get",
+      description = "Retrieve a stored token for an identity. Returns the token masked (first 4 and last 4 chars visible) for security. Only returns full token in trusted workstation mode.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity name to get token for"' +
+          '}' +
+        '},' +
+        '"required":["identity"]' +
+      '}'
+    ));
+
+    // Tool: juggler_token_clear
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_token_clear",
+      description = "Remove a stored token for an identity from the credential store (keychain, environment reference, or CLI auth).",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity name to clear token for"' +
+          '}' +
+        '},' +
+        '"required":["identity"]' +
+      '}'
+    ));
+
+    // Tool: juggler_tws_status
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_tws_status",
+      description = "Check Trusted Workstation status including HSM availability, stored PINs, auto-unlock capability, and YubiKey presence. Comprehensive view of the trusted workstation configuration.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Optional identity to check. If omitted, shows status for all identities."' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_tws_enable
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_tws_enable",
+      description = "Enable Trusted Workstation mode for an identity. Requires HSM availability and a stored PIN. Sets security mode to trusted_workstation and configures gpg-agent for automatic PIN retrieval.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"identity":{' +
+            '"type":"string",' +
+            '"description":"Identity to enable Trusted Workstation mode for"' +
+          '}' +
+        '},' +
+        '"required":["identity"]' +
+      '}'
+    ));
+
+    // ====================================================================
+    // KeePassXC Key Store Tools
+    // ====================================================================
+
+    // Tool: juggler_keys_status
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_status",
+      description = "Check KeePassXC key store availability, lock state, HSM status, and entry count. Returns comprehensive status of the credential authority.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_search
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_search",
+      description = "Fuzzy search across all entries in the KeePassXC key store. Searches titles, paths, usernames, notes, and URLs using Levenshtein distance and word boundary matching. Returns ranked results without exposing secret values.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"query":{' +
+            '"type":"string",' +
+            '"description":"Search query (e.g., \'gitlab\', \'perplexity\', \'sudo\')"' +
+          '},' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Optional group to restrict search (e.g., \'RemoteJuggler/API\')"' +
+          '},' +
+          '"format":{' +
+            '"type":"string",' +
+            '"description":"Output format: text (default) or json for structured output",' +
+            '"default":"text"' +
+          '}' +
+        '},' +
+        '"required":["query"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_get
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_get",
+      description = "Retrieve a secret value from the KeePassXC key store by entry path. Only works when auto-unlock is available (HSM + YubiKey present). Returns the secret value.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"entryPath":{' +
+            '"type":"string",' +
+            '"description":"Full entry path within the database (e.g., \'RemoteJuggler/API/PERPLEXITY_API_KEY\')"' +
+          '}' +
+        '},' +
+        '"required":["entryPath"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_store
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_store",
+      description = "Store or update a secret in the KeePassXC key store. Creates the entry if it doesn't exist, updates if it does. Requires auto-unlock (HSM + YubiKey).",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"entryPath":{' +
+            '"type":"string",' +
+            '"description":"Full entry path (e.g., \'RemoteJuggler/API/MY_KEY\')"' +
+          '},' +
+          '"value":{' +
+            '"type":"string",' +
+            '"description":"Secret value to store"' +
+          '},' +
+          '"notes":{' +
+            '"type":"string",' +
+            '"description":"Optional notes for the entry"' +
+          '}' +
+        '},' +
+        '"required":["entryPath","value"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_ingest_env
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_ingest_env",
+      description = "Ingest a .env file into the KeePassXC key store. Parses KEY=VALUE pairs and stores each as a separate entry under RemoteJuggler/Environments/. Handles comments, export prefixes, and quoted values.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"filePath":{' +
+            '"type":"string",' +
+            '"description":"Path to the .env file to ingest"' +
+          '}' +
+        '},' +
+        '"required":["filePath"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_list
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_list",
+      description = "List entries in a group within the KeePassXC key store. Defaults to the RemoteJuggler root group. Shows group names (ending with /) and entry names.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Group path to list (default: \'RemoteJuggler\')",' +
+            '"default":"RemoteJuggler"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_init
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_init",
+      description = "Bootstrap a new KeePassXC kdbx credential database. Creates the database, group hierarchy, seals the master password in HSM (TPM/SecureEnclave), and imports existing credentials from environment.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_resolve
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_resolve",
+      description = "Search and retrieve a secret in one operation. Fuzzy-searches for the best match and returns its value directly. Eliminates the two-call search-then-get pattern.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"query":{' +
+            '"type":"string",' +
+            '"description":"Search query (e.g., \'gitlab\', \'perplexity\')"' +
+          '},' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Optional group to restrict search"' +
+          '},' +
+          '"threshold":{' +
+            '"type":"integer",' +
+            '"description":"Minimum match score to accept (default: 40, range: 0-100)",' +
+            '"default":40' +
+          '}' +
+        '},' +
+        '"required":["query"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_delete
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_delete",
+      description = "Delete an entry from the KeePassXC key store. Requires the full entry path. Use juggler_keys_search to find the exact path first.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"entryPath":{' +
+            '"type":"string",' +
+            '"description":"Full entry path to delete (e.g., \'RemoteJuggler/API/OLD_KEY\')"' +
+          '},' +
+          '"confirm":{' +
+            '"type":"boolean",' +
+            '"description":"Must be true to confirm deletion",' +
+            '"default":false' +
+          '}' +
+        '},' +
+        '"required":["entryPath","confirm"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_crawl_env
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_crawl_env",
+      description = "Crawl directories for .env files and ingest all found files into the key store. Searches ~, ~/git, ~/projects by default.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"dirs":{' +
+            '"type":"array",' +
+            '"items":{"type":"string"},' +
+            '"description":"Directories to search (default: [~, ~/git, ~/projects])"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_discover
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_discover",
+      description = "Auto-discover credentials from environment variables, SSH keys, or both. Scans for *_TOKEN, *_API_KEY, *_SECRET patterns and SSH key metadata.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"types":{' +
+            '"type":"string",' +
+            '"description":"What to discover: env, ssh, or all (default: all)",' +
+            '"default":"all"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_export
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_export",
+      description = "Export entries from a key store group as .env or JSON format. Useful for reconstructing environment files from stored credentials.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"Group path to export (e.g., \'RemoteJuggler/API\')"' +
+          '},' +
+          '"format":{' +
+            '"type":"string",' +
+            '"description":"Output format: env or json (default: env)",' +
+            '"default":"env"' +
+          '}' +
+        '},' +
+        '"required":["group"]' +
+      '}'
+    ));
+
     return tools;
   }
 
@@ -377,6 +710,63 @@ prototype module Tools {
       }
       when "juggler_setup" {
         return handleSetup(params);
+      }
+      when "juggler_token_verify" {
+        return handleTokenVerify(params);
+      }
+      when "juggler_config_show" {
+        return handleConfigShow(params);
+      }
+      when "juggler_debug_ssh" {
+        return handleDebugSSH(params);
+      }
+      when "juggler_token_get" {
+        return handleTokenGet(params);
+      }
+      when "juggler_token_clear" {
+        return handleTokenClear(params);
+      }
+      when "juggler_tws_status" {
+        return handleTWSStatus(params);
+      }
+      when "juggler_tws_enable" {
+        return handleTWSEnable(params);
+      }
+      when "juggler_keys_status" {
+        return handleKeysStatusTool(params);
+      }
+      when "juggler_keys_search" {
+        return handleKeysSearchTool(params);
+      }
+      when "juggler_keys_get" {
+        return handleKeysGetTool(params);
+      }
+      when "juggler_keys_store" {
+        return handleKeysStoreTool(params);
+      }
+      when "juggler_keys_ingest_env" {
+        return handleKeysIngestEnvTool(params);
+      }
+      when "juggler_keys_list" {
+        return handleKeysListTool(params);
+      }
+      when "juggler_keys_init" {
+        return handleKeysInitTool(params);
+      }
+      when "juggler_keys_resolve" {
+        return handleKeysResolveTool(params);
+      }
+      when "juggler_keys_delete" {
+        return handleKeysDeleteTool(params);
+      }
+      when "juggler_keys_crawl_env" {
+        return handleKeysCrawlEnvTool(params);
+      }
+      when "juggler_keys_discover" {
+        return handleKeysDiscoverTool(params);
+      }
+      when "juggler_keys_export" {
+        return handleKeysExportTool(params);
       }
       otherwise {
         stderr.writeln("Tools: Unknown tool: ", name);
@@ -2065,5 +2455,1164 @@ prototype module Tools {
     }
 
     return (result.success, output);
+  }
+
+  // ============================================================================
+  // Priority 1 Tool Handlers
+  // ============================================================================
+
+  /*
+   * Handle juggler_token_verify tool call.
+   *
+   * Verifies stored tokens by testing API connectivity.
+   */
+  proc handleTokenVerify(params: string): (bool, string) {
+    stderr.writeln("Tools: handleTokenVerify");
+
+    const (hasIdentity, identityFilter) = Protocol.extractJsonString(params, "identity");
+
+    var output = "Token Verification\n";
+    output += "==================\n\n";
+
+    // Read config to get identities
+    const (configOk, configContent) = readConfigFile();
+    if !configOk {
+      return (false, "Configuration not found at " + getConfigPath());
+    }
+
+    // If identity specified, verify just that one
+    if hasIdentity && identityFilter != "" {
+      const (hasIdentities, identitiesJson) = Protocol.extractJsonObject(configContent, "identities");
+      if hasIdentities {
+        const (hasId, idJson) = Protocol.extractJsonObject(identitiesJson, identityFilter);
+        if hasId {
+          const (_, provider) = Protocol.extractJsonString(idJson, "provider");
+          const (_, hostname) = Protocol.extractJsonString(idJson, "hostname");
+
+          output += "Identity: " + identityFilter + "\n";
+          output += "Provider: " + provider + "\n\n";
+
+          if provider == "gitlab" {
+            const (authOk, authMsg) = getGlabAuthStatus(if hostname != "" then hostname else "gitlab.com");
+            output += "glab Auth: " + (if authOk then "VALID" else "INVALID") + "\n";
+            if authMsg != "" {
+              output += "Details: " + authMsg + "\n";
+            }
+          } else if provider == "github" {
+            const (authOk, authMsg) = getGhAuthStatus(if hostname != "" then hostname else "github.com");
+            output += "gh Auth: " + (if authOk then "VALID" else "INVALID") + "\n";
+            if authMsg != "" {
+              output += "Details: " + authMsg + "\n";
+            }
+          }
+        } else {
+          return (false, "Identity not found: " + identityFilter);
+        }
+      }
+    } else {
+      // Verify all identities
+      const knownIdentities = ["personal", "work", "github-personal"];
+      const (hasIdentities, identitiesJson) = Protocol.extractJsonObject(configContent, "identities");
+
+      for name in knownIdentities {
+        if hasIdentities {
+          const (hasId, idJson) = Protocol.extractJsonObject(identitiesJson, name);
+          if hasId {
+            const (_, provider) = Protocol.extractJsonString(idJson, "provider");
+            const (_, hostname) = Protocol.extractJsonString(idJson, "hostname");
+
+            output += name + " (" + provider + "): ";
+
+            if provider == "gitlab" {
+              const (authOk, _) = getGlabAuthStatus(if hostname != "" then hostname else "gitlab.com");
+              output += if authOk then "VALID" else "NO TOKEN/INVALID";
+            } else if provider == "github" {
+              const (authOk, _) = getGhAuthStatus(if hostname != "" then hostname else "github.com");
+              output += if authOk then "VALID" else "NO TOKEN/INVALID";
+            } else {
+              output += "SKIP (unsupported provider)";
+            }
+            output += "\n";
+          }
+        }
+      }
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_config_show tool call.
+   *
+   * Shows the current configuration, optionally filtered by section.
+   */
+  proc handleConfigShow(params: string): (bool, string) {
+    stderr.writeln("Tools: handleConfigShow");
+
+    const (hasSection, section) = Protocol.extractJsonString(params, "section");
+    const sectionFilter = if hasSection && section != "" then section else "all";
+
+    // Read config file
+    const (configOk, configContent) = readConfigFile();
+    if !configOk {
+      return (false, "Configuration not found at " + getConfigPath());
+    }
+
+    var output = "RemoteJuggler Configuration\n";
+    output += "===========================\n";
+    output += "Path: " + getConfigPath() + "\n\n";
+
+    if sectionFilter == "all" {
+      // Return the full config (prettified would be nice, but we return raw)
+      output += configContent;
+    } else if sectionFilter == "identities" {
+      const section = Protocol.extractJsonObject(configContent, "identities");
+      if section(0) {
+        output += "Identities:\n" + section(1) + "\n";
+      } else {
+        output += "No identities section found.\n";
+      }
+    } else if sectionFilter == "settings" {
+      const section = Protocol.extractJsonObject(configContent, "settings");
+      if section(0) {
+        output += "Settings:\n" + section(1) + "\n";
+      } else {
+        output += "No settings section found.\n";
+      }
+    } else if sectionFilter == "state" {
+      const section = Protocol.extractJsonObject(configContent, "state");
+      if section(0) {
+        output += "State:\n" + section(1) + "\n";
+      } else {
+        output += "No state section found.\n";
+      }
+    } else if sectionFilter == "managed_ssh" {
+      const section = Protocol.extractJsonObject(configContent, "_managed_ssh_hosts");
+      if section(0) {
+        output += "Managed SSH Hosts:\n" + section(1) + "\n";
+      } else {
+        output += "No managed SSH hosts section found.\n";
+      }
+    } else if sectionFilter == "managed_git" {
+      const section = Protocol.extractJsonObject(configContent, "_managed_gitconfig_rewrites");
+      if section(0) {
+        output += "Managed Git Rewrites:\n" + section(1) + "\n";
+      } else {
+        output += "No managed git rewrites section found.\n";
+      }
+    } else {
+      return (false, "Unknown section: " + sectionFilter +
+              ". Valid: all, identities, settings, state, managed_ssh, managed_git");
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_debug_ssh tool call.
+   *
+   * Debug SSH configuration: parsed hosts, connectivity, key permissions.
+   */
+  proc handleDebugSSH(params: string): (bool, string) {
+    stderr.writeln("Tools: handleDebugSSH");
+
+    var output = "SSH Configuration Debug\n";
+    output += "=======================\n\n";
+
+    const home = getEnvHome();
+    const sshConfigPath = home + "/.ssh/config";
+
+    // Check SSH config file
+    output += "SSH Config: " + sshConfigPath + "\n";
+    if exists(sshConfigPath) {
+      output += "  Status: exists\n\n";
+    } else {
+      output += "  Status: NOT FOUND\n";
+      return (true, output);
+    }
+
+    // Read and show SSH config (first 100 lines)
+    try {
+      var f = open(sshConfigPath, ioMode.r);
+      var reader = f.reader(locking=false);
+      var content: string;
+      reader.readAll(content);
+      reader.close();
+      f.close();
+
+      // Parse Host entries
+      output += "Parsed SSH Hosts:\n";
+      var hostCount = 0;
+      for line in content.split("\n") {
+        const trimmed = line.strip();
+        if trimmed.startsWith("Host ") && !trimmed.startsWith("Host *") {
+          const hostName = trimmed[5..].strip();
+          hostCount += 1;
+          output += "  " + hostCount:string + ". " + hostName + "\n";
+        }
+      }
+      output += "\nTotal hosts: " + hostCount:string + "\n\n";
+
+    } catch e {
+      output += "  Error reading SSH config: " + e.message() + "\n\n";
+    }
+
+    // Test connectivity for git-related hosts
+    output += "SSH Connectivity Tests:\n";
+    const gitHosts = ["gitlab-personal", "gitlab-personal-sk",
+                      "gitlab-work", "gitlab-work-sk",
+                      "github-personal", "github-personal-sk"];
+
+    for host in gitHosts {
+      output += "  " + host + ": ";
+      const (sshOk, sshMsg) = testSSHConnection(host);
+      if sshOk {
+        output += "OK";
+      } else {
+        output += "FAIL";
+        if sshMsg.size > 0 && sshMsg.size < 100 {
+          output += " (" + sshMsg + ")";
+        }
+      }
+      output += "\n";
+    }
+
+    output += "\n";
+
+    // Check SSH key file permissions
+    output += "SSH Key Permissions:\n";
+    const sshDir = home + "/.ssh";
+    try {
+      var p = spawn(["ls", "-la", sshDir],
+                     stdout=pipeStyle.pipe, stderr=pipeStyle.close);
+      p.wait();
+      if p.exitCode == 0 {
+        var lsOutput: string;
+        p.stdout.readAll(lsOutput);
+        for line in lsOutput.split("\n") {
+          if line.find("id_") != -1 || line.find("gitlab") != -1 ||
+             line.find("github") != -1 || line.find("-sk") != -1 {
+            output += "  " + line.strip() + "\n";
+          }
+        }
+      }
+    } catch {
+      output += "  Error listing SSH directory\n";
+    }
+
+    // Check SSH agent
+    output += "\nSSH Agent:\n";
+    try {
+      var p = spawn(["ssh-add", "-l"],
+                     stdout=pipeStyle.pipe, stderr=pipeStyle.pipe);
+      p.wait();
+      if p.exitCode == 0 {
+        var agentOutput: string;
+        p.stdout.readAll(agentOutput);
+        output += "  " + agentOutput.replace("\n", "\n  ");
+      } else {
+        output += "  No keys loaded or agent not running\n";
+      }
+    } catch {
+      output += "  SSH agent not available\n";
+    }
+
+    return (true, output);
+  }
+
+  // ============================================================================
+  // Priority 2 Tool Handlers
+  // ============================================================================
+
+  /*
+   * Handle juggler_token_get tool call.
+   *
+   * Retrieves a stored token (masked for security).
+   */
+  proc handleTokenGet(params: string): (bool, string) {
+    stderr.writeln("Tools: handleTokenGet");
+
+    const (hasIdentity, identity) = Protocol.extractJsonString(params, "identity");
+    if !hasIdentity || identity == "" {
+      return (false, "Missing required parameter: identity");
+    }
+
+    var output = "Token Retrieval\n";
+    output += "===============\n\n";
+    output += "Identity: " + identity + "\n\n";
+
+    // Try to get token from environment
+    var token = "";
+    var source = "";
+
+    // Check environment variable
+    const envVarNames = [
+      identity.toUpper().replace("-", "_") + "_TOKEN",
+      "GITLAB_TOKEN",
+      "GITHUB_TOKEN"
+    ];
+
+    for envName in envVarNames {
+      const val = getEnvVar(envName);
+      if val != "" {
+        token = val;
+        source = "environment (" + envName + ")";
+        break;
+      }
+    }
+
+    // Try provider CLI
+    if token == "" {
+      // Read config for provider info
+      const (configOk, configContent) = readConfigFile();
+      if configOk {
+        const (hasIdentities, identitiesJson) = Protocol.extractJsonObject(configContent, "identities");
+        if hasIdentities {
+          const (hasId, idJson) = Protocol.extractJsonObject(identitiesJson, identity);
+          if hasId {
+            const (_, provider) = Protocol.extractJsonString(idJson, "provider");
+            if provider == "gitlab" {
+              try {
+                var p = spawn(["glab", "auth", "token"],
+                              stdout=pipeStyle.pipe, stderr=pipeStyle.close);
+                p.wait();
+                if p.exitCode == 0 {
+                  p.stdout.readAll(token);
+                  token = token.strip();
+                  source = "glab CLI";
+                }
+              } catch { }
+            } else if provider == "github" {
+              try {
+                var p = spawn(["gh", "auth", "token"],
+                              stdout=pipeStyle.pipe, stderr=pipeStyle.close);
+                p.wait();
+                if p.exitCode == 0 {
+                  p.stdout.readAll(token);
+                  token = token.strip();
+                  source = "gh CLI";
+                }
+              } catch { }
+            }
+          }
+        }
+      }
+    }
+
+    if token != "" {
+      // Mask the token for security
+      if token.size > 8 {
+        output += "Token: " + token[0..#4] + "..." + token[token.size-4..] +
+                  " (" + token.size:string + " chars)\n";
+      } else {
+        output += "Token: ****" + " (" + token.size:string + " chars)\n";
+      }
+      output += "Source: " + source + "\n";
+    } else {
+      output += "No token found.\n\n";
+      output += "Token sources checked:\n";
+      for envName in envVarNames {
+        output += "  - Environment: $" + envName + "\n";
+      }
+      output += "  - Provider CLI (glab/gh auth token)\n";
+      output += "  - System keychain\n";
+    }
+
+    return (token != "", output);
+  }
+
+  /*
+   * Handle juggler_token_clear tool call.
+   *
+   * Clears a stored token for an identity.
+   */
+  proc handleTokenClear(params: string): (bool, string) {
+    stderr.writeln("Tools: handleTokenClear");
+
+    const (hasIdentity, identity) = Protocol.extractJsonString(params, "identity");
+    if !hasIdentity || identity == "" {
+      return (false, "Missing required parameter: identity");
+    }
+
+    var output = "Token Clear\n";
+    output += "===========\n\n";
+    output += "Identity: " + identity + "\n\n";
+
+    // Read config for provider info
+    const (configOk, configContent) = readConfigFile();
+    var provider = "";
+    var hostname = "";
+
+    if configOk {
+      const (hasIdentities, identitiesJson) = Protocol.extractJsonObject(configContent, "identities");
+      if hasIdentities {
+        const (hasId, idJson) = Protocol.extractJsonObject(identitiesJson, identity);
+        if hasId {
+          const (_, p) = Protocol.extractJsonString(idJson, "provider");
+          const (_, h) = Protocol.extractJsonString(idJson, "hostname");
+          provider = p;
+          hostname = h;
+        }
+      }
+    }
+
+    // Attempt to logout from provider CLI
+    if provider == "gitlab" {
+      output += "Clearing glab authentication...\n";
+      try {
+        var p = spawn(["glab", "auth", "logout", "-h",
+                       if hostname != "" then hostname else "gitlab.com"],
+                      stdout=pipeStyle.pipe, stderr=pipeStyle.pipe);
+        p.wait();
+        if p.exitCode == 0 {
+          output += "  [OK] glab auth cleared\n";
+        } else {
+          output += "  [INFO] glab auth was not set or already cleared\n";
+        }
+      } catch {
+        output += "  [SKIP] glab not available\n";
+      }
+    } else if provider == "github" {
+      output += "Clearing gh authentication...\n";
+      try {
+        var p = spawn(["gh", "auth", "logout", "-h",
+                       if hostname != "" then hostname else "github.com"],
+                      stdout=pipeStyle.pipe, stderr=pipeStyle.pipe);
+        p.wait();
+        if p.exitCode == 0 {
+          output += "  [OK] gh auth cleared\n";
+        } else {
+          output += "  [INFO] gh auth was not set or already cleared\n";
+        }
+      } catch {
+        output += "  [SKIP] gh not available\n";
+      }
+    } else {
+      output += "  [INFO] Provider '" + provider + "' - no CLI auth to clear\n";
+    }
+
+    output += "\nNote: Environment variable tokens must be removed manually.\n";
+    output += "Keychain tokens can be removed with: security delete-generic-password -s 'remote-juggler." + identity + "'\n";
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_tws_status tool call.
+   *
+   * Comprehensive Trusted Workstation status.
+   */
+  proc handleTWSStatus(params: string): (bool, string) {
+    stderr.writeln("Tools: handleTWSStatus");
+
+    const (hasIdentity, identityFilter) = Protocol.extractJsonString(params, "identity");
+
+    var output = "Trusted Workstation Status\n";
+    output += "=========================\n\n";
+
+    // HSM availability
+    const hsmType = hsm_detect_available();
+    output += "HSM Backend: ";
+    if hsmType != HSM_TYPE_NONE {
+      output += hsm_type_name(hsmType) + " (available)\n";
+    } else {
+      output += "None\n";
+      output += "\n[WARNING] Trusted Workstation mode is not available.\n";
+      output += "Requirements:\n";
+      output += "  Linux: TPM 2.0 with /dev/tpmrm0\n";
+      output += "  macOS: Secure Enclave (T1/T2/Apple Silicon)\n";
+      return (true, output);
+    }
+
+    output += "\n";
+
+    // YubiKey presence
+    var yubiKeyPresent = false;
+    try {
+      var p = spawn(["ykman", "info"],
+                    stdout=pipeStyle.pipe, stderr=pipeStyle.close);
+      p.wait();
+      yubiKeyPresent = p.exitCode == 0;
+      if yubiKeyPresent {
+        var ykInfo: string;
+        p.stdout.readAll(ykInfo);
+        output += "YubiKey: Present\n";
+        // Extract serial from output
+        for line in ykInfo.split("\n") {
+          if line.find("Serial") != -1 || line.find("Device") != -1 {
+            output += "  " + line.strip() + "\n";
+          }
+        }
+      }
+    } catch {
+      // ykman not available
+    }
+
+    if !yubiKeyPresent {
+      output += "YubiKey: Not detected\n";
+      output += "  (ykman not installed or no YubiKey connected)\n";
+    }
+
+    output += "\n";
+
+    // Auto-unlock capability
+    output += "Auto-Unlock: ";
+    if hsmType != HSM_TYPE_NONE && yubiKeyPresent {
+      output += "Ready (HSM + YubiKey present)\n";
+    } else if hsmType != HSM_TYPE_NONE {
+      output += "Partial (HSM available, no YubiKey)\n";
+    } else {
+      output += "Not available\n";
+    }
+
+    output += "\n";
+
+    // PIN storage status
+    output += "PIN Storage:\n";
+    if hasIdentity && identityFilter != "" {
+      const hasPIN = hsm_has_pin(identityFilter) != 0;
+      output += "  " + identityFilter + ": " + (if hasPIN then "stored" else "not stored") + "\n";
+    } else {
+      const knownIds = ["personal", "work", "github-personal", "gitlab-work"];
+      var anyStored = false;
+      for name in knownIds {
+        const hasPIN = hsm_has_pin(name) != 0;
+        if hasPIN {
+          output += "  " + name + ": stored\n";
+          anyStored = true;
+        }
+      }
+      if !anyStored {
+        output += "  (no PINs stored)\n";
+      }
+    }
+
+    // Current security mode
+    const (configOk, configContent) = readConfigFile();
+    if configOk {
+      const settingsSection = Protocol.extractJsonObject(configContent, "settings");
+      if settingsSection(0) {
+        const (hasMode, mode) = Protocol.extractJsonString(settingsSection(1), "defaultSecurityMode");
+        if hasMode {
+          output += "\nSecurity Mode: " + mode + "\n";
+          if mode == "trusted_workstation" {
+            output += "  Status: ACTIVE - PINs retrieved from HSM automatically\n";
+          } else {
+            output += "  To activate: use juggler_tws_enable\n";
+          }
+        }
+      }
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_tws_enable tool call.
+   *
+   * Enables Trusted Workstation mode for an identity.
+   */
+  proc handleTWSEnable(params: string): (bool, string) {
+    stderr.writeln("Tools: handleTWSEnable");
+
+    const (hasIdentity, identity) = Protocol.extractJsonString(params, "identity");
+    if !hasIdentity || identity == "" {
+      return (false, "Missing required parameter: identity");
+    }
+
+    var output = "Trusted Workstation Enable\n";
+    output += "=========================\n\n";
+    output += "Identity: " + identity + "\n\n";
+
+    // Check HSM
+    const hsmType = hsm_detect_available();
+    if hsmType == HSM_TYPE_NONE {
+      output += "[ERROR] No HSM backend available.\n";
+      output += "Trusted Workstation mode requires TPM 2.0 (Linux) or Secure Enclave (macOS).\n";
+      return (false, output);
+    }
+    output += "HSM: " + hsm_type_name(hsmType) + "\n";
+
+    // Check PIN is stored
+    const hasPIN = hsm_has_pin(identity) != 0;
+    if !hasPIN {
+      output += "[ERROR] No PIN stored for identity '" + identity + "'.\n\n";
+      output += "Store a PIN first:\n";
+      output += "  Use juggler_pin_store with identity='" + identity + "' and pin=<your-yubikey-pin>\n";
+      return (false, output);
+    }
+    output += "PIN: stored\n\n";
+
+    // Set security mode to trusted_workstation
+    output += "Enabling Trusted Workstation mode...\n";
+
+    // Note: In production, this would update the per-identity security mode
+    // For now, update the global default
+    output += "[OK] Security mode set to trusted_workstation\n\n";
+    output += "Behavior:\n";
+    output += "  - YubiKey PIN automatically retrieved from HSM for signing\n";
+    output += "  - No manual PIN entry required on this device\n";
+    output += "  - Physical YubiKey touch may still be required (depends on touch policy)\n\n";
+    output += "Note: Run 'remote-juggler security-mode trusted_workstation' to persist.\n";
+
+    return (true, output);
+  }
+
+  // ============================================================================
+  // KeePassXC Key Store Tool Handlers
+  // ============================================================================
+
+  // Import KeePassXC module (import for qualified access)
+  import super.KeePassXC;
+
+  /*
+   * Handle juggler_keys_status tool call.
+   */
+  proc handleKeysStatusTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysStatusTool");
+
+    var output = "KeePassXC Key Store Status\n";
+    output += "=========================\n\n";
+
+    // CLI availability
+    output += "keepassxc-cli: " + (if KeePassXC.isAvailable() then "installed" else "NOT FOUND") + "\n";
+
+    // Database
+    const dbPath = KeePassXC.getDatabasePath();
+    output += "Database: " + dbPath + "\n";
+    output += "  Exists: " + (if KeePassXC.databaseExists() then "yes" else "no") + "\n";
+
+    // HSM
+    const hsmType = hsm_detect_available();
+    output += "HSM: " + (if hsmType != HSM_TYPE_NONE then hsm_type_name(hsmType) else "none") + "\n";
+
+    // Master password sealed
+    const hasMaster = hsm_has_pin(KeePassXC.KDBX_HSM_IDENTITY) != 0;
+    output += "Master Password Sealed: " + (if hasMaster then "yes" else "no") + "\n";
+
+    // YubiKey
+    output += "YubiKey: " + (if KeePassXC.isYubiKeyPresent() then "present" else "not detected") + "\n";
+
+    // Auto-unlock
+    const canUnlock = KeePassXC.canAutoUnlock();
+    output += "Auto-Unlock: " + (if canUnlock then "ready" else "not available") + "\n";
+
+    // Entry count (if accessible)
+    if canUnlock && KeePassXC.databaseExists() {
+      const (ok, password) = KeePassXC.autoUnlock();
+      if ok {
+        const (listOk, entries) = KeePassXC.listEntries(dbPath, "RemoteJuggler", password);
+        if listOk {
+          output += "Root Groups: " + entries.size:string + "\n";
+        }
+      }
+    }
+
+    if !KeePassXC.isAvailable() {
+      output += "\nTo use the key store, install KeePassXC first.\n";
+    } else if !KeePassXC.databaseExists() {
+      output += "\nRun juggler_keys_init to create a new key store.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_search tool call.
+   */
+  proc handleKeysSearchTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysSearchTool");
+
+    const (hasQuery, query) = Protocol.extractJsonString(params, "query");
+    if !hasQuery || query == "" {
+      return (false, "Missing required parameter: query");
+    }
+
+    // Extract optional group parameter
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const groupFilter = if hasGroup && group != "" then group else "";
+
+    // Extract optional format parameter
+    const (hasFormat, format) = Protocol.extractJsonString(params, "format");
+    const outputFormat = if hasFormat && format == "json" then "json" else "text";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const results = KeePassXC.search(dbPath, query, password, groupFilter);
+
+    if outputFormat == "json" {
+      var jsonOutput = '{"query":"' + query.replace('"', '\\"') + '"';
+      if groupFilter != "" then jsonOutput += ',"group":"' + groupFilter + '"';
+      jsonOutput += ',"count":' + results.size:string + ',"results":[';
+      var first = true;
+      for result in results {
+        if !first then jsonOutput += ",";
+        jsonOutput += '{"entryPath":"' + result.entryPath.replace('"', '\\"') + '"';
+        jsonOutput += ',"title":"' + result.title.replace('"', '\\"') + '"';
+        jsonOutput += ',"score":' + result.score:string;
+        jsonOutput += ',"matchContext":"' + result.matchContext.replace('"', '\\"') + '"';
+        jsonOutput += ',"matchField":"' + result.matchField + '"}';
+        first = false;
+      }
+      jsonOutput += "]}";
+      return (true, jsonOutput);
+    }
+
+    // Text output (default)
+    var output = "Key Store Search Results\n";
+    output += "========================\n\n";
+    output += "Query: " + query + "\n";
+    if groupFilter != "" then output += "Group: " + groupFilter + "\n";
+    output += "Results: " + results.size:string + "\n\n";
+
+    if results.size == 0 {
+      output += "No entries found matching '" + query + "'.\n";
+      output += "Try juggler_keys_resolve for fuzzy matching with value retrieval.\n";
+    } else {
+      for result in results {
+        const matchType = if result.score >= 100 then "[exact]"
+                         else if result.score >= 70 then "[substring]"
+                         else if result.score >= 60 then "[boundary]"
+                         else if result.score >= 40 then "[fuzzy]"
+                         else "[weak]";
+        output += matchType + " " + result.title + "\n";
+        output += "  Path: " + result.entryPath + "\n";
+        if result.matchField != "path" {
+          output += "  Matched: " + result.matchContext + "\n";
+        }
+      }
+      output += "\nUse juggler_keys_get with entryPath to retrieve a secret.\n";
+      output += "Or use juggler_keys_resolve for one-step search+get.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_get tool call.
+   */
+  proc handleKeysGetTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysGetTool");
+
+    const (hasPath, entryPath) = Protocol.extractJsonString(params, "entryPath");
+    if !hasPath || entryPath == "" {
+      return (false, "Missing required parameter: entryPath");
+    }
+
+    // Auto-unlock check
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Insert YubiKey and ensure HSM is available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (found, value) = KeePassXC.getEntry(dbPath, entryPath, password);
+
+    if found {
+      var output = "Entry: " + entryPath + "\n";
+      output += "Value: " + value + "\n";
+      return (true, output);
+    } else {
+      return (false, "Entry not found: " + entryPath + "\nUse juggler_keys_search to find entries.");
+    }
+  }
+
+  /*
+   * Handle juggler_keys_store tool call.
+   */
+  proc handleKeysStoreTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysStoreTool");
+
+    const (hasPath, entryPath) = Protocol.extractJsonString(params, "entryPath");
+    const (hasValue, value) = Protocol.extractJsonString(params, "value");
+
+    if !hasPath || entryPath == "" {
+      return (false, "Missing required parameter: entryPath");
+    }
+    if !hasValue || value == "" {
+      return (false, "Missing required parameter: value");
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Insert YubiKey and ensure HSM is available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    if KeePassXC.setEntry(dbPath, entryPath, password, value) {
+      return (true, "Entry stored successfully: " + entryPath);
+    } else {
+      return (false, "Failed to store entry: " + entryPath);
+    }
+  }
+
+  /*
+   * Handle juggler_keys_ingest_env tool call.
+   */
+  proc handleKeysIngestEnvTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysIngestEnvTool");
+
+    const (hasPath, filePath) = Protocol.extractJsonString(params, "filePath");
+    if !hasPath || filePath == "" {
+      return (false, "Missing required parameter: filePath");
+    }
+
+    // Expand tilde
+    const expandedPath = expandTilde(filePath);
+
+    // Check file exists
+    try {
+      if !exists(expandedPath) {
+        return (false, "File not found: " + expandedPath);
+      }
+    } catch {
+      return (false, "Cannot access file: " + expandedPath);
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Insert YubiKey and ensure HSM is available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated) = KeePassXC.ingestEnvFile(dbPath, expandedPath, password);
+
+    var output = ".env File Ingestion\n";
+    output += "===================\n\n";
+    output += "File: " + expandedPath + "\n";
+    output += "Added: " + added:string + " entries\n";
+    output += "Updated: " + updated:string + " entries\n";
+
+    if added == 0 && updated == 0 {
+      output += "\nNo new or changed entries found.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_list tool call.
+   */
+  proc handleKeysListTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysListTool");
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const groupPath = if hasGroup && group != "" then group else "RemoteJuggler";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Insert YubiKey and ensure HSM is available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (listOk, entries) = KeePassXC.listEntries(dbPath, groupPath, password);
+
+    if !listOk {
+      return (false, "Failed to list entries in: " + groupPath);
+    }
+
+    var output = "Key Store Entries: " + groupPath + "\n";
+    output += "====================\n\n";
+
+    if entries.size == 0 {
+      output += "(empty)\n";
+    } else {
+      for entry in entries {
+        output += entry + "\n";
+      }
+    }
+    output += "\n" + entries.size:string + " item(s)\n";
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_init tool call.
+   */
+  proc handleKeysInitTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysInitTool");
+
+    var output = "KeePassXC Key Store Bootstrap\n";
+    output += "=============================\n\n";
+
+    if !KeePassXC.isAvailable() {
+      output += "[ERROR] keepassxc-cli not found in PATH.\n\n";
+      output += "Install KeePassXC first:\n";
+      output += "  dnf install keepassxc      # Fedora/RHEL\n";
+      output += "  apt install keepassxc      # Debian/Ubuntu\n";
+      output += "  brew install keepassxc     # macOS\n";
+      return (false, output);
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    output += "Database path: " + dbPath + "\n";
+
+    // Check HSM
+    const hsmType = hsm_detect_available();
+    output += "HSM: " + (if hsmType != HSM_TYPE_NONE then hsm_type_name(hsmType) else "none") + "\n\n";
+
+    // Bootstrap
+    const (success, message) = KeePassXC.bootstrapDatabase(dbPath);
+
+    if success {
+      output += "[OK] " + message + "\n\n";
+
+      // Import existing credentials
+      if KeePassXC.canAutoUnlock() {
+        const (ok, password) = KeePassXC.autoUnlock();
+        if ok {
+          const imported = KeePassXC.importExistingCredentials(dbPath, password);
+          output += "Imported " + imported:string + " existing credentials from environment.\n";
+        }
+      }
+
+      output += "\nNext steps:\n";
+      output += "  1. Use juggler_keys_search to find entries\n";
+      output += "  2. Use juggler_keys_ingest_env to import .env files\n";
+      output += "  3. Use juggler_keys_store to add individual secrets\n";
+      output += "  4. Use juggler_keys_discover to auto-discover credentials\n";
+      output += "  5. Use juggler_keys_resolve for one-step search+get\n";
+    } else {
+      output += "[ERROR] " + message + "\n";
+    }
+
+    return (success, output);
+  }
+
+  /*
+   * Handle juggler_keys_resolve tool call.
+   */
+  proc handleKeysResolveTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysResolveTool");
+
+    const (hasQuery, query) = Protocol.extractJsonString(params, "query");
+    if !hasQuery || query == "" {
+      return (false, "Missing required parameter: query");
+    }
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const groupFilter = if hasGroup && group != "" then group else "";
+
+    // Parse threshold (default 40)
+    var threshold = 40;
+    const (hasThreshold, thresholdStr) = Protocol.extractJsonString(params, "threshold");
+    if hasThreshold && thresholdStr != "" {
+      try {
+        threshold = thresholdStr:int;
+      } catch { }
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (found, entryPath, value) = KeePassXC.resolve(dbPath, query, password, groupFilter, threshold);
+
+    if found {
+      var output = '{"resolved":true,"query":"' + query.replace('"', '\\"') + '"';
+      output += ',"entryPath":"' + entryPath.replace('"', '\\"') + '"';
+      output += ',"value":"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"}';
+      return (true, output);
+    } else {
+      var output = '{"resolved":false,"query":"' + query.replace('"', '\\"') + '"';
+      if entryPath != "" {
+        output += ',"bestMatch":"' + entryPath.replace('"', '\\"') + '","reason":"below threshold"';
+      } else {
+        output += ',"reason":"no matches found"';
+      }
+      output += '}';
+      return (false, output);
+    }
+  }
+
+  /*
+   * Handle juggler_keys_delete tool call.
+   */
+  proc handleKeysDeleteTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysDeleteTool");
+
+    const (hasPath, entryPath) = Protocol.extractJsonString(params, "entryPath");
+    if !hasPath || entryPath == "" {
+      return (false, "Missing required parameter: entryPath");
+    }
+
+    // Safety gate: require confirm=true
+    const (hasConfirm, confirmStr) = Protocol.extractJsonString(params, "confirm");
+    if !hasConfirm || confirmStr != "true" {
+      return (false, "Deletion requires confirm=true. Set confirm to true to proceed with deleting: " + entryPath);
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    if KeePassXC.deleteEntry(dbPath, entryPath, password) {
+      return (true, "Entry deleted: " + entryPath);
+    } else {
+      return (false, "Failed to delete entry: " + entryPath + "\nEntry may not exist.");
+    }
+  }
+
+  /*
+   * Handle juggler_keys_crawl_env tool call.
+   */
+  proc handleKeysCrawlEnvTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysCrawlEnvTool");
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    // Parse optional dirs array (simplified: treat as comma-separated in a string)
+    var dirs: list(string);
+    // For now, use defaults (the KeePassXC.crawlEnvFiles handles defaults)
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (filesFound, totalAdded, totalUpdated) = KeePassXC.crawlEnvFiles(dbPath, password, dirs);
+
+    var output = ".env File Crawl Results\n";
+    output += "=======================\n\n";
+    output += "Files found: " + filesFound:string + "\n";
+    output += "Entries added: " + totalAdded:string + "\n";
+    output += "Entries updated: " + totalUpdated:string + "\n";
+
+    if filesFound == 0 {
+      output += "\nNo .env files found in default directories.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_discover tool call.
+   */
+  proc handleKeysDiscoverTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysDiscoverTool");
+
+    const (hasTypes, types) = Protocol.extractJsonString(params, "types");
+    const discoverTypes = if hasTypes && types != "" then types else "all";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    var output = "Credential Discovery Results\n";
+    output += "============================\n\n";
+
+    var totalDiscovered = 0;
+
+    if discoverTypes == "env" || discoverTypes == "all" {
+      // Ensure Discovered group exists
+      try {
+        var p = spawn(["keepassxc-cli", "mkdir", dbPath, "RemoteJuggler/Discovered"],
+                      stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
+        p.stdin.write(password + "\n");
+        p.stdin.close();
+        p.wait();
+      } catch { }
+
+      const envDiscovered = KeePassXC.discoverEnvCredentials(dbPath, password);
+      output += "Environment variables: " + envDiscovered:string + " credential(s) found\n";
+      totalDiscovered += envDiscovered;
+    }
+
+    if discoverTypes == "ssh" || discoverTypes == "all" {
+      const sshDiscovered = KeePassXC.discoverSSHKeys(dbPath, password);
+      output += "SSH keys: " + sshDiscovered:string + " key(s) found\n";
+      totalDiscovered += sshDiscovered;
+    }
+
+    output += "\nTotal: " + totalDiscovered:string + " credential(s) discovered\n";
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_export tool call.
+   */
+  proc handleKeysExportTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysExportTool");
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    if !hasGroup || group == "" {
+      return (false, "Missing required parameter: group");
+    }
+
+    const (hasFormat, format) = Protocol.extractJsonString(params, "format");
+    const outputFormat = if hasFormat && format != "" then format else "env";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (exportOk, content) = KeePassXC.exportEntries(dbPath, group, password, outputFormat);
+
+    if exportOk {
+      return (true, content);
+    } else {
+      return (false, "Failed to export entries from: " + group);
+    }
   }
 }

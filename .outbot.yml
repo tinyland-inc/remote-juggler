@@ -264,7 +264,7 @@ safety_checks:
     blocking: true
     critical_files:
       - "Mason.toml"
-      - "Makefile"
+      - "justfile"
       - "LICENSE"
 
   drastic_loc_change:
@@ -285,7 +285,7 @@ safety_checks:
     critical_files:
       - "LICENSE*"
       - "Mason.toml"
-      - "Makefile"
+      - "justfile"
 
   binary_file_corruption:
     enabled: true

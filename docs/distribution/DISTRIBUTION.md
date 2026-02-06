@@ -134,7 +134,7 @@ class RemoteJuggler < Formula
   depends_on "chapel" => :build
 
   def install
-    system "make", "release"
+    system "just", "release"
     bin.install "remote-juggler"
     # Install shell completions
     bash_completion.install "completions/remote-juggler.bash"
@@ -408,7 +408,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build
-        run: make release
+        run: just release
 
       - name: Sign (macOS)
         if: startsWith(matrix.platform, 'darwin')

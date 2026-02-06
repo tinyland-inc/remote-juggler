@@ -158,7 +158,7 @@ class RemoteJuggler < Formula
   depends_on "chapel" => :build
 
   def install
-    system "make", "release"
+    system "just", "release"
     bin.install "target/release/remote-juggler"
     # Install completions
     bash_completion.install "completions/remote-juggler.bash"
@@ -185,7 +185,7 @@ sha256sums=('CHECKSUM')
 
 build() {
   cd "$srcdir/$pkgname-v$pkgver"
-  make release
+  just release
 }
 
 package() {
@@ -213,7 +213,7 @@ modules:
   - name: remote-juggler
     buildsystem: simple
     build-commands:
-      - make release
+      - just release
       - install -Dm755 target/release/remote-juggler /app/bin/remote-juggler
     sources:
       - type: archive

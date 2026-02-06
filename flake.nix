@@ -242,7 +242,7 @@
             cat > $out/bin/remote-juggler << 'EOF'
             #!/bin/sh
             echo "RemoteJuggler: macOS Nix builds require Chapel via Homebrew"
-            echo "Install: brew install chapel && make release"
+            echo "Install: brew install chapel && just release"
             exit 1
             EOF
             chmod +x $out/bin/remote-juggler
@@ -372,7 +372,8 @@
           ] ++ gtkDeps ++ [
             # Common tools
             pkgs.git
-            pkgs.gnumake
+            pkgs.just
+            pkgs.gnumake  # needed by pinentry/Makefile and Chapel internals
             pkgs.pkg-config
 
             # Rust tools
@@ -382,6 +383,9 @@
             # CI/CD tools
             pkgs.jq
             pkgs.curl
+
+            # KeePassXC CLI for credential authority
+            pkgs.keepassxc
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.darwin.apple_sdk.frameworks.Security
             pkgs.darwin.apple_sdk.frameworks.CoreFoundation
@@ -405,26 +409,37 @@
               echo "  Quick test: chapel-fhs -c 'chpl --version'"
               echo ""
               echo "Build with Chapel:"
-              echo "  chapel-fhs -c 'make release'"
+              echo "  chapel-fhs -c 'just release'"
             '' else ''
               echo "Chapel: Using system Chapel (install via: brew install chapel)"
             ''}
             echo ""
             echo "Available commands:"
-            echo "  make build        - Build Chapel CLI (debug)"
-            echo "  make release      - Build Chapel CLI (release)"
-            echo "  make test         - Run Chapel tests"
+            echo "  just build        - Build Chapel CLI (debug)"
+            echo "  just release      - Build Chapel CLI (release)"
+            echo "  just test         - Run Chapel tests"
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               echo "  cargo build       - Build GTK GUI (in gtk-gui/)"
               echo "  cargo test        - Run GTK GUI tests"
               echo ""
               echo "TPM/HSM development:"
-              echo "  make -C pinentry all     - Build HSM library"
-              echo "  make -C pinentry test    - Run HSM unit tests"
+              echo "  just hsm          - Build HSM library"
+              echo "  just hsm-test     - Run HSM unit tests"
               echo "  swtpm --version          - Software TPM available"
             ''}
             echo ""
             echo "Attic cache: https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
+            echo ""
+
+            # RemoteJuggler identity auto-switching
+            if command -v remote-juggler >/dev/null 2>&1; then
+              if [ -d .git ] || git rev-parse --git-dir >/dev/null 2>&1; then
+                DETECTED=$(remote-juggler detect --quiet 2>/dev/null)
+                if [ -n "$DETECTED" ]; then
+                  echo "RemoteJuggler: Detected identity '$DETECTED'"
+                fi
+              fi
+            fi
           '';
 
           # Ensure pkg-config can find GTK
@@ -476,7 +491,7 @@
             echo "  tpm2_getcap properties-fixed"
             echo ""
             echo "Build pinentry with TPM support:"
-            echo "  make -C pinentry clean all test"
+            echo "  just hsm && just hsm-test"
           '';
         });
 

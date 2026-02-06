@@ -30,7 +30,7 @@ test/
 ### All Tests
 
 ```bash
-make test
+just test
 ```
 
 Or using the test runner script:
@@ -245,7 +245,7 @@ Tests run automatically in CI:
 test:
   stage: test
   script:
-    - make test
+    - just test
   artifacts:
     reports:
       junit: test-results.xml

@@ -52,7 +52,8 @@ module Setup {
     Auto,         // Auto-detect and configure
     ImportSSH,    // Import SSH hosts only
     ImportGPG,    // Import GPG keys only
-    Status        // Show current setup status
+    Status,       // Show current setup status
+    ShellIntegration  // Install shell integration (envrc, starship, nix)
   }
 
   // ============================================================
@@ -202,8 +203,13 @@ module Setup {
   proc detectSSHHosts(): list(DetectedSSHHost) {
     var hosts: list(DetectedSSHHost);
 
-    // Parse SSH config
-    const sshHosts = Config.parseSSHConfig();
+    // Parse SSH config (return empty list on failure)
+    var sshHosts: list(Config.SSHHost);
+    try {
+      sshHosts = Config.parseSSHConfig();
+    } catch {
+      return hosts;
+    }
 
     for host in sshHosts {
       // Skip wildcard and local hosts
@@ -868,6 +874,7 @@ module Setup {
       when SetupMode.ImportSSH do return runImportSSH();
       when SetupMode.ImportGPG do return runImportGPG();
       when SetupMode.Status do return showSetupStatus();
+      when SetupMode.ShellIntegration do return installShellIntegrations();
     }
 
     var result = new SetupResult();
@@ -884,7 +891,185 @@ module Setup {
       when "--import-ssh", "--ssh" do return SetupMode.ImportSSH;
       when "--import-gpg", "--gpg" do return SetupMode.ImportGPG;
       when "--status", "-s" do return SetupMode.Status;
+      when "--shell", "--integrations" do return SetupMode.ShellIntegration;
       otherwise do return SetupMode.Interactive;
     }
+  }
+
+  // ============================================================
+  // Shell Integration Setup
+  // ============================================================
+
+  /*
+   * Install shell integrations (envrc, starship, nix)
+   */
+  proc installShellIntegrations(): SetupResult {
+    var result = new SetupResult();
+
+    writeln("RemoteJuggler Shell Integration Setup");
+    writeln("=====================================");
+    writeln();
+
+    const homeDir = getEnvVar("HOME");
+    if homeDir == "" {
+      result.message = "Could not determine home directory";
+      return result;
+    }
+
+    // Determine template source directory
+    // Check if running from repo (templates/ exists) or installed (use share/remote-juggler/)
+    const repoTemplatesDir = "./templates";
+    const installedTemplatesDir = "/usr/local/share/remote-juggler/templates";
+    var templatesDir = "";
+
+    if exists(repoTemplatesDir) {
+      templatesDir = repoTemplatesDir;
+    } else if exists(installedTemplatesDir) {
+      templatesDir = installedTemplatesDir;
+    } else {
+      result.message = "Template files not found. Install from repo or package.";
+      return result;
+    }
+
+    writeln("Using templates from: ", templatesDir);
+    writeln();
+
+    var installed = 0;
+    var skipped = 0;
+
+    // 1. direnv/.envrc integration
+    writeln("1. direnv/.envrc integration");
+    const envrcTemplate = templatesDir + "/envrc";
+    const envrcDest = homeDir + "/.config/remote-juggler/envrc-template";
+
+    if !exists(envrcTemplate) {
+      writeln("  ✗ Template not found: ", envrcTemplate);
+      skipped += 1;
+    } else {
+      try {
+        const destDir = homeDir + "/.config/remote-juggler";
+        if !exists(destDir) {
+          mkdir(destDir, mode=0o755, parents=true);
+        }
+
+        var srcFile = open(envrcTemplate, ioMode.r);
+        var srcReader = srcFile.reader(locking=false);
+        var content: string;
+        srcReader.readAll(content);
+        srcReader.close();
+        srcFile.close();
+
+        var destFile = open(envrcDest, ioMode.cw);
+        var destWriter = destFile.writer(locking=false);
+        destWriter.write(content);
+        destWriter.close();
+        destFile.close();
+
+        writeln("  ✓ Installed: ", envrcDest);
+        writeln("    Copy to project: cp ", envrcDest, " /path/to/project/.envrc");
+        writeln("    Then run: direnv allow");
+        installed += 1;
+      } catch e {
+        writeln("  ✗ Failed to install: ", e.message());
+        skipped += 1;
+      }
+    }
+    writeln();
+
+    // 2. Starship integration
+    writeln("2. Starship prompt integration");
+    const starshipTemplate = templatesDir + "/starship.toml";
+    const starshipDest = homeDir + "/.config/remote-juggler/starship-module.toml";
+
+    if !exists(starshipTemplate) {
+      writeln("  ✗ Template not found: ", starshipTemplate);
+      skipped += 1;
+    } else {
+      try {
+        var srcFile = open(starshipTemplate, ioMode.r);
+        var srcReader = srcFile.reader(locking=false);
+        var content: string;
+        srcReader.readAll(content);
+        srcReader.close();
+        srcFile.close();
+
+        var destFile = open(starshipDest, ioMode.cw);
+        var destWriter = destFile.writer(locking=false);
+        destWriter.write(content);
+        destWriter.close();
+        destFile.close();
+
+        writeln("  ✓ Installed: ", starshipDest);
+        writeln("    Add to ~/.config/starship.toml:");
+        writeln("    [custom.remotejuggler]");
+        writeln("    command = \"remote-juggler status --quiet 2>/dev/null\"");
+        writeln("    when = \"test -d .git\"");
+        writeln("    format = \"[$output](\\$style) \"");
+        writeln("    style = \"bold blue\"");
+        installed += 1;
+      } catch e {
+        writeln("  ✗ Failed to install: ", e.message());
+        skipped += 1;
+      }
+    }
+    writeln();
+
+    // 3. Nix shell integration
+    writeln("3. Nix devShell integration");
+    const nixTemplate = templatesDir + "/nix-shell-integration.sh";
+    const nixDest = homeDir + "/.config/remote-juggler/nix-shell-integration.sh";
+
+    if !exists(nixTemplate) {
+      writeln("  ✗ Template not found: ", nixTemplate);
+      skipped += 1;
+    } else {
+      try {
+        var srcFile = open(nixTemplate, ioMode.r);
+        var srcReader = srcFile.reader(locking=false);
+        var content: string;
+        srcReader.readAll(content);
+        srcReader.close();
+        srcFile.close();
+
+        var destFile = open(nixDest, ioMode.cw);
+        var destWriter = destFile.writer(locking=false);
+        destWriter.write(content);
+        destWriter.close();
+        destFile.close();
+
+        writeln("  ✓ Installed: ", nixDest);
+        writeln("    Add to flake.nix shellHook:");
+        writeln("    shellHook = ''");
+        writeln("      source ~/.config/remote-juggler/nix-shell-integration.sh");
+        writeln("    '';");
+        installed += 1;
+      } catch e {
+        writeln("  ✗ Failed to install: ", e.message());
+        skipped += 1;
+      }
+    }
+    writeln();
+
+    // Summary
+    writeln("═══════════════════════════════════════");
+    writeln("           Installation Complete        ");
+    writeln("═══════════════════════════════════════");
+    writeln();
+    writeln("Installed: ", installed, " integration(s)");
+    if skipped > 0 {
+      writeln("Skipped: ", skipped, " (errors or missing templates)");
+    }
+    writeln();
+    writeln("Documentation:");
+    writeln("  - direnv: https://direnv.net/");
+    writeln("  - Starship: https://starship.rs/");
+    writeln("  - Nix flakes: https://nixos.wiki/wiki/Flakes");
+    writeln();
+
+    result.success = (installed > 0);
+    result.identitiesCreated = installed;
+    result.message = "Shell integration setup completed";
+
+    return result;
   }
 }

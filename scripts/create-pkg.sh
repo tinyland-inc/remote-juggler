@@ -45,7 +45,7 @@ PKG_SIGNED="$PKG_OUTPUT/RemoteJuggler-$VERSION.pkg"
 # Check for binary
 if [ ! -f "$BINARY" ]; then
     echo "Binary not found at $BINARY"
-    echo "Run 'make release' first to build the binary."
+    echo "Run 'just release' first to build the binary."
     exit 1
 fi
 

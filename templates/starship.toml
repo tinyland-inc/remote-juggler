@@ -1,0 +1,57 @@
+# RemoteJuggler Starship integration
+# Add to your ~/.config/starship.toml
+#
+# Shows current git identity in your prompt with dynamic styling
+
+[custom.remotejuggler]
+# Display current identity name
+command = "remote-juggler status --quiet 2>/dev/null"
+when = "test -d .git"
+format = "[$output]($style) "
+style = "bold blue"
+description = "Current RemoteJuggler git identity"
+
+# Optional: Show provider icon
+# [custom.remotejuggler_provider]
+# command = """
+#   identity=$(remote-juggler status --quiet 2>/dev/null)
+#   if remote-juggler list | grep -q "^$identity.*gitlab"; then
+#     echo "󰮠"
+#   elif remote-juggler list | grep -q "^$identity.*github"; then
+#     echo ""
+#   else
+#     echo "󰊤"
+#   fi
+# """
+# when = "test -d .git && remote-juggler status --quiet >/dev/null 2>&1"
+# format = "$output "
+# style = "bold blue"
+
+# Optional: Color-code by identity type
+# [custom.remotejuggler_colored]
+# command = "remote-juggler status --quiet 2>/dev/null"
+# when = "test -d .git"
+# format = "[$output]($style) "
+# style = """
+#   case "$(remote-juggler status --quiet 2>/dev/null)" in
+#     *work*|*company*) echo "bold yellow";;
+#     *personal*|*oss*) echo "bold green";;
+#     *) echo "bold blue";;
+#   esac
+# """
+
+# Full example prompt configuration
+# Uncomment and customize to taste:
+#
+# format = """
+# $username\
+# $hostname\
+# $directory\
+# $git_branch\
+# $git_status\
+# $custom.remotejuggler\
+# $fill\
+# $cmd_duration\
+# $line_break\
+# $character
+# """
