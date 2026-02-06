@@ -518,7 +518,7 @@ prototype module KeePassXC {
     } catch { }
 
     // Ensure parent directory exists
-    const parentDir = dbPath[0..#dbPath.rfind("/")];
+    const parentDir = dbPath[0..#dbPath.rfind("/"):int];
     try {
       if !FileSystem.exists(parentDir) {
         FileSystem.mkdir(parentDir, parents=true);
@@ -672,7 +672,7 @@ prototype module KeePassXC {
         continue;
       }
 
-      const key = trimmed[0..#eqPos].strip();
+      const key = trimmed[0..#eqPos:int].strip();
       var value = trimmed[eqPos+1..].strip();
 
       // Remove surrounding quotes

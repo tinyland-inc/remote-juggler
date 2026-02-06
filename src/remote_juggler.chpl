@@ -32,12 +32,12 @@ prototype module remote_juggler {
   include module Protocol;
   include module MCP;
   include module ACP;
-  include module Tools;
   include module YubiKey;
   include module HSM;
+  include module KeePassXC;
+  include module Tools;
   include module TrustedWorkstation;
   include module Setup;
-  include module KeePassXC;
 
   // Public re-exports for external consumers
   public use Core;

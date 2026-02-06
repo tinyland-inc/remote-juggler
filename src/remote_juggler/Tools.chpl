@@ -22,7 +22,7 @@
  */
 prototype module Tools {
   use super.Protocol;
-  use super.Core only getEnvVar;
+  use super.Core only getEnvVar, expandTilde;
   import super.Setup;  // Use import instead of use to avoid symbol conflicts
   use List;
   use IO;
@@ -2943,8 +2943,8 @@ prototype module Tools {
   // KeePassXC Key Store Tool Handlers
   // ============================================================================
 
-  // Import KeePassXC module
-  public use super.KeePassXC;
+  // Import KeePassXC module (import for qualified access)
+  import super.KeePassXC;
 
   /*
    * Handle juggler_keys_status tool call.
