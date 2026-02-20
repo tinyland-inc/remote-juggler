@@ -1,5 +1,11 @@
 # RemoteJuggler
 
+[![npm](https://img.shields.io/npm/v/@tummycrypt/remote-juggler?color=CB3837)](https://www.npmjs.com/package/@tummycrypt/remote-juggler)
+[![GitHub release](https://img.shields.io/github/v/release/Jesssullivan/RemoteJuggler)](https://github.com/Jesssullivan/RemoteJuggler/releases/latest)
+[![CI](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/ghcr.io-remote--juggler-blue?logo=docker)](https://github.com/Jesssullivan/RemoteJuggler/pkgs/container/remote-juggler)
+[![License: Zlib](https://img.shields.io/badge/license-Zlib-blue)](LICENSE)
+
 *An agent-first identity management utility*
 
 Seamlessly switch between multiple git identities (personal, work, different providers) with automatic credential resolution, GPG + ssh signing, be you a robot or even a human.
@@ -50,6 +56,31 @@ nix profile install github:Jesssullivan/RemoteJuggler
 ```
 
 For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, building from source), see the **[Installation Guide](docs/getting-started/installation.md)**.
+
+## Binary Downloads
+
+Pre-built binaries are attached to each [GitHub Release](https://github.com/Jesssullivan/RemoteJuggler/releases/latest):
+
+| Platform | CLI | GTK GUI | Tray |
+|----------|-----|---------|------|
+| Linux x86_64 | `remote-juggler-linux-amd64` | `remote-juggler-gui-linux-amd64` | `remote-juggler-tray-linux-amd64` |
+| Linux ARM64 | `remote-juggler-linux-arm64` | `remote-juggler-gui-linux-arm64` | `remote-juggler-tray-linux-arm64` |
+| macOS ARM64 | `remote-juggler-darwin-arm64` | -- | `remote-juggler-tray-darwin-arm64` |
+| macOS x86_64 | `remote-juggler-darwin-amd64` | -- | -- |
+| AppImage | -- | `.AppImage` | -- |
+| .deb (amd64) | `.deb` | -- | -- |
+| .rpm (x86_64) | `.rpm` | -- | -- |
+| Docker | `ghcr.io/jesssullivan/remote-juggler` | -- | -- |
+
+Verify your download:
+
+```bash
+sha256sum -c SHA256SUMS.txt
+# Or check an individual file
+sha256sum -c remote-juggler-linux-amd64.sha256
+```
+
+> **Note:** macOS binaries from GitHub are unsigned. For signed/notarized macOS builds, see [GitLab Releases](https://gitlab.com/tinyland/projects/remote-juggler/-/releases).
 
 ## Configuration
 
