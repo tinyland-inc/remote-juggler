@@ -3,8 +3,8 @@
  * RemoteJuggler CLI wrapper
  *
  * Spawns the platform-native binary with all arguments and stdio inherited,
- * forwarding the exit code. This enables the `npx @tinyland/remote-juggler`
- * and `npx @tinyland/remote-juggler --mode=mcp` usage patterns.
+ * forwarding the exit code. This enables the `npx @tummycrypt/remote-juggler`
+ * and `npx @tummycrypt/remote-juggler --mode=mcp` usage patterns.
  */
 
 const { spawn } = require("child_process");
@@ -14,7 +14,7 @@ const { existsSync } = require("fs");
 const BINARY_PATH = join(__dirname, "remote-juggler-binary");
 
 if (!existsSync(BINARY_PATH)) {
-  console.error("RemoteJuggler binary not found. Run: npm install @tinyland/remote-juggler");
+  console.error("RemoteJuggler binary not found. Run: npm install @tummycrypt/remote-juggler");
   console.error("Or install directly: curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash");
   process.exit(1);
 }

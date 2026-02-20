@@ -1,11 +1,11 @@
 site_name: RemoteJuggler
-site_url: https://tinyland.gitlab.io/projects/remote-juggler
+site_url: https://transscendsurvival.org/RemoteJuggler
 site_description: Backend-agnostic git identity management with MCP/ACP agent protocol support
 site_author: Jess Sullivan
 
-repo_url: https://gitlab.com/tinyland/projects/remote-juggler
-repo_name: tinyland/projects/remote-juggler
-edit_uri: -/edit/main/docs/
+repo_url: https://github.com/Jesssullivan/RemoteJuggler
+repo_name: Jesssullivan/RemoteJuggler
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -120,7 +120,7 @@ nav:
 
 extra:
   social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Jesssullivan/RemoteJuggler
     - icon: fontawesome/brands/gitlab
       link: https://gitlab.com/tinyland/projects/remote-juggler
-    - icon: fontawesome/brands/github
-      link: https://github.com/Jesssullivan/remote-juggler

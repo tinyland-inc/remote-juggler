@@ -10,27 +10,17 @@
 #
 class RemoteJuggler < Formula
   desc "Backend-agnostic git identity management with MCP/ACP agent protocol support"
-  homepage "https://gitlab.com/tinyland/projects/remote-juggler"
-  version "2.1.0-beta.1"
+  homepage "https://github.com/Jesssullivan/RemoteJuggler"
+  version "2.1.0-beta.2"
   license "Zlib"
-
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.1/remote-juggler-darwin-arm64"
-      sha256 "PLACEHOLDER_DARWIN_ARM64" # Updated by release workflow
-    else
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.1/remote-juggler-darwin-amd64"
-      sha256 "PLACEHOLDER_DARWIN_AMD64" # Updated by release workflow
-    end
-  end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.1/remote-juggler-linux-arm64"
-      sha256 "PLACEHOLDER_LINUX_ARM64" # Updated by release workflow
+      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.2/remote-juggler-linux-arm64"
+      sha256 "aa16768b161beb9a957b90c595a567bbba05cf2808b7d550f01cc65f08b83459" # Updated by release workflow
     else
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.1/remote-juggler-linux-amd64"
-      sha256 "PLACEHOLDER_LINUX_AMD64" # Updated by release workflow
+      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.2/remote-juggler-linux-amd64"
+      sha256 "f4ae82cb5eddd582005cdc770f6c45f4a5a13cc71be54178d88a44eacf5bed24" # Updated by release workflow
     end
   end
 
@@ -62,7 +52,12 @@ class RemoteJuggler < Formula
         ~/.config/remote-juggler/config.json
 
       Documentation:
-        https://tinyland.gitlab.io/projects/remote-juggler/
+        https://transscendsurvival.org/RemoteJuggler/
+
+      macOS users: This formula currently provides Linux binaries only.
+      For macOS, install via:
+        curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash
+      Or: npx @tummycrypt/remote-juggler
 
       For Claude Code integration, add to .mcp.json:
         {

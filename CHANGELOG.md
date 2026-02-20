@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Pages documentation site
 - Automated Homebrew SHA256 updates in release workflow
 - install.sh auto-detects latest version from GitHub API
-- npm package: `npx @tinyland/remote-juggler`
+- npm package: `npx @tummycrypt/remote-juggler`
 
 **Testing**
 - 50 E2E tests covering all MCP tools, installation, and multi-identity switching

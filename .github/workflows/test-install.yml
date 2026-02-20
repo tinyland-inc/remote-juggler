@@ -140,7 +140,7 @@ jobs:
           # Verify package.json fields
           node -e "
             const pkg = require('./package.json');
-            console.assert(pkg.name === '@tinyland/remote-juggler', 'Wrong package name');
+            console.assert(pkg.name === '@tummycrypt/remote-juggler', 'Wrong package name');
             console.assert(pkg.bin['remote-juggler'] === './bin/cli.js', 'Wrong bin path');
             console.assert(pkg.scripts.postinstall === 'node bin/install.js', 'Wrong postinstall');
             console.log('Package manifest validation: OK');
