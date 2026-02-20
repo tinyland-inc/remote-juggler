@@ -33,7 +33,7 @@ curl -sSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/inst
 Or via npm (all platforms):
 
 ```bash
-npx @tinyland/remote-juggler@latest --version
+npx @tummycrypt/remote-juggler@latest --version
 ```
 
 Or via Homebrew:

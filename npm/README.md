@@ -1,4 +1,4 @@
-# @tinyland/remote-juggler
+# @tummycrypt/remote-juggler
 
 Multi-provider git identity management with MCP server support for AI agents.
 
@@ -13,7 +13,7 @@ Add to your MCP client configuration (Claude Code, Cursor, VS Code):
   "mcpServers": {
     "remote-juggler": {
       "command": "npx",
-      "args": ["-y", "@tinyland/remote-juggler", "--mode=mcp"]
+      "args": ["-y", "@tummycrypt/remote-juggler", "--mode=mcp"]
     }
   }
 }
@@ -22,9 +22,9 @@ Add to your MCP client configuration (Claude Code, Cursor, VS Code):
 ### As a CLI Tool
 
 ```bash
-npx @tinyland/remote-juggler list
-npx @tinyland/remote-juggler switch gitlab-personal
-npx @tinyland/remote-juggler status
+npx @tummycrypt/remote-juggler list
+npx @tummycrypt/remote-juggler switch gitlab-personal
+npx @tummycrypt/remote-juggler status
 ```
 
 ### Full Installation

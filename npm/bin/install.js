@@ -34,7 +34,7 @@ function getDownloadUrl() {
     if (process.platform === "win32") {
       console.error("RemoteJuggler does not have a native Windows build.");
       console.error("Use WSL (Windows Subsystem for Linux) instead:");
-      console.error("  wsl --install && wsl npm install -g @tinyland/remote-juggler");
+      console.error("  wsl --install && wsl npm install -g @tummycrypt/remote-juggler");
       console.error("");
       console.error("Or install in WSL directly:");
       console.error("  wsl curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash");

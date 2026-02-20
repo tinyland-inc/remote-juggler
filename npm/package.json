@@ -1,6 +1,6 @@
 {
-  "name": "@tinyland/remote-juggler",
-  "version": "2.1.0-beta.1",
+  "name": "@tummycrypt/remote-juggler",
+  "version": "2.1.0-beta.2",
   "description": "Multi-provider git identity management with MCP server support for AI agents",
   "bin": {
     "remote-juggler": "./bin/cli.js"
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Jesssullivan/RemoteJuggler"
+    "url": "git+https://github.com/Jesssullivan/RemoteJuggler.git"
   },
   "homepage": "https://github.com/Jesssullivan/RemoteJuggler",
   "keywords": [

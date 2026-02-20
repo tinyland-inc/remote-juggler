@@ -18,11 +18,11 @@ Works on any platform with Node.js 18+:
 
 ```bash
 # Install globally
-npm install -g @tinyland/remote-juggler
+npm install -g @tummycrypt/remote-juggler
 
 # Or run directly without installing
-npx @tinyland/remote-juggler --version
-npx @tinyland/remote-juggler --mode=mcp
+npx @tummycrypt/remote-juggler --version
+npx @tummycrypt/remote-juggler --mode=mcp
 ```
 
 ## Homebrew (macOS / Linux)
@@ -185,7 +185,7 @@ For environments without a persistent installation:
   "mcpServers": {
     "remote-juggler": {
       "command": "npx",
-      "args": ["-y", "@tinyland/remote-juggler", "--mode=mcp"]
+      "args": ["-y", "@tummycrypt/remote-juggler", "--mode=mcp"]
     }
   }
 }

@@ -10,19 +10,9 @@
 #
 class RemoteJuggler < Formula
   desc "Backend-agnostic git identity management with MCP/ACP agent protocol support"
-  homepage "https://gitlab.com/tinyland/projects/remote-juggler"
+  homepage "https://github.com/Jesssullivan/RemoteJuggler"
   version "2.1.0-beta.2"
   license "Zlib"
-
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.2/remote-juggler-darwin-arm64"
-      sha256 "PLACEHOLDER_DARWIN_ARM64" # Updated by release workflow
-    else
-      url "https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.2/remote-juggler-darwin-amd64"
-      sha256 "PLACEHOLDER_DARWIN_AMD64" # Updated by release workflow
-    end
-  end
 
   on_linux do
     if Hardware::CPU.arm?
@@ -62,7 +52,12 @@ class RemoteJuggler < Formula
         ~/.config/remote-juggler/config.json
 
       Documentation:
-        https://tinyland.gitlab.io/projects/remote-juggler/
+        https://transscendsurvival.org/RemoteJuggler/
+
+      macOS users: This formula currently provides Linux binaries only.
+      For macOS, install via:
+        curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash
+      Or: npx @tummycrypt/remote-juggler
 
       For Claude Code integration, add to .mcp.json:
         {
