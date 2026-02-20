@@ -1,6 +1,6 @@
 {
   "name": "@tummycrypt/remote-juggler",
-  "version": "2.1.0-beta.5",
+  "version": "2.1.0-beta.6",
   "description": "Multi-provider git identity management with MCP server support for AI agents",
   "bin": {
     "remote-juggler": "./bin/cli.js"
