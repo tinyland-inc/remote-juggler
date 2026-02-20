@@ -81,6 +81,7 @@ jobs:
       - name: Test configure-mcp-clients.sh
         run: |
           export HOME=$(mktemp -d)
+          mkdir -p "$HOME/.local/bin"
           export PATH="$HOME/.local/bin:$PATH"
           cp target/release/remote_juggler "$HOME/.local/bin/remote-juggler"
           chmod +x "$HOME/.local/bin/remote-juggler"
@@ -174,6 +175,9 @@ jobs:
           wget -q https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-1.ubuntu24.amd64.deb
           sudo apt-get install -y ./chapel-${CHAPEL_VERSION}-1.ubuntu24.amd64.deb
 
+      - name: Install runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libhwloc15
+
       - name: Build and install
         run: |
           mason build --release
@@ -196,19 +200,24 @@ jobs:
         run: pip install -r test/e2e/requirements.txt
 
       - name: Run installation E2E tests
-        env:
-          REMOTE_JUGGLER_BIN: ~/.local/bin/remote-juggler
         run: |
+          export REMOTE_JUGGLER_BIN="$HOME/.local/bin/remote-juggler"
           pytest test/e2e/test_installation.py -v \
             -m "not tpm and not secure_enclave and not yubikey and not hardware and not gpg" \
             --timeout=30
 
       - name: Run MCP protocol E2E tests
-        env:
-          REMOTE_JUGGLER_BIN: ~/.local/bin/remote-juggler
         run: |
+          export REMOTE_JUGGLER_BIN="$HOME/.local/bin/remote-juggler"
           pytest test/e2e/test_mcp_protocol.py -v \
             -m "not tpm and not secure_enclave and not yubikey and not hardware" \
+            --timeout=30
+
+      - name: Run MCP tool E2E tests
+        run: |
+          export REMOTE_JUGGLER_BIN="$HOME/.local/bin/remote-juggler"
+          pytest test/e2e/test_mcp_tools.py -v \
+            -m "not tpm and not secure_enclave and not yubikey and not hardware and not keys" \
             --timeout=30
 
   # ===========================================================================
