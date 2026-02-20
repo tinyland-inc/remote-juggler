@@ -6,12 +6,13 @@ verifying parameter handling, response content, and error paths.
 Extends test_mcp_protocol.py which covers protocol-level compliance.
 """
 
+import json
 from pathlib import Path
 from typing import Optional
 
 import pytest
 
-from conftest import run_mcp_request
+from conftest import run_juggler
 
 
 # =============================================================================
@@ -20,17 +21,115 @@ from conftest import run_mcp_request
 
 
 def call_tool(name: str, arguments: dict, env: dict, timeout: int = 10) -> dict:
-    """Call an MCP tool and return the response."""
-    request = {
+    """Call an MCP tool with proper initialization handshake.
+
+    MCP requires initialize before tools/call, so this sends both
+    in a single process invocation.
+    """
+    init_request = {
         "jsonrpc": "2.0",
         "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"},
+        },
+    }
+    initialized_notification = {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+    }
+    tool_request = {
+        "jsonrpc": "2.0",
+        "id": 2,
         "method": "tools/call",
         "params": {
             "name": name,
             "arguments": arguments,
         },
     }
-    return run_mcp_request(request, env=env, timeout=timeout)
+
+    input_data = (
+        json.dumps(init_request)
+        + "\n"
+        + json.dumps(initialized_notification)
+        + "\n"
+        + json.dumps(tool_request)
+        + "\n"
+    )
+
+    result = run_juggler(
+        ["--mode=mcp"],
+        env=env,
+        input_data=input_data,
+        timeout=timeout,
+    )
+
+    # Parse responses - return the last valid JSON-RPC response (the tool result)
+    last_response = {}
+    if result.stdout:
+        for line in result.stdout.strip().split("\n"):
+            try:
+                parsed = json.loads(line)
+                if isinstance(parsed, dict) and "id" in parsed:
+                    last_response = parsed
+            except json.JSONDecodeError:
+                continue
+
+    return last_response
+
+
+def list_tools(env: dict, timeout: int = 10) -> dict:
+    """List MCP tools with proper initialization handshake."""
+    init_request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "1.0"},
+        },
+    }
+    initialized_notification = {
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+    }
+    list_request = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {},
+    }
+
+    input_data = (
+        json.dumps(init_request)
+        + "\n"
+        + json.dumps(initialized_notification)
+        + "\n"
+        + json.dumps(list_request)
+        + "\n"
+    )
+
+    result = run_juggler(
+        ["--mode=mcp"],
+        env=env,
+        input_data=input_data,
+        timeout=timeout,
+    )
+
+    last_response = {}
+    if result.stdout:
+        for line in result.stdout.strip().split("\n"):
+            try:
+                parsed = json.loads(line)
+                if isinstance(parsed, dict) and "id" in parsed:
+                    last_response = parsed
+            except json.JSONDecodeError:
+                continue
+
+    return last_response
 
 
 def get_tool_result_text(response: dict) -> Optional[str]:
@@ -630,13 +729,7 @@ class TestMCPToolSchemas:
 
     def test_all_tools_listed(self, mcp_env: dict):
         """Verify all expected tools appear in tools/list."""
-        request = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {},
-        }
-        response = run_mcp_request(request, env=mcp_env)
+        response = list_tools(env=mcp_env)
 
         if not response or "result" not in response:
             pytest.skip("Could not get tools list")
@@ -684,13 +777,7 @@ class TestMCPToolSchemas:
 
     def test_tools_have_descriptions(self, mcp_env: dict):
         """All tools should have non-empty descriptions."""
-        request = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {},
-        }
-        response = run_mcp_request(request, env=mcp_env)
+        response = list_tools(env=mcp_env)
 
         if not response or "result" not in response:
             pytest.skip("Could not get tools list")
@@ -704,13 +791,7 @@ class TestMCPToolSchemas:
 
     def test_tools_have_input_schemas(self, mcp_env: dict):
         """All tools should define inputSchema."""
-        request = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/list",
-            "params": {},
-        }
-        response = run_mcp_request(request, env=mcp_env)
+        response = list_tools(env=mcp_env)
 
         if not response or "result" not in response:
             pytest.skip("Could not get tools list")
