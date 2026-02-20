@@ -1,8 +1,9 @@
 # RemoteJuggler
 
-[![npm](https://img.shields.io/npm/v/@tummycrypt/remote-juggler?color=CB3837)](https://www.npmjs.com/package/@tummycrypt/remote-juggler)
-[![GitHub release](https://img.shields.io/github/v/release/Jesssullivan/RemoteJuggler)](https://github.com/Jesssullivan/RemoteJuggler/releases/latest)
+[![npm](https://img.shields.io/npm/v/@tummycrypt/remote-juggler/beta?color=CB3837)](https://www.npmjs.com/package/@tummycrypt/remote-juggler)
+[![GitHub release](https://img.shields.io/github/v/release/Jesssullivan/RemoteJuggler?include_prereleases)](https://github.com/Jesssullivan/RemoteJuggler/releases/latest)
 [![CI](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/ci.yml)
+[![Release](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/release.yml/badge.svg)](https://github.com/Jesssullivan/RemoteJuggler/actions/workflows/release.yml)
 [![Docker](https://img.shields.io/badge/ghcr.io-remote--juggler-blue?logo=docker)](https://github.com/Jesssullivan/RemoteJuggler/pkgs/container/remote-juggler)
 [![License: Zlib](https://img.shields.io/badge/license-Zlib-blue)](LICENSE)
 
@@ -80,10 +81,10 @@ For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, buil
 | Debian/Ubuntu | [remote-juggler_2.1.0.beta.6_amd64.deb](https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.6/remote-juggler_2.1.0.beta.6_amd64.deb) (1.8MB) |
 | RHEL/Fedora | [remote-juggler-2.1.0.beta.6-1.x86_64.rpm](https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.6/remote-juggler-2.1.0.beta.6-1.x86_64.rpm) (1.8MB) |
 | AppImage | [remote-juggler-gui-v2.1.0-beta.6-x86_64.AppImage](https://github.com/Jesssullivan/RemoteJuggler/releases/download/v2.1.0-beta.6/remote-juggler-gui-v2.1.0-beta.6-x86_64.AppImage) (613KB) |
-| Docker | `ghcr.io/jesssullivan/remote-juggler:latest` |
-| npm | `npx @tummycrypt/remote-juggler@latest` |
+| Docker | `ghcr.io/jesssullivan/remote-juggler:v2.1.0-beta.6` |
+| npm | `npx @tummycrypt/remote-juggler@beta` |
 | Homebrew | `brew install remote-juggler` |
-| Nix | `nix profile install github:Jesssullivan/RemoteJuggler` |
+| Nix | `nix profile install github:Jesssullivan/RemoteJuggler/v2.1.0-beta.6` |
 
 ### Platform Compatibility
 

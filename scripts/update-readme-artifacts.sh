@@ -25,11 +25,6 @@ MARKER_END="<!-- ARTIFACT-TABLE:END -->"
 DOWNLOAD_BASE="https://github.com/${REPO}/releases/download"
 RELEASE_URL="https://github.com/${REPO}/releases"
 
-# Toolchain versions (keep in sync with release.yml)
-CHAPEL_VERSION="2.7.0"
-GO_VERSION="1.21"
-RUST_TOOLCHAIN="stable"
-
 # Defaults
 TAG=""
 README="${PROJECT_ROOT}/README.md"
@@ -57,6 +52,17 @@ done
 # Verify prerequisites
 command -v gh >/dev/null 2>&1 || err "gh CLI required but not found"
 command -v jq >/dev/null 2>&1 || err "jq required but not found"
+
+# Extract toolchain versions from release.yml (single source of truth)
+WORKFLOW="${PROJECT_ROOT}/.github/workflows/release.yml"
+if [ -f "$WORKFLOW" ]; then
+    CHAPEL_VERSION=$(grep 'CHAPEL_VERSION:' "$WORKFLOW" | head -1 | sed 's/.*: *"\(.*\)"/\1/')
+    GO_VERSION=$(grep "go-version:" "$WORKFLOW" | head -1 | sed "s/.*: *'\(.*\)'/\1/")
+else
+    CHAPEL_VERSION="unknown"
+    GO_VERSION="unknown"
+fi
+RUST_TOOLCHAIN="stable"
 
 # Find latest release tag (including pre-releases)
 if [ -z "$TAG" ]; then
@@ -136,8 +142,14 @@ download_cell_pattern() {
 
 generate_block() {
     local prerelease_label=""
+    local npm_tag="latest"
+    local docker_tag="latest"
+    local nix_ref="github:Jesssullivan/RemoteJuggler"
     if [ "$PRERELEASE" = "true" ]; then
         prerelease_label=" (pre-release)"
+        npm_tag="beta"
+        docker_tag="${TAG}"
+        nix_ref="github:Jesssullivan/RemoteJuggler/${TAG}"
     fi
 
     cat <<BLOCK
@@ -163,10 +175,10 @@ generate_block() {
 | Debian/Ubuntu | $(download_cell_pattern "^remote-juggler_.*\\.deb$") |
 | RHEL/Fedora | $(download_cell_pattern "^remote-juggler-.*\\.rpm$") |
 | AppImage | $(download_cell_pattern "^remote-juggler-gui-.*\\.AppImage$") |
-| Docker | \`ghcr.io/jesssullivan/remote-juggler:latest\` |
-| npm | \`npx @tummycrypt/remote-juggler@latest\` |
+| Docker | \`ghcr.io/jesssullivan/remote-juggler:${docker_tag}\` |
+| npm | \`npx @tummycrypt/remote-juggler@${npm_tag}\` |
 | Homebrew | \`brew install remote-juggler\` |
-| Nix | \`nix profile install github:Jesssullivan/RemoteJuggler\` |
+| Nix | \`nix profile install ${nix_ref}\` |
 
 ### Platform Compatibility
 
