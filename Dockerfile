@@ -33,11 +33,16 @@ RUN ARCH=$(dpkg --print-architecture) && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY . .
+COPY src/ src/
+COPY c_src/ c_src/
+COPY Mason.toml Mason.lock ./
 
-RUN mason build --release && \
-    cp target/release/remote_juggler /usr/local/bin/remote-juggler && \
-    chmod +x /usr/local/bin/remote-juggler
+# Build directly with chpl (more reliable than mason in containers)
+RUN chpl --fast -o /usr/local/bin/remote-juggler \
+    src/remote_juggler.chpl \
+    -M src/remote_juggler \
+    -I c_src \
+    --permit-unhandled-module-errors
 
 # --- Runtime stage ---
 FROM ubuntu:24.04 AS runtime
