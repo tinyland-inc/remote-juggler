@@ -685,10 +685,13 @@ jobs:
             ### Features
 
             - Multi-provider support (GitLab, GitHub, Bitbucket)
+            - KeePassXC credential authority with TPM/YubiKey auto-unlock
             - Darwin Keychain integration for secure credential storage
             - GPG signing configuration per identity
-            - MCP server for Claude Code / VS Code / Cursor integration
+            - MCP server (32 tools) for Claude Code / VS Code / Cursor
             - ACP server for JetBrains IDE integration
+            - YubiKey / FIDO2 hardware key management
+            - Trusted workstation mode (TPM/Secure Enclave)
             - Automatic SSH identity detection
             - Rootless installation
             - GTK4/Libadwaita GUI for Linux
@@ -703,6 +706,87 @@ jobs:
             ```
           files: |
             release/*
+
+  # ===========================================================================
+  # Homebrew SHA256 Update (after release so binaries are downloadable)
+  # ===========================================================================
+
+  update-homebrew:
+    name: Update Homebrew Formula SHA256s
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download and compute SHA256s
+        id: sha
+        run: |
+          BASE_URL="https://github.com/Jesssullivan/RemoteJuggler/releases/download/${{ steps.version.outputs.VERSION }}"
+
+          for PLATFORM in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
+            URL="${BASE_URL}/${{ env.PROJECT_NAME }}-${PLATFORM}"
+            echo "Downloading ${PLATFORM}..."
+            if curl -fsSL -o "/tmp/${PLATFORM}" "${URL}"; then
+              SHA=$(sha256sum "/tmp/${PLATFORM}" | cut -d' ' -f1)
+              echo "${PLATFORM}_sha=${SHA}" >> $GITHUB_OUTPUT
+              echo "  SHA256: ${SHA}"
+            else
+              echo "  WARNING: Failed to download ${PLATFORM}"
+              echo "${PLATFORM}_sha=DOWNLOAD_FAILED" >> $GITHUB_OUTPUT
+            fi
+          done
+
+      - name: Update Homebrew formula
+        run: |
+          FORMULA="homebrew-tap/Formula/remote-juggler.rb"
+
+          # Update version
+          sed -i "s|version \".*\"|version \"${VERSION#v}\"|" "$FORMULA"
+
+          # Update download URLs to new version
+          sed -i "s|/releases/download/v[^/]*/|/releases/download/${{ steps.version.outputs.VERSION }}/|g" "$FORMULA"
+
+          # Update SHA256 values using line-context matching
+          # Each sha256 line follows a url line containing the platform name
+          if [ "${{ steps.sha.outputs.darwin-arm64_sha }}" != "DOWNLOAD_FAILED" ]; then
+            sed -i '/darwin-arm64"$/{n;s/sha256 "[^"]*"/sha256 "${{ steps.sha.outputs.darwin-arm64_sha }}"/;}' "$FORMULA"
+          fi
+          if [ "${{ steps.sha.outputs.darwin-amd64_sha }}" != "DOWNLOAD_FAILED" ]; then
+            sed -i '/darwin-amd64"$/{n;s/sha256 "[^"]*"/sha256 "${{ steps.sha.outputs.darwin-amd64_sha }}"/;}' "$FORMULA"
+          fi
+          if [ "${{ steps.sha.outputs.linux-arm64_sha }}" != "DOWNLOAD_FAILED" ]; then
+            sed -i '/linux-arm64"$/{n;s/sha256 "[^"]*"/sha256 "${{ steps.sha.outputs.linux-arm64_sha }}"/;}' "$FORMULA"
+          fi
+          if [ "${{ steps.sha.outputs.linux-amd64_sha }}" != "DOWNLOAD_FAILED" ]; then
+            sed -i '/linux-amd64"$/{n;s/sha256 "[^"]*"/sha256 "${{ steps.sha.outputs.linux-amd64_sha }}"/;}' "$FORMULA"
+          fi
+
+          echo "=== Updated formula ==="
+          cat "$FORMULA"
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+
+      - name: Commit and push formula update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add homebrew-tap/Formula/remote-juggler.rb
+          git diff --cached --quiet || \
+            git commit -m "chore(homebrew): update SHA256s for ${{ steps.version.outputs.VERSION }}" && \
+            git push origin dev
 
   # ===========================================================================
   # npm Publish (after GitHub Release so binaries are available for download)
