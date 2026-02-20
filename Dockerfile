@@ -24,11 +24,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget ca-certificates make gcc g++ pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Chapel
+# Install Chapel (apt-get update needed since lists were cleaned above)
 RUN ARCH=$(dpkg --print-architecture) && \
     wget -q "https://github.com/chapel-lang/chapel/releases/download/${CHAPEL_VERSION}/chapel-${CHAPEL_VERSION}-1.ubuntu24.${ARCH}.deb" && \
+    apt-get update && \
     apt-get install -y "./chapel-${CHAPEL_VERSION}-1.ubuntu24.${ARCH}.deb" && \
-    rm -f "chapel-${CHAPEL_VERSION}-1.ubuntu24.${ARCH}.deb"
+    rm -f "chapel-${CHAPEL_VERSION}-1.ubuntu24.${ARCH}.deb" && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY . .
