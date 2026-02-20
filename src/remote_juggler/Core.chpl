@@ -96,7 +96,7 @@ prototype module Core {
   /*
     Full semantic version string.
   */
-  param VERSION = "2.0.0";
+  param VERSION = "2.1.0-beta.1";
 
   /*
     Major version number (breaking changes).
@@ -106,7 +106,7 @@ prototype module Core {
   /*
     Minor version number (new features, backward compatible).
   */
-  param VERSION_MINOR = 0;
+  param VERSION_MINOR = 1;
 
   /*
     Patch version number (bug fixes).

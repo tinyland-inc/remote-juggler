@@ -435,11 +435,11 @@ module Setup {
     hsm: DetectedHSM
   ): string {
     var json = '{\n';
-    json += '  "version": "2.0.0",\n';
+    json += '  "version": "2.1.0-beta.1",\n';
 
     // Setup metadata
     json += '  "setupCompleted": true,\n';
-    json += '  "setupVersion": "2.0.0",\n';
+    json += '  "setupVersion": "2.1.0-beta.1",\n';
     json += '  "setupDate": "' + getCurrentISODate() + '",\n';
 
     // Detected sources

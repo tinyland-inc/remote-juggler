@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-beta.1] - 2026-02-20
+
+### Added
+
+**KeePassXC Credential Authority**
+- Full KeePassXC integration with TPM/SE-backed auto-unlock
+- 12 `keys` CLI commands: init, status, search, resolve, get, store, delete, list, ingest, crawl, discover, export
+- Auto-discovery of environment variables, SSH keys, and .env files
+- Fuzzy search with Levenshtein distance, word boundary, and substring matching
+
+**Expanded MCP Tools**
+- 32 MCP tools (up from 13), including full credential management
+- KeePassXC MCP tools: juggler_keys_status, search, get, store, ingest_env, list, init, resolve, delete, crawl_env, discover, export
+
+**Distribution & Packaging**
+- First public GitHub release with automated CI/CD pipeline
+- .deb and .rpm packages via nfpm
+- Nix flake with overlay and Home Manager module for declarative installation
+- GitHub Pages documentation site
+- Automated Homebrew SHA256 updates in release workflow
+- install.sh auto-detects latest version from GitHub API
+- npm package: `npx @tinyland/remote-juggler`
+
+**Testing**
+- 50 E2E tests covering all MCP tools, installation, and multi-identity switching
+- Comprehensive CI: 15 jobs across Chapel CLI, GTK GUI, Go tray, macOS, ARM64
+
+### Changed
+- Bumped MCP protocol version to 2025-11-25
+- install.sh downloads from GitHub Releases (primary) with GitLab fallback
+
+### Fixed
+- MCP tool tests require proper initialization handshake
+- TPM tests skip gracefully when swtpm unavailable
+- Multi-identity test fixtures use --no-gpg-sign
+
 ## [2.0.0] - 2026-02-05
 
 ### Added

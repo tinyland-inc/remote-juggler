@@ -11,7 +11,7 @@
 #   updpkgsums
 
 pkgname=remote-juggler
-pkgver=2.0.0
+pkgver=2.1.0_beta.1
 pkgrel=1
 pkgdesc="Git identity manager for seamless multi-account SSH/GPG workflows"
 arch=('x86_64' 'aarch64')

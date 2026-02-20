@@ -30,6 +30,18 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay, chapel-src }:
+    {
+      # System-independent outputs for consumption by other flakes
+      overlays.default = final: prev: {
+        remote-juggler = self.packages.${prev.stdenv.hostPlatform.system}.remote-juggler;
+        pinentry-remotejuggler = self.packages.${prev.stdenv.hostPlatform.system}.pinentry-remotejuggler;
+      } // (if prev.stdenv.isLinux then {
+        remote-juggler-gui = self.packages.${prev.stdenv.hostPlatform.system}.remote-juggler-gui;
+      } else {});
+
+      homeManagerModules.default = import ./nix/homeManagerModule.nix;
+    }
+    //
     flake-utils.lib.eachSystem [
       "x86_64-linux"
       "aarch64-linux"
@@ -197,7 +209,7 @@
         # inside an FHS-compatible sandbox
         remote-juggler = pkgs.stdenv.mkDerivation {
           pname = "remote-juggler";
-          version = "2.0.0";
+          version = "2.1.0-beta.1";
 
           src = pkgs.lib.cleanSourceWith {
             src = ./.;

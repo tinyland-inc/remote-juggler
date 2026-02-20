@@ -1,7 +1,7 @@
 # RemoteJuggler Linux Tray App Makefile
 
 BINARY_NAME := remote-juggler-tray
-VERSION := 2.0.0
+VERSION := 2.1.0-beta.1
 BUILD_DIR := build
 
 # Build flags
