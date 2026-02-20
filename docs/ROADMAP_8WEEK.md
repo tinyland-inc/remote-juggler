@@ -12,7 +12,7 @@ This roadmap addresses critical gaps identified through comprehensive research:
 
 | Area | Current State | Target State |
 |------|---------------|--------------|
-| **Build System** | Make + Nix | Just entrypoint + Bazel (Rust/Go/C) + Nix (Chapel) |
+| **Build System** | Just + Nix | Just entrypoint + Bazel (Rust/Go/C) + Nix (Chapel) |
 | **Testing** | Fragmented, 40% coverage | Unified, 85%+ coverage with e2e |
 | **GUI Testing** | GTK minimal, Tray zero | Full UI automation |
 | **HSM Testing** | Manual on hardware | CI with swtpm, SE mocks |
@@ -25,7 +25,7 @@ This roadmap addresses critical gaps identified through comprehensive research:
 
 ### Critical Discoveries
 
-1. **Bazel + Chapel**: No `rules_chapel` exists. Creating custom rules = 2-4 weeks. **Decision**: Use Bazel for Rust/Go/C/Swift only; keep Nix+Make for Chapel.
+1. **Bazel + Chapel**: No `rules_chapel` exists. Creating custom rules = 2-4 weeks. **Decision**: Use Bazel for Rust/Go/C/Swift only; keep Nix+Just for Chapel.
 
 2. **Pinentry Implementation**: 95% complete (1,170 lines Python + 3,000+ lines C). Full Assuan protocol, TPM/SE backends working.
 
@@ -581,7 +581,7 @@ This roadmap addresses critical gaps identified through comprehensive research:
 | Test Coverage | ~40% | 85%+ |
 | GUI Tests | 0 | 50+ |
 | E2E Tests in CI | 0 | All |
-| Build Commands | `make ...` | `just ...` |
+| Build Commands | `just ...` | `just ...` |
 | Distribution | Manual | Homebrew + packages |
 | Documentation | Sparse | Comprehensive |
 | CI `allow_failure` | 12 jobs | 2 (hardware only) |
@@ -592,7 +592,7 @@ This roadmap addresses critical gaps identified through comprehensive research:
 
 | Risk | Mitigation |
 |------|------------|
-| Bazel Chapel rules too complex | Keep Nix+Make for Chapel; Bazel for others |
+| Bazel Chapel rules too complex | Keep Nix+Just for Chapel; Bazel for others |
 | SE testing impossible in cloud | Self-hosted runner + mocking for CI |
 | YubiKey simulation missing | Interface abstraction + manual hardware tests |
 | Breaking changes during refactor | Feature flags, gradual rollout |

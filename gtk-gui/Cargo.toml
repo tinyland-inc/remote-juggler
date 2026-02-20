@@ -1,6 +1,6 @@
 [package]
 name = "remote-juggler-gui"
-version = "2.0.0"
+version = "2.1.0-beta.1"
 edition = "2021"
 description = "GTK4/Libadwaita GUI for RemoteJuggler identity management"
 authors = ["Jess Sullivan <jess@sulliwood.org>"]
@@ -11,7 +11,7 @@ categories = ["development-tools", "gui"]
 
 [dependencies]
 # GTK4 and Libadwaita for native GNOME experience
-gtk4 = "0.9"
+gtk4 = { version = "0.9", features = ["v4_10"] }
 libadwaita = "0.7"
 
 # Serialization for config parsing

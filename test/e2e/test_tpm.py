@@ -9,6 +9,7 @@ Run with: pytest test/e2e/test_tpm.py -v -m tpm
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -16,7 +17,10 @@ from pathlib import Path
 import pytest
 
 
-pytestmark = pytest.mark.tpm
+pytestmark = [pytest.mark.tpm, pytest.mark.hardware]
+
+if not shutil.which("swtpm"):
+    pytestmark.append(pytest.mark.skip(reason="swtpm not available"))
 
 
 class TestTPMAvailability:

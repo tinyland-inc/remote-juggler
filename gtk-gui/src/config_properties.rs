@@ -117,6 +117,11 @@ fn arb_identity() -> impl Strategy<Value = Identity> {
             0..3,
         ),
         arb_gpg_config(),
+        prop::option::of(prop::sample::select(vec![
+            "RemoteJuggler/Tokens/GitLab/default".to_string(),
+            "RemoteJuggler/Tokens/GitHub/default".to_string(),
+            "RemoteJuggler/API/PERPLEXITY_API_KEY".to_string(),
+        ])),
     )
         .prop_map(
             |(
@@ -129,6 +134,7 @@ fn arb_identity() -> impl Strategy<Value = Identity> {
                 credential_source,
                 organizations,
                 gpg,
+                keepassxc_entry,
             )| {
                 let user = if user.is_empty() {
                     "user".to_string()
@@ -150,6 +156,7 @@ fn arb_identity() -> impl Strategy<Value = Identity> {
                     credential_source: credential_source.to_string(),
                     organizations,
                     gpg,
+                    keepassxc_entry,
                 }
             },
         )

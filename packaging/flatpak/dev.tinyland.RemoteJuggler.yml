@@ -100,16 +100,16 @@ modules:
         CHPL_TARGET_PLATFORM: linux64
     build-commands:
       # Build CLI
-      - make release PREFIX=/app
+      - just release
       # Build HSM library
       - make -C pinentry HSM_BACKEND=linux PREFIX=/app
       # Install
-      - make install PREFIX=/app
+      - just install-binary
       - make -C pinentry install PREFIX=/app
     sources:
       - type: git
         url: https://gitlab.com/tinyland/remote-juggler.git
-        tag: v2.0.0
+        tag: v2.1.0-beta.1
         # Or use local directory for development:
         # type: dir
         # path: ../..
@@ -127,7 +127,7 @@ modules:
     sources:
       - type: git
         url: https://gitlab.com/tinyland/remote-juggler.git
-        tag: v2.0.0
+        tag: v2.1.0-beta.1
     modules:
       # GTK4 and Libadwaita are in the runtime
 
@@ -143,7 +143,7 @@ modules:
     sources:
       - type: git
         url: https://gitlab.com/tinyland/remote-juggler.git
-        tag: v2.0.0
+        tag: v2.1.0-beta.1
 
   # Desktop integration
   - name: desktop-files
@@ -158,4 +158,4 @@ modules:
     sources:
       - type: git
         url: https://gitlab.com/tinyland/remote-juggler.git
-        tag: v2.0.0
+        tag: v2.1.0-beta.1

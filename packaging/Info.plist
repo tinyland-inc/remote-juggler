@@ -12,9 +12,9 @@
 
     <!-- Version Information -->
     <key>CFBundleVersion</key>
-    <string>2.0.0</string>
+    <string>2.1.0</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
+    <string>2.1.0</string>
 
     <!-- Executable -->
     <key>CFBundleExecutable</key>

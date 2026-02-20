@@ -42,9 +42,9 @@ const VERSION = "2.1.0";
 ### 3. Build and Test
 
 ```bash
-make clean
-make release
-make test
+just clean
+just release
+just test
 ```
 
 ### 4. Create Tag
@@ -75,7 +75,7 @@ build:linux-amd64:
   stage: build
   image: chapel/chapel:2.6
   script:
-    - make release
+    - just release
     - mv target/release/remote-juggler remote-juggler-linux-amd64
   artifacts:
     paths:
@@ -85,7 +85,7 @@ build:darwin-arm64:
   stage: build
   tags: [macos, arm64]
   script:
-    - make release
+    - just release
     - mv target/release/remote-juggler remote-juggler-darwin-arm64
   artifacts:
     paths:

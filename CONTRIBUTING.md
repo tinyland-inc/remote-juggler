@@ -83,7 +83,7 @@ brew install chapel
 # See docs/NIX_CHAPEL_SETUP.md for Nix setup
 
 # Build
-make release
+just release
 ```
 
 #### HSM Library

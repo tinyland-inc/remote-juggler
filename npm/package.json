@@ -1,0 +1,38 @@
+{
+  "name": "@tinyland/remote-juggler",
+  "version": "2.1.0-beta.1",
+  "description": "Multi-provider git identity management with MCP server support for AI agents",
+  "bin": {
+    "remote-juggler": "./bin/cli.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jesssullivan/RemoteJuggler"
+  },
+  "homepage": "https://github.com/Jesssullivan/RemoteJuggler",
+  "keywords": [
+    "mcp",
+    "git",
+    "identity",
+    "gitlab",
+    "github",
+    "ssh",
+    "gpg",
+    "model-context-protocol"
+  ],
+  "license": "Zlib",
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

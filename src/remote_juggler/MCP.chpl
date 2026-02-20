@@ -41,7 +41,7 @@ prototype module MCP {
     var state: MCPState = MCPState.Uninitialized;
     var protocolVersion: string = "2025-11-25";
     var serverName: string = "remote-juggler";
-    var serverVersion: string = "2.0.0";
+    var serverVersion: string = "2.1.0-beta.1";
     var clientName: string = "";
     var clientVersion: string = "";
   }
@@ -386,7 +386,7 @@ prototype module MCP {
   proc runMCPServer() {
     stderr.writeln("MCP: RemoteJuggler MCP Server starting...");
     stderr.writeln("MCP: Protocol version: 2025-11-25");
-    stderr.writeln("MCP: Server version: 2.0.0");
+    stderr.writeln("MCP: Server version: 2.1.0-beta.1");
     stderr.writeln("MCP: Waiting for input on stdin...");
 
     var server = new MCPServer();

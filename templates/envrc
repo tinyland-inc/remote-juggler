@@ -1,0 +1,40 @@
+# RemoteJuggler direnv integration
+# Copy to project root as .envrc and customize as needed
+#
+# Usage:
+#   cp templates/envrc .envrc
+#   direnv allow
+
+# Auto-detect identity from repository context
+DETECTED_IDENTITY=$(remote-juggler detect --quiet 2>/dev/null)
+CURRENT_IDENTITY=$(remote-juggler status --quiet 2>/dev/null)
+
+# Auto-switch if detection succeeded and differs from current
+if [ -n "$DETECTED_IDENTITY" ] && [ "$DETECTED_IDENTITY" != "$CURRENT_IDENTITY" ]; then
+    echo "RemoteJuggler: Switching to identity '$DETECTED_IDENTITY'"
+    remote-juggler switch "$DETECTED_IDENTITY" --setRemote=false 2>/dev/null || true
+fi
+
+# Or: Force a specific identity (comment out auto-detection above if using)
+# remote-juggler switch work --setRemote=false 2>/dev/null || true
+
+# Optional: Load identity-specific environment
+# case "$DETECTED_IDENTITY" in
+#   work)
+#     export AWS_PROFILE="company-prod"
+#     export KUBE_CONTEXT="work-cluster"
+#     ;;
+#   personal)
+#     export AWS_PROFILE="personal"
+#     ;;
+# esac
+
+# Optional: Load Nix shell if flake.nix exists
+# if [ -f flake.nix ]; then
+#   use flake
+# fi
+
+# Optional: Load from .env file
+# dotenv_if_exists
+
+log_status "RemoteJuggler identity: ${DETECTED_IDENTITY:-none}"

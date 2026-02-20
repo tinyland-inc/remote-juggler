@@ -123,9 +123,9 @@ in rec {
     exec ${chapel-fhs}/bin/chapel-fhs -c "${chapelExtracted}/bin/${chapelArch}/chpl $*"
   '';
 
-  # Convenience script to enter FHS and run make
-  make-fhs = pkgs.writeShellScriptBin "make-fhs" ''
-    exec ${chapel-fhs}/bin/chapel-fhs -c "make $*"
+  # Convenience script to enter FHS and run just
+  just-fhs = pkgs.writeShellScriptBin "just-fhs" ''
+    exec ${chapel-fhs}/bin/chapel-fhs -c "just $*"
   '';
 
   # Export chapelExtracted for use in builds

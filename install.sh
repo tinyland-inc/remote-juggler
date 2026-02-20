@@ -14,9 +14,21 @@ set -eu
 
 # Configuration
 GITLAB_REPO="https://gitlab.com/tinyland/projects/remote-juggler"
-GITHUB_REPO="https://github.com/Jesssullivan/remote-juggler"
+GITHUB_REPO="https://github.com/Jesssullivan/RemoteJuggler"
 BINARY_NAME="remote-juggler"
-VERSION="${REMOTE_JUGGLER_VERSION:-2.0.0}"
+
+# Version: use env var, or detect latest from GitHub, or fallback
+if [ -n "${REMOTE_JUGGLER_VERSION:-}" ]; then
+  VERSION="$REMOTE_JUGGLER_VERSION"
+elif command -v curl >/dev/null 2>&1; then
+  VERSION=$(curl -fsSL https://api.github.com/repos/Jesssullivan/RemoteJuggler/releases/latest 2>/dev/null \
+    | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//' || echo "")
+  if [ -z "$VERSION" ]; then
+    VERSION="2.1.0-beta.1"
+  fi
+else
+  VERSION="2.1.0-beta.1"
+fi
 
 # Colors for output (if terminal supports it)
 if [ -t 1 ]; then
@@ -141,24 +153,24 @@ download_binary() {
 
   printf 'Downloading %s...\n' "$artifact"
 
-  # Try GitLab releases first
+  # Try GitHub Releases first (primary distribution)
+  if curl -fsSL "${GITHUB_REPO}/releases/download/v${VERSION}/${artifact}" -o "${tmp_file}" 2>/dev/null; then
+    mv "${tmp_file}" "${target}"
+    printf '%bDownloaded from GitHub%b\n' "$GREEN" "$NC"
+    return 0
+  fi
+
+  # Fall back to GitLab releases
   if curl -fsSL "${GITLAB_REPO}/-/releases/v${VERSION}/downloads/${artifact}" -o "${tmp_file}" 2>/dev/null; then
     mv "${tmp_file}" "${target}"
     printf '%bDownloaded from GitLab releases%b\n' "$GREEN" "$NC"
     return 0
   fi
 
-  # Try GitLab Package Registry
+  # Fall back to GitLab Package Registry
   if curl -fsSL "${GITLAB_REPO}/-/package_files/generic/remote-juggler/${VERSION}/${artifact}" -o "${tmp_file}" 2>/dev/null; then
     mv "${tmp_file}" "${target}"
     printf '%bDownloaded from GitLab Package Registry%b\n' "$GREEN" "$NC"
-    return 0
-  fi
-
-  # Fall back to GitHub Releases
-  if curl -fsSL "${GITHUB_REPO}/releases/download/v${VERSION}/${artifact}" -o "${tmp_file}" 2>/dev/null; then
-    mv "${tmp_file}" "${target}"
-    printf '%bDownloaded from GitHub%b\n' "$GREEN" "$NC"
     return 0
   fi
 
@@ -414,35 +426,126 @@ EOF
   fi
 }
 
+# Configure Cursor MCP
+configure_cursor() {
+  cursor_dir="$HOME/.cursor"
+  mcp_file="${cursor_dir}/mcp.json"
+
+  if [ ! -d "$cursor_dir" ]; then
+    return 0  # Cursor not installed
+  fi
+
+  printf '  Configuring Cursor MCP...\n'
+
+  if [ -f "$mcp_file" ]; then
+    # Check if already configured
+    if grep -q "remote-juggler" "$mcp_file" 2>/dev/null; then
+      printf '    Already configured\n'
+      return 0
+    fi
+  fi
+
+  # Write MCP config (simple case - create or overwrite)
+  mkdir -p "$cursor_dir"
+  cat > "$mcp_file" << 'EOF'
+{
+  "mcpServers": {
+    "remote-juggler": {
+      "command": "remote-juggler",
+      "args": ["--mode=mcp"]
+    }
+  }
+}
+EOF
+  printf '    %bConfigured%b: %s\n' "$GREEN" "$NC" "$mcp_file"
+}
+
+# Configure VS Code MCP
+configure_vscode() {
+  if [ "$OS" = "darwin" ]; then
+    vscode_dir="$HOME/Library/Application Support/Code/User"
+  else
+    vscode_dir="$HOME/.config/Code/User"
+  fi
+
+  if [ ! -d "$vscode_dir" ]; then
+    return 0  # VS Code not installed
+  fi
+
+  printf '  Configuring VS Code MCP...\n'
+
+  mcp_file="${vscode_dir}/mcp.json"
+
+  if [ -f "$mcp_file" ] && grep -q "remote-juggler" "$mcp_file" 2>/dev/null; then
+    printf '    Already configured\n'
+    return 0
+  fi
+
+  # Write MCP config
+  cat > "$mcp_file" << 'EOF'
+{
+  "servers": {
+    "remote-juggler": {
+      "command": "remote-juggler",
+      "args": ["--mode=mcp"]
+    }
+  }
+}
+EOF
+  printf '    %bConfigured%b: %s\n' "$GREEN" "$NC" "$mcp_file"
+}
+
+# Configure Windsurf MCP
+configure_windsurf() {
+  windsurf_dir="$HOME/.windsurf"
+  mcp_file="${windsurf_dir}/mcp.json"
+
+  if [ ! -d "$windsurf_dir" ]; then
+    return 0  # Windsurf not installed
+  fi
+
+  printf '  Configuring Windsurf MCP...\n'
+
+  if [ -f "$mcp_file" ] && grep -q "remote-juggler" "$mcp_file" 2>/dev/null; then
+    printf '    Already configured\n'
+    return 0
+  fi
+
+  mkdir -p "$windsurf_dir"
+  cat > "$mcp_file" << 'EOF'
+{
+  "mcpServers": {
+    "remote-juggler": {
+      "command": "remote-juggler",
+      "args": ["--mode=mcp"]
+    }
+  }
+}
+EOF
+  printf '    %bConfigured%b: %s\n' "$GREEN" "$NC" "$mcp_file"
+}
+
 # Configure IDE integrations
 configure_ides() {
   printf '\n'
-  printf 'Configuring IDE integrations...\n'
+  printf 'Configuring IDE/agent integrations...\n'
 
   # Always configure Claude Code (create dirs if needed)
   configure_claude "$HOME/.claude"
 
-  # Configure JetBrains if directory exists or user has IntelliJ
+  # Configure JetBrains if directory exists
   if [ -d "$HOME/.jetbrains" ] || [ -d "$HOME/Library/Application Support/JetBrains" ]; then
     configure_jetbrains "$HOME/.jetbrains"
   fi
 
-  # Note about project-level configs
+  # Configure MCP clients (if installed)
+  configure_cursor
+  configure_vscode
+  configure_windsurf
+
   printf '\n'
-  printf '%bProject-level configuration:%b\n' "$BLUE" "$NC"
-  printf '  For MCP-enabled editors (VS Code, Cursor, etc.):\n'
-  printf '  Copy .mcp.json to your project root:\n'
-  printf '\n'
-  cat << 'EOF'
-  {
-    "mcpServers": {
-      "remote-juggler": {
-        "command": "remote-juggler",
-        "args": ["--mode=mcp"]
-      }
-    }
-  }
-EOF
+  printf '%bMCP Server:%b remote-juggler --mode=mcp\n' "$BLUE" "$NC"
+  printf '  Works with: Claude Code, Cursor, VS Code, Windsurf, and any MCP client\n'
 }
 
 # Setup Darwin keychain (if applicable)

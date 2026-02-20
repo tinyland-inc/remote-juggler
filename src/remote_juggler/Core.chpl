@@ -96,7 +96,7 @@ prototype module Core {
   /*
     Full semantic version string.
   */
-  param VERSION = "2.0.0";
+  param VERSION = "2.1.0-beta.1";
 
   /*
     Major version number (breaking changes).
@@ -106,7 +106,7 @@ prototype module Core {
   /*
     Minor version number (new features, backward compatible).
   */
-  param VERSION_MINOR = 0;
+  param VERSION_MINOR = 1;
 
   /*
     Patch version number (bug fixes).
@@ -158,6 +158,7 @@ prototype module Core {
   */
   enum CredentialSource {
     Keychain,
+    KeePassXC,
     Environment,
     CLIAuth,
     None
@@ -404,6 +405,7 @@ prototype module Core {
     var keychainService: string = "";
     var organizations: list(string);
     var gpg: GPGConfig;
+    var keePassEntry: string = "";
 
     /*
       Initialize with default values.
@@ -960,6 +962,7 @@ prototype module Core {
   proc credentialSourceToString(cs: CredentialSource): string {
     select cs {
       when CredentialSource.Keychain do return "keychain";
+      when CredentialSource.KeePassXC do return "keepassxc";
       when CredentialSource.Environment do return "environment";
       when CredentialSource.CLIAuth do return "cli";
       when CredentialSource.None do return "none";
@@ -976,6 +979,7 @@ prototype module Core {
   proc stringToCredentialSource(s: string): CredentialSource {
     const lower = s.toLower();
     if lower == "keychain" then return CredentialSource.Keychain;
+    if lower == "keepassxc" || lower == "kdbx" then return CredentialSource.KeePassXC;
     if lower == "environment" || lower == "env" then return CredentialSource.Environment;
     if lower == "cli" || lower == "cliauth" then return CredentialSource.CLIAuth;
     return CredentialSource.None;

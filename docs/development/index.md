@@ -7,7 +7,7 @@ Contributor guide for RemoteJuggler development.
 - Chapel 2.6.0 or later
 - macOS or Linux development environment
 - Git
-- Make
+- Just
 
 ## Repository Structure
 
@@ -28,7 +28,7 @@ remote-juggler/
   scripts/
     run-tests.sh             # Test runner
   docs/                      # Documentation
-  Makefile                   # Build system
+  justfile                   # Build system
   Mason.toml                 # Chapel package config
 ```
 
@@ -39,13 +39,13 @@ remote-juggler/
 ```bash
 git clone https://gitlab.com/tinyland/projects/remote-juggler.git
 cd remote-juggler
-make build
+just build
 ```
 
 ### 2. Run Tests
 
 ```bash
-make test
+just test
 ```
 
 ### 3. Test Changes
@@ -61,7 +61,7 @@ make test
 ### 4. Build Release
 
 ```bash
-make release
+just release
 ```
 
 ## Code Style

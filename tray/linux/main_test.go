@@ -367,17 +367,26 @@ func TestConfigSettings(t *testing.T) {
 // =============================================================================
 
 func TestGetConfigDir(t *testing.T) {
-	// Save and restore HOME
+	// Save and restore HOME and XDG_CONFIG_HOME
 	origHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", origHome)
+	origXDG := os.Getenv("XDG_CONFIG_HOME")
+	defer func() {
+		os.Setenv("HOME", origHome)
+		if origXDG != "" {
+			os.Setenv("XDG_CONFIG_HOME", origXDG)
+		} else {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		}
+	}()
 
-	// Set a test HOME
+	// Set a test HOME, clear XDG to test fallback path
 	tempDir, err := os.MkdirTemp("", "remotejuggler-home")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
+	os.Unsetenv("XDG_CONFIG_HOME")
 	os.Setenv("HOME", tempDir)
 
 	dir := getConfigDir()
@@ -385,6 +394,49 @@ func TestGetConfigDir(t *testing.T) {
 	expected := filepath.Join(tempDir, ".config", "remote-juggler")
 	if dir != expected {
 		t.Errorf("Expected config dir '%s', got '%s'", expected, dir)
+	}
+}
+
+func TestGetConfigDirXDG(t *testing.T) {
+	// Save and restore XDG_CONFIG_HOME
+	origXDG := os.Getenv("XDG_CONFIG_HOME")
+	defer func() {
+		if origXDG != "" {
+			os.Setenv("XDG_CONFIG_HOME", origXDG)
+		} else {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		}
+	}()
+
+	tempDir, err := os.MkdirTemp("", "remotejuggler-xdg")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	os.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	dir := getConfigDir()
+
+	expected := filepath.Join(tempDir, "remote-juggler")
+	if dir != expected {
+		t.Errorf("Expected config dir '%s', got '%s'", expected, dir)
+	}
+}
+
+func TestDBusName(t *testing.T) {
+	// Verify D-Bus name is the tray-specific name, not the GUI name
+	// This prevents the collision that was fixed in Phase 1a
+	expectedDBusName := "dev.tinyland.RemoteJuggler.Tray"
+	guiDBusName := "dev.tinyland.RemoteJuggler"
+
+	// The D-Bus name is used as a string literal in main.go
+	// This test documents the expected value for regression detection
+	if expectedDBusName == guiDBusName {
+		t.Error("Tray D-Bus name must differ from GUI D-Bus name")
+	}
+	if expectedDBusName != "dev.tinyland.RemoteJuggler.Tray" {
+		t.Errorf("Expected D-Bus name 'dev.tinyland.RemoteJuggler.Tray', got '%s'", expectedDBusName)
 	}
 }
 

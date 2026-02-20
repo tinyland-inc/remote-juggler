@@ -4,7 +4,7 @@
 class RemoteJuggler < Formula
   desc "Backend-agnostic git identity management with MCP/ACP support"
   homepage "https://gitlab.com/tinyland/projects/remote-juggler"
-  url "https://gitlab.com/tinyland/projects/remote-juggler/-/archive/v2.0.0/remote-juggler-v2.0.0.tar.gz"
+  url "https://gitlab.com/tinyland/projects/remote-juggler/-/archive/v2.1.0-beta.1/remote-juggler-v2.1.0-beta.1.tar.gz"
   sha256 "" # Will be filled after first release
   license "MIT"
   head "https://gitlab.com/tinyland/projects/remote-juggler.git", branch: "main"

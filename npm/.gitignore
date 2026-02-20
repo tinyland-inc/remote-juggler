@@ -1,0 +1,3 @@
+node_modules/
+bin/remote-juggler-binary
+*.tgz

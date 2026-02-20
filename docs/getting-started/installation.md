@@ -207,15 +207,15 @@ Building requires Chapel 2.6.0 or later.
 git clone https://gitlab.com/tinyland/projects/remote-juggler.git
 cd remote-juggler
 
-# Build with make
-make build    # Debug build -> target/debug/
-make release  # Optimized build -> target/release/
+# Build with just
+just build    # Debug build -> target/debug/
+just release  # Optimized build -> target/release/
 
 # Or use Mason (Chapel package manager)
 mason build --release
 
 # Install to ~/.local/bin
-make install
+just install
 ```
 
 ### Build Prerequisites

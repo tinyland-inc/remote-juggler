@@ -1,13 +1,13 @@
 ---
 title: "Building from Source"
-description: "Build RemoteJuggler from Chapel source code. Covers compiler requirements, Makefile targets, and cross-compilation."
+description: "Build RemoteJuggler from Chapel source code. Covers compiler requirements, justfile targets, and cross-compilation."
 category: "reference"
 llm_priority: 5
 keywords:
   - build
   - chapel
   - compiler
-  - makefile
+  - justfile
   - source
 ---
 
@@ -42,7 +42,7 @@ source util/quickstart/setchplenv.bash
 
 ### Build Tools
 
-- Make
+- Just
 - C compiler (for FFI code)
 
 ## Build Commands
@@ -50,7 +50,7 @@ source util/quickstart/setchplenv.bash
 ### Debug Build
 
 ```bash
-make build
+just build
 ```
 
 Output: `target/debug/remote-juggler`
@@ -63,7 +63,7 @@ Features:
 ### Release Build
 
 ```bash
-make release
+just release
 ```
 
 Output: `target/release/remote-juggler`
@@ -76,31 +76,23 @@ Features:
 ### Clean
 
 ```bash
-make clean
+just clean
 ```
 
 Removes build artifacts.
 
-## Makefile Reference
+## Justfile Reference
 
-Key targets from `Makefile`:
+Key recipes from `justfile`:
 
-```makefile
-# Compiler configuration
-CHPL_FLAGS = -M src/remote_juggler
-
-# Platform-specific flags
-ifeq ($(UNAME_S),Darwin)
-  CHPL_LDFLAGS = --ldflags="-framework Security -framework CoreFoundation"
-endif
-
-# Targets
-build:     # Debug build
-release:   # Optimized build
-test:      # Run tests
-lint:      # Check code style
-install:   # Install to $HOME/.local/bin
-clean:     # Remove artifacts
+```just
+# Recipes
+build       # Debug build
+release     # Optimized build
+test        # Run tests
+lint        # Check code style
+install     # Install to $HOME/.local/bin
+clean       # Remove artifacts
 ```
 
 ## Mason Build
@@ -118,7 +110,7 @@ mason build
 mason build --release
 ```
 
-Note: Mason may not properly pass linker flags for macOS frameworks. Use Make for production builds.
+Note: Mason may not properly pass linker flags for macOS frameworks. Use `just` for production builds.
 
 ## Cross-Compilation
 
@@ -133,7 +125,7 @@ FROM chapel/chapel:2.6
 
 WORKDIR /app
 COPY . .
-RUN make release
+RUN just release
 ```
 
 ## Build Troubleshooting

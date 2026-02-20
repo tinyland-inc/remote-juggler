@@ -11,10 +11,10 @@ RemoteJuggler supports Nix for reproducible builds and development environments.
 nix develop
 
 # Build debug version
-make build
+just build
 
 # Build release version
-make release
+just release
 ```
 
 ### Building with Nix
@@ -83,8 +83,8 @@ brew install chapel
 # Enter devShell (uses Homebrew Chapel)
 nix develop
 
-# Build with make (not nix build)
-make release
+# Build with just (not nix build)
+just release
 ```
 
 ## CI/CD Integration
@@ -193,8 +193,8 @@ brew install chapel
 which chpl
 chpl --version
 
-# Then use make (not nix build)
-make release
+# Then use just (not nix build)
+just release
 ```
 
 ## Development Workflow
@@ -206,9 +206,9 @@ make release
 nix develop
 
 # Development cycle
-make build        # Quick debug build
-make test         # Run tests
-make lint         # Run linter
+just build        # Quick debug build
+just test         # Run tests
+just lint         # Run linter
 
 # Release build
 nix build         # Full reproducible build
@@ -223,8 +223,8 @@ brew install chapel
 # Enter devShell for Rust tooling
 nix develop
 
-# Build with make
-make release
+# Build with just
+just release
 ```
 
 ## Updating Chapel Version

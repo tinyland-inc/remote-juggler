@@ -38,14 +38,14 @@ chapel-fhs
 
 # Now you're in an FHS sandbox with Chapel available
 chpl --version
-make release
+just release
 ```
 
 Or run commands directly:
 
 ```bash
 chapel-fhs -c 'chpl --version'
-chapel-fhs -c 'make release'
+chapel-fhs -c 'just release'
 ```
 
 ### Building with Nix
