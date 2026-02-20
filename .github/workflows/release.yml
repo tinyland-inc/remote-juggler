@@ -465,8 +465,8 @@ jobs:
           REMOTE_JUGGLER_BIN: ${{ github.workspace }}/${{ env.PROJECT_NAME }}-linux-amd64
         run: |
           chmod +x $REMOTE_JUGGLER_BIN
-          pytest test/e2e/test_installation.py test/e2e/test_mcp_protocol.py -v \
-            -m "not tpm and not secure_enclave and not yubikey and not hardware and not gpg" \
+          pytest test/e2e/test_installation.py test/e2e/test_mcp_protocol.py test/e2e/test_mcp_tools.py -v \
+            -m "not tpm and not secure_enclave and not yubikey and not hardware and not gpg and not keys" \
             --timeout=30
 
   test-gtk-gui:
