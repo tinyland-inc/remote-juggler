@@ -378,5 +378,5 @@ Available modes:
 ## Next Steps
 
 - [Trusted Workstation Setup](./TRUSTED_WORKSTATION_SETUP.md) - HSM configuration
-- [Configuration Reference](../reference/config-schema.md) - Full config.json schema
-- [CLI Reference](../cli/commands.md) - All commands and options
+- [Configuration Reference](reference/config-schema.md) - Full config.json schema
+- [CLI Reference](cli/commands.md) - All commands and options
