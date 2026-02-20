@@ -13,16 +13,31 @@ _remote-juggler() {
         args)
             case $line[1] in
                 config)
-                    _arguments '1: :(show add edit remove import sync)'
+                    _arguments '1: :(show add edit remove import sync init)'
                     ;;
                 token)
-                    _arguments '1: :(set get clear verify)'
+                    _arguments '1: :(set get clear verify check-expiry renew)'
                     ;;
                 gpg)
                     _arguments '1: :(status configure verify)'
                     ;;
                 debug)
-                    _arguments '1: :(ssh-config git-config keychain)'
+                    _arguments '1: :(ssh-config git-config keychain hsm)'
+                    ;;
+                keys|kdbx)
+                    _arguments '1: :(init status search resolve get store delete list ingest crawl discover export)'
+                    ;;
+                pin)
+                    _arguments '1: :(store clear status)'
+                    ;;
+                yubikey|yk)
+                    _arguments '1: :(info set-pin-policy set-touch configure-trusted diagnostics)'
+                    ;;
+                trusted-workstation|tws)
+                    _arguments '1: :(enable disable status verify)'
+                    ;;
+                security-mode)
+                    _arguments '1: :(standard trusted_workstation hardware_only)'
                     ;;
                 switch|to|validate|edit|remove|set|get|clear|configure)
                     _remote_juggler_identities
@@ -45,6 +60,17 @@ _remote_juggler_commands() {
         'token:Token management'
         'gpg:GPG signing management'
         'debug:Debug utilities'
+        'keys:KeePassXC credential authority'
+        'kdbx:Alias for keys'
+        'pin:HSM PIN management'
+        'yubikey:YubiKey management'
+        'yk:Alias for yubikey'
+        'trusted-workstation:Trusted workstation mode'
+        'tws:Alias for trusted-workstation'
+        'security-mode:Set security mode'
+        'setup:Run setup wizard'
+        'unseal-pin:Unseal HSM PIN'
+        'verify:Verify GPG keys'
     )
     _describe 'command' commands
 }

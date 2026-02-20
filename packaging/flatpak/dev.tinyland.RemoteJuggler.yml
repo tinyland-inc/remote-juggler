@@ -71,7 +71,7 @@ modules:
         else
           CHAPEL_ARCH="aarch64"
         fi
-        curl -fsSL "https://github.com/chapel-lang/chapel/releases/download/2.0.0/chapel-2.0.0-linux64-${CHAPEL_ARCH}.tar.gz" \
+        curl -fsSL "https://github.com/chapel-lang/chapel/releases/download/2.7.0/chapel-2.7.0-linux64-${CHAPEL_ARCH}.tar.gz" \
           | tar xzf - --strip-components=1 -C /app/share/chapel
     sources:
       - type: shell
@@ -88,7 +88,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/tpm2-software/tpm2-tss/releases/download/4.0.1/tpm2-tss-4.0.1.tar.gz
-        sha256: FIXME  # Add actual checksum
+        sha256: 532a70133910b6bd842289915b3f9423c0205c0ea009d65294ca18a74087c950
 
   # Build RemoteJuggler CLI
   - name: remote-juggler
