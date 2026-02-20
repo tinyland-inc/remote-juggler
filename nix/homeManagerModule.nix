@@ -59,45 +59,25 @@ in
     home.packages = [ cfg.package ]
       ++ lib.optional (cfg.gui.enable && pkgs.stdenv.isLinux) cfg.gui.package;
 
-    # Write config.json if provided
-    xdg.configFile."remote-juggler/config.json" = lib.mkIf (cfg.config != null) {
-      source = jsonFormat.generate "remote-juggler-config.json" cfg.config;
-    };
-
-    # MCP server configuration for AI agent clients
-    xdg.configFile = lib.mkIf cfg.mcp.enable (
-      let
-        mcpConfig = {
-          mcpServers.remote-juggler = {
-            command = "${cfg.package}/bin/remote-juggler";
-            args = [ "--mode=mcp" ];
-          };
+    xdg.configFile = let
+      mcpConfig = {
+        mcpServers.remote-juggler = {
+          command = "${cfg.package}/bin/remote-juggler";
+          args = [ "--mode=mcp" ];
         };
-        mcpJson = jsonFormat.generate "mcp-config.json" mcpConfig;
-      in
-      lib.mkMerge [
-        # Claude Code
-        (lib.mkIf (builtins.elem "claude-code" cfg.mcp.clients) {
-          # Claude Code reads from project .mcp.json or ~/.claude/.mcp.json
-          # We write a global config that users can reference
-          "remote-juggler/mcp-claude.json".source = mcpJson;
-        })
+      };
+      mcpJson = jsonFormat.generate "mcp-config.json" mcpConfig;
+    in lib.mkMerge [
+      # Write config.json if provided
+      (lib.mkIf (cfg.config != null) {
+        "remote-juggler/config.json".source =
+          jsonFormat.generate "remote-juggler-config.json" cfg.config;
+      })
 
-        # Cursor
-        (lib.mkIf (builtins.elem "cursor" cfg.mcp.clients) {
-          # Cursor reads ~/.cursor/mcp.json
-        })
-
-        # VS Code
-        (lib.mkIf (builtins.elem "vscode" cfg.mcp.clients) {
-          # VS Code reads ~/.config/Code/User/mcp.json on Linux
-        })
-
-        # Windsurf
-        (lib.mkIf (builtins.elem "windsurf" cfg.mcp.clients) {
-          # Windsurf reads ~/.windsurf/mcp.json
-        })
-      ]
-    );
+      # Claude Code MCP config
+      (lib.mkIf (cfg.mcp.enable && builtins.elem "claude-code" cfg.mcp.clients) {
+        "remote-juggler/mcp-claude.json".source = mcpJson;
+      })
+    ];
   };
 }
