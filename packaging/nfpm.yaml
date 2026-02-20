@@ -1,0 +1,44 @@
+# nfpm configuration for generating .deb and .rpm packages
+# https://nfpm.goreleaser.com/
+#
+# Usage:
+#   VERSION=2.1.0-beta.1 ARCH=amd64 nfpm package --packager deb --target .
+#   VERSION=2.1.0-beta.1 ARCH=amd64 nfpm package --packager rpm --target .
+
+name: remote-juggler
+arch: "${ARCH}"
+platform: linux
+version: "${VERSION}"
+section: devel
+priority: optional
+maintainer: "Jess Sullivan <jess@sulliwood.org>"
+description: "Backend-agnostic git identity management with MCP/ACP agent protocol support"
+vendor: "Tinyland"
+homepage: "https://github.com/Jesssullivan/RemoteJuggler"
+license: Zlib
+
+contents:
+  - src: remote-juggler
+    dst: /usr/local/bin/remote-juggler
+    file_info:
+      mode: 0755
+
+  - src: docs/man/remote-juggler.1
+    dst: /usr/share/man/man1/remote-juggler.1
+    file_info:
+      mode: 0644
+    type: doc
+
+recommends:
+  - openssh-client
+  - gnupg
+
+suggests:
+  - keepassxc
+  - tpm2-tools
+
+overrides:
+  rpm:
+    recommends:
+      - openssh-clients
+      - gnupg2

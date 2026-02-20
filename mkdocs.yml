@@ -81,6 +81,7 @@ hooks:
 
 nav:
   - Home: index.md
+  - Install: install.md
   - Getting Started:
     - getting-started/index.md
     - Installation: getting-started/installation.md

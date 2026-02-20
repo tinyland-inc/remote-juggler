@@ -76,6 +76,17 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="2.1.0-beta.1" date="2026-02-20">
+      <description>
+        <p>First public pre-release with comprehensive distribution:</p>
+        <ul>
+          <li>32 MCP tools for AI agent integration</li>
+          <li>KeePassXC credential authority with auto-discovery</li>
+          <li>Nix flake with Home Manager module</li>
+          <li>.deb and .rpm packages</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-02-01">
       <description>
         <p>Major release with hardware security support:</p>

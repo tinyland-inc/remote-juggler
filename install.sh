@@ -14,9 +14,21 @@ set -eu
 
 # Configuration
 GITLAB_REPO="https://gitlab.com/tinyland/projects/remote-juggler"
-GITHUB_REPO="https://github.com/Jesssullivan/remote-juggler"
+GITHUB_REPO="https://github.com/Jesssullivan/RemoteJuggler"
 BINARY_NAME="remote-juggler"
-VERSION="${REMOTE_JUGGLER_VERSION:-2.0.0}"
+
+# Version: use env var, or detect latest from GitHub, or fallback
+if [ -n "${REMOTE_JUGGLER_VERSION:-}" ]; then
+  VERSION="$REMOTE_JUGGLER_VERSION"
+elif command -v curl >/dev/null 2>&1; then
+  VERSION=$(curl -fsSL https://api.github.com/repos/Jesssullivan/RemoteJuggler/releases/latest 2>/dev/null \
+    | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//' || echo "")
+  if [ -z "$VERSION" ]; then
+    VERSION="2.1.0-beta.1"
+  fi
+else
+  VERSION="2.1.0-beta.1"
+fi
 
 # Colors for output (if terminal supports it)
 if [ -t 1 ]; then
