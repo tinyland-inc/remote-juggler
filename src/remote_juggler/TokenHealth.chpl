@@ -9,7 +9,7 @@
  *   - Support token renewal workflows
  *
  * Copyright (c) 2026 Jess Sullivan <jess@sulliwood.org>
- * License: MIT
+ * License: Zlib
  */
 prototype module TokenHealth {
   use Time;

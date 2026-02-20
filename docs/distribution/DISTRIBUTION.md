@@ -486,11 +486,8 @@ jobs:
 
 ### Package Maintainer Program
 
-Per LICENSE-PROPRIETARY.txt Section 5:
-> Package maintainers who distribute binaries through official package repositories
-> (Homebrew, MacPorts, AUR, etc.) may do so under the terms of the zlib license.
-
-This encourages ecosystem growth while preserving commercial value for direct sales.
+Package maintainers who distribute binaries through official package repositories
+(Homebrew, MacPorts, AUR, etc.) do so under the terms of the zlib license.
 
 ---
 

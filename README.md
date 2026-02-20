@@ -12,18 +12,28 @@ Written primarily in [Chapel](https://chapel-lang.org/) with a great deal of car
 
 - **Multi-Provider Support**:  This version you are looking at supports GitLab & GitHub.  Enterprise RemoteJuggler supports **Mariolex gitChapel** git server if you need to scale to millions of concurrent agent operations.
 - **Automatic Identity Detection**: Detects the correct identity from repository remote URLs
+- **KeePassXC Credential Authority**: Secure credential storage and auto-discovery with TPM/YubiKey hardware-backed unlock
 - **Darwin Keychain Integration**: Secure token storage on macOS
 - **GPG Signing**: Automatic GPG key configuration per identity
-- **MCP Server**: AI agent integration for interprenters and agents like OpenCode and Claude Code
+- **YubiKey / FIDO2**: Hardware key support with PIN management and touch policies
+- **Trusted Workstation Mode**: TPM/Secure Enclave-based auto-unlock for headless environments
+- **MCP Server**: 32 tools for AI agent integration (Claude Code, Cursor, VS Code, Windsurf)
 - **ACP Server**: **JetBrains IDE integration**
 - **System Tray Apps**: Native macOS (SwiftUI) and Linux (Go) tray applications for da humans oWo
+- **GTK4 GUI**: Libadwaita desktop app for Linux
 
 ## Quick Start
 
 Install RemoteJuggler with the automated installer:
 
 ```bash
-curl -sSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash
+```
+
+Or via npm (all platforms):
+
+```bash
+npx @tinyland/remote-juggler@latest --version
 ```
 
 Or via Homebrew:
@@ -33,7 +43,13 @@ brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
 brew install remote-juggler
 ```
 
-For other installation methods (AUR, Nix, Flatpak, binary downloads, building from source), see the **[Installation Guide](docs/getting-started/installation.md)**.
+Or via Nix:
+
+```bash
+nix profile install github:Jesssullivan/RemoteJuggler
+```
+
+For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, building from source), see the **[Installation Guide](docs/getting-started/installation.md)**.
 
 ## Configuration
 
@@ -97,7 +113,7 @@ The tool auto-generates `~/.config/remote-juggler/config.json` on first run, or 
 }
 ```
 
-### 3. Store Tokens (macOS)
+### 3. Store Tokens
 
 ```bash
 # Store GitLab token in Keychain
@@ -133,14 +149,37 @@ remote-juggler validate personal
 remote-juggler [command] [options]
 
 Commands:
-  (none)           Show current identity status
-  list             List all configured identities
-  detect           Detect identity for current repository
-  switch <name>    Switch to specified identity
-  validate <name>  Validate SSH and API connectivity
-  token set <name> Store token in keychain
-  token verify     Verify all credentials
-  config sync      Sync managed blocks from SSH/git config
+  (none)                    Show current identity status
+  list                      List all configured identities
+  detect                    Detect identity for current repository
+  switch <name>             Switch to specified identity
+  validate <name>           Validate SSH and API connectivity
+  verify                    Verify GPG keys
+  status                    Show current identity status
+
+  config show|add|edit|remove|import|sync|init
+                            Configuration management
+
+  token set|get|clear|verify|check-expiry|renew
+                            Token/credential management
+
+  gpg status|configure|verify
+                            GPG signing configuration
+
+  keys init|status|search|resolve|get|store|delete|list|ingest|crawl|discover|export
+                            KeePassXC credential authority
+
+  pin store|clear|status    HSM PIN management
+  yubikey info|set-pin-policy|set-touch|configure-trusted|diagnostics
+                            YubiKey management
+  trusted-workstation enable|disable|status|verify
+                            Trusted workstation mode
+  security-mode <mode>      Set security mode
+  setup                     Interactive setup wizard
+  unseal-pin                Unseal HSM PIN
+
+  debug ssh-config|git-config|keychain|hsm
+                            Debug utilities
 
 Options:
   --mode=mcp       Run as MCP server (STDIO transport)
@@ -151,7 +190,7 @@ Options:
 
 ## MCP Server Integration
 
-RemoteJuggler can run as an MCP (Model Context Protocol) server for AI agent integration:
+RemoteJuggler implements an MCP (Model Context Protocol) server with 32 tools for AI agent integration:
 
 ```bash
 remote-juggler --mode=mcp
@@ -176,6 +215,7 @@ Add to your `.mcp.json`:
 
 | Tool | Description |
 |------|-------------|
+| **Identity Management** | |
 | `juggler_list_identities` | List configured identities |
 | `juggler_detect_identity` | Detect repo identity from remote URL |
 | `juggler_switch` | Switch to a different identity |
@@ -183,11 +223,35 @@ Add to your `.mcp.json`:
 | `juggler_validate` | Test SSH/API connectivity |
 | `juggler_store_token` | Store token in keychain |
 | `juggler_sync_config` | Sync managed SSH/git blocks |
-
-> **Note**: Some MCP tools have implementation limitations:
-> - `juggler_sync_config`: SSH/gitconfig parsers are not yet fully implemented
-> - `juggler_store_token`: Currently returns guidance; actual storage requires CLI
-> - `juggler_validate`: GPG validation is not yet implemented
+| **Security & GPG** | |
+| `juggler_gpg_status` | GPG key status |
+| `juggler_pin_store` | Store HSM PIN |
+| `juggler_pin_clear` | Clear HSM PIN |
+| `juggler_pin_status` | Check PIN status |
+| `juggler_security_mode` | Set security mode |
+| `juggler_setup` | Run setup wizard |
+| `juggler_tws_status` | Trusted workstation status |
+| `juggler_tws_enable` | Enable trusted workstation |
+| **Token Management** | |
+| `juggler_token_verify` | Verify tokens |
+| `juggler_token_get` | Retrieve stored token |
+| `juggler_token_clear` | Clear stored token |
+| **Configuration & Debug** | |
+| `juggler_config_show` | Show configuration |
+| `juggler_debug_ssh` | Debug SSH config |
+| **Credential Authority (KeePassXC)** | |
+| `juggler_keys_init` | Initialize credential store |
+| `juggler_keys_status` | Credential store status |
+| `juggler_keys_search` | Fuzzy search credentials |
+| `juggler_keys_resolve` | Search + retrieve in one call |
+| `juggler_keys_get` | Get specific credential |
+| `juggler_keys_store` | Store credential |
+| `juggler_keys_delete` | Delete credential |
+| `juggler_keys_list` | List all credentials |
+| `juggler_keys_ingest_env` | Ingest from environment |
+| `juggler_keys_crawl_env` | Crawl .env files |
+| `juggler_keys_discover` | Auto-discover credentials |
+| `juggler_keys_export` | Export as env vars |
 
 ## ACP Server Integration
 
@@ -199,14 +263,38 @@ remote-juggler --mode=acp
 
 Configure in `acp.json` for JetBrains AI Assistant. See the [Installation Guide](docs/getting-started/installation.md#jetbrains) for configuration details.
 
+## KeePassXC Credential Authority
+
+RemoteJuggler includes a built-in credential authority backed by KeePassXC (`.kdbx` format) with hardware-backed security:
+
+```bash
+# Initialize credential store
+remote-juggler keys init
+
+# Auto-discover credentials from environment
+remote-juggler keys discover
+
+# Search credentials with fuzzy matching
+remote-juggler keys search "gitlab token"
+
+# Crawl .env files
+remote-juggler keys crawl
+
+# Export as environment variables
+remote-juggler keys export
+```
+
+**Security model**: TPM/Secure Enclave + YubiKey presence = auto-unlock with 30-second session cache.
+
 ## Credential Resolution
 
 RemoteJuggler resolves credentials in this order:
 
-1. **Darwin Keychain** (macOS) - Service: `remote-juggler.<provider>.<identity>`
-2. **Environment variable** - `${IDENTITY}_TOKEN` or custom
-3. **Provider CLI** - `glab auth token` / `gh auth token`
-4. **SSH-only fallback** - No token, git operations via SSH only
+1. **KeePassXC Store** - Hardware-backed credential authority (`~/.remotejuggler/keys.kdbx`)
+2. **Darwin Keychain** (macOS) - Service: `remote-juggler.<provider>.<identity>`
+3. **Environment variable** - `${IDENTITY}_TOKEN` or custom
+4. **Provider CLI** - `glab auth token` / `gh auth token`
+5. **SSH-only fallback** - No token, git operations via SSH only
 
 ## System Tray Application (Experimental)
 
@@ -237,16 +325,16 @@ go build -o remote-juggler-tray
 
 ```bash
 # Debug build
-mason build
+just build
 
 # Release build
-mason build --release
+just release
 
 # Run tests
-mason test
+just test
 
-# Clean
-mason clean
+# Build GTK GUI (Linux)
+just gui-release
 ```
 
 ### Project Structure
@@ -255,35 +343,44 @@ mason clean
 remote-juggler/
 ├── src/
 │   ├── remote_juggler.chpl      # Main entry point
-│   └── remote_juggler/          # Module implementations
-├── c_src/                       # C FFI for Darwin Keychain
-├── test/                        # Unit tests
+│   └── remote_juggler/          # 20 Chapel modules
+│       ├── Core.chpl            # Version, helpers, formatting
+│       ├── Config.chpl          # Configuration management
+│       ├── GlobalConfig.chpl    # Schema versioning
+│       ├── State.chpl           # State persistence
+│       ├── Identity.chpl        # Identity switching
+│       ├── Remote.chpl          # Remote URL management
+│       ├── Keychain.chpl        # macOS Keychain integration
+│       ├── GPG.chpl             # GPG signing
+│       ├── ProviderCLI.chpl     # Provider CLI wrappers
+│       ├── Protocol.chpl        # JSON-RPC protocol
+│       ├── MCP.chpl             # MCP server
+│       ├── ACP.chpl             # ACP server
+│       ├── Tools.chpl           # MCP/ACP tool definitions
+│       ├── HSM.chpl             # TPM/Secure Enclave
+│       ├── YubiKey.chpl         # YubiKey management
+│       ├── TrustedWorkstation.chpl # Auto-unlock mode
+│       ├── GPGAgent.chpl        # GPG agent integration
+│       ├── TokenHealth.chpl     # Token expiry detection
+│       ├── Setup.chpl           # Interactive setup wizard
+│       └── KeePassXC.chpl       # Credential authority
+├── gtk-gui/                     # Rust/GTK4/Libadwaita GUI
 ├── tray/
 │   ├── darwin/                  # SwiftUI tray app
 │   └── linux/                   # Go tray app
+├── pinentry/                    # HSM pinentry helper
 ├── docs/                        # MkDocs documentation
+├── packaging/                   # .deb/.rpm/AUR/Flatpak packaging
 └── scripts/                     # Build/install scripts
 ```
 
 ## Documentation
 
 - **[Installation Guide](docs/getting-started/installation.md)** - Complete installation instructions for all platforms
+- **[CLI Commands](docs/cli/commands.md)** - Full command reference
+- **[MCP Server](docs/integrations/mcp.md)** - MCP integration guide
 - **[Distribution Guide](docs/DISTRIBUTION.md)** - For packagers and distributors
-
-## Todos:
-- [ ] Lace up this public demo repo with outbot harness
-- [ ] Add screenshots and workflow for humans
-- [ ] Publish docs
-- [ ] Publish public propaganda page and artifactory
-- [ ] Publish prebuilt binaries, rpm and brew packages UwU
-- [ ] Publish RemoteJuggler's Tinyland ecosystem facets when appropriate to do so, aiming for Q4 2026
-
-
 
 ## License
 
-RemoteJuggler is dual-licensed:
-- **Source Code**: [zlib License](LICENSE-ZLIB.txt) - build from source for any purpose
-- **Prebuilt Binaries**: [Commercial License](LICENSE-PROPRIETARY.txt) - see terms for usage
-
-See [LICENSE](LICENSE) for details.
+RemoteJuggler is licensed under the [zlib License](LICENSE).

@@ -1,32 +1,22 @@
-# RemoteJuggler Dual License
+zlib License
 
-Copyright (c) 2026 Jess Sullivan <jess@sulliwood.org>
-Copyright (c) 2026 Tinyland
+Copyright (c) 2024-2026 Jess Sullivan <jess@sulliwood.org>
+Copyright (c) 2024-2026 Tinyland
 
-RemoteJuggler is dual-licensed under the following terms:
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-## Open Source License (zlib)
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
 
-The source code of RemoteJuggler is licensed under the zlib license.
-You may freely build, modify, and use RemoteJuggler from source for any purpose.
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
 
-See LICENSE-ZLIB.txt for the full license text.
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
 
-## Commercial License (Prebuilt Binaries)
-
-Prebuilt binaries, signed applications, and notarized packages distributed
-by Tinyland are licensed under a commercial license. Commercial use of
-prebuilt binaries requires a paid license.
-
-See LICENSE-PROPRIETARY.txt for the full license text.
-
-## Summary
-
-| Use Case | License Required |
-|----------|------------------|
-| Build from source (personal) | zlib (free) |
-| Build from source (commercial) | zlib (free) |
-| Prebuilt binaries (personal) | Commercial (see terms) |
-| Prebuilt binaries (commercial) | Commercial (paid) |
-
-For licensing inquiries: license@tinyland.dev
+3. This notice may not be removed or altered from any source distribution.

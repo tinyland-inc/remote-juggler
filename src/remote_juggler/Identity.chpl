@@ -12,7 +12,7 @@
  * to provide a complete identity switching experience.
  *
  * Copyright (c) 2026 Jess Sullivan <jess@sulliwood.org>
- * License: MIT
+ * License: Zlib
  */
 prototype module Identity {
   use List;

@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>dev.tinyland.RemoteJuggler</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>Zlib</project_license>
   <name>RemoteJuggler</name>
   <summary>Git identity management for multi-account workflows</summary>
   <description>

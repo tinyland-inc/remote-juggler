@@ -234,8 +234,7 @@ protect_comments:
     - 'DO NOT EDIT'
     - '@license'
     - '@preserve'
-    - 'MIT License'
-    - 'ZLIB License'
+    - 'Zlib License'
   preserve_docstrings: false  # Strip docstrings (privacy)
   preserve_shebangs: true
   preserve_encoding: true
