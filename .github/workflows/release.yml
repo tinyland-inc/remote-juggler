@@ -303,6 +303,9 @@ jobs:
         with:
           name: ${{ env.PROJECT_NAME }}-linux-amd64
 
+      - name: Install Chapel runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libhwloc15
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

@@ -162,6 +162,9 @@ jobs:
         with:
           name: remote-juggler-linux-amd64
 
+      - name: Install Chapel runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libhwloc15
+
       - name: Run integration tests
         run: |
           chmod +x remote_juggler
@@ -195,6 +198,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: remote-juggler-linux-amd64
+
+      - name: Install Chapel runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libhwloc15
 
       - name: Setup Python
         uses: actions/setup-python@v5
