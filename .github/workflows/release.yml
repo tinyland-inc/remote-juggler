@@ -572,6 +572,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
+    if: ${{ always() && !cancelled() }}
     needs:
       - build-linux-amd64
       - build-linux-arm64
@@ -601,7 +602,7 @@ jobs:
           mkdir -p release
 
           # Move all binaries to release directory
-          find artifacts -type f \( -name "${{ env.PROJECT_NAME }}-*" -o -name "*.AppImage" \) -exec mv {} release/ \;
+          find artifacts -type f \( -name "${{ env.PROJECT_NAME }}-*" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec mv {} release/ \;
 
           # Make all binaries executable
           chmod +x release/* || true
