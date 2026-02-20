@@ -11,7 +11,7 @@ categories = ["development-tools", "gui"]
 
 [dependencies]
 # GTK4 and Libadwaita for native GNOME experience
-gtk4 = "0.9"
+gtk4 = { version = "0.9", features = ["v4_10"] }
 libadwaita = "0.7"
 
 # Serialization for config parsing

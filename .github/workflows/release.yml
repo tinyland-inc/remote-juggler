@@ -392,7 +392,7 @@ jobs:
 
   build-tray-darwin:
     name: Tray (macOS ARM64)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
