@@ -683,6 +683,14 @@ def multi_identity_repos(tmp_path) -> Generator[Dict[str, Path], None, None]:
             capture_output=True,
         )
 
+        # Disable GPG signing in test repos
+        subprocess.run(
+            ["git", "config", "commit.gpgsign", "false"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+        )
+
         # Add remote
         subprocess.run(
             ["git", "remote", "add", "origin", f"git@{remote}"],
@@ -701,7 +709,7 @@ def multi_identity_repos(tmp_path) -> Generator[Dict[str, Path], None, None]:
             capture_output=True,
         )
         subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
+            ["git", "commit", "--no-gpg-sign", "-m", "Initial commit"],
             cwd=repo_path,
             check=True,
             capture_output=True,

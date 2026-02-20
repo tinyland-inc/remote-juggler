@@ -91,10 +91,7 @@ fn main() -> glib::ExitCode {
     let gtk_args: Vec<String> = args
         .iter()
         .filter(|a| {
-            !a.starts_with("--status")
-                && !a.starts_with("--switch")
-                && *a != "--help"
-                && *a != "-h"
+            !a.starts_with("--status") && !a.starts_with("--switch") && *a != "--help" && *a != "-h"
         })
         .cloned()
         .collect();

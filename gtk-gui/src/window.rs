@@ -484,14 +484,10 @@ mod imp {
                         status.set_text(&format!("Setting security mode to {}...", &mode_display));
 
                         glib::spawn_future_local(async move {
-                            let result =
-                                run_cli_async("security-mode", &mode_arg).await;
+                            let result = run_cli_async("security-mode", &mode_arg).await;
                             match result {
                                 Ok(_) => {
-                                    status.set_text(&format!(
-                                        "Security mode: {}",
-                                        &mode_display
-                                    ));
+                                    status.set_text(&format!("Security mode: {}", &mode_display));
                                     status.add_css_class("success");
                                     tracing::info!("Security mode changed to: {}", &mode_display);
                                 }
@@ -527,11 +523,15 @@ mod imp {
                         let result = run_cli_async("keys", "status").await;
                         match result {
                             Ok(output) => {
-                                if output.contains("Auto-Unlock:   ready") || output.contains("Auto-Unlock: ready") {
+                                if output.contains("Auto-Unlock:   ready")
+                                    || output.contains("Auto-Unlock: ready")
+                                {
                                     label.set_text("Unlocked");
                                     label.remove_css_class("dim-label");
                                     label.add_css_class("success");
-                                } else if output.contains("Exists:      yes") || output.contains("Exists: yes") {
+                                } else if output.contains("Exists:      yes")
+                                    || output.contains("Exists: yes")
+                                {
                                     label.set_text("Locked");
                                     label.remove_css_class("dim-label");
                                     label.add_css_class("warning");
@@ -624,7 +624,9 @@ mod imp {
                         label.set_visible(true);
 
                         glib::spawn_future_local(async move {
-                            let result = run_cli_args_async(vec!["keys".into(), "search".into(), query]).await;
+                            let result =
+                                run_cli_args_async(vec!["keys".into(), "search".into(), query])
+                                    .await;
                             match result {
                                 Ok(output) => {
                                     label.set_text(&output);
@@ -674,10 +676,18 @@ mod imp {
                                     st.remove_css_class("success");
 
                                     glib::spawn_future_local(async move {
-                                        let result = run_cli_args_async(vec!["keys".into(), "ingest".into(), path_str.clone()]).await;
+                                        let result = run_cli_args_async(vec![
+                                            "keys".into(),
+                                            "ingest".into(),
+                                            path_str.clone(),
+                                        ])
+                                        .await;
                                         match result {
                                             Ok(output) => {
-                                                st.set_text(&format!("Ingested: {}", output.lines().last().unwrap_or("done")));
+                                                st.set_text(&format!(
+                                                    "Ingested: {}",
+                                                    output.lines().last().unwrap_or("done")
+                                                ));
                                                 st.add_css_class("success");
                                             }
                                             Err(e) => {
@@ -717,7 +727,8 @@ mod imp {
                         }
                         let status = status_clone.clone();
                         glib::spawn_future_local(async move {
-                            let result = run_cli_args_async(vec!["keys".into(), "get".into(), path]).await;
+                            let result =
+                                run_cli_args_async(vec!["keys".into(), "get".into(), path]).await;
                             match result {
                                 Ok(value) => {
                                     let display = gdk::Display::default().unwrap();
@@ -778,9 +789,13 @@ mod imp {
                         let vc = value_clone.clone();
                         glib::spawn_future_local(async move {
                             let result = run_cli_args_async(vec![
-                                "keys".into(), "store".into(), path.clone(),
-                                "--value".into(), value,
-                            ]).await;
+                                "keys".into(),
+                                "store".into(),
+                                path.clone(),
+                                "--value".into(),
+                                value,
+                            ])
+                            .await;
                             match result {
                                 Ok(_) => {
                                     status.set_text(&format!("Stored: {}", path));
@@ -830,8 +845,11 @@ mod imp {
                         let ec = entry_clone.clone();
                         glib::spawn_future_local(async move {
                             let result = run_cli_args_async(vec![
-                                "keys".into(), "delete".into(), path.clone(),
-                            ]).await;
+                                "keys".into(),
+                                "delete".into(),
+                                path.clone(),
+                            ])
+                            .await;
                             match result {
                                 Ok(_) => {
                                     status.set_text(&format!("Deleted: {}", path));
@@ -875,8 +893,12 @@ mod imp {
 
                         glib::spawn_future_local(async move {
                             let result = run_cli_args_async(vec![
-                                "keys".into(), "discover".into(), "--types".into(), "all".into(),
-                            ]).await;
+                                "keys".into(),
+                                "discover".into(),
+                                "--types".into(),
+                                "all".into(),
+                            ])
+                            .await;
                             match result {
                                 Ok(output) => {
                                     status.set_text(&output.lines().last().unwrap_or("Done"));
@@ -967,9 +989,7 @@ mod imp {
     /// Run a remote-juggler CLI command asynchronously with arbitrary args
     async fn run_cli_args_async(args: Vec<String>) -> Result<String, String> {
         let result = gio::spawn_blocking(move || {
-            let output = Command::new("remote-juggler")
-                .args(&args)
-                .output();
+            let output = Command::new("remote-juggler").args(&args).output();
 
             match output {
                 Ok(output) => {

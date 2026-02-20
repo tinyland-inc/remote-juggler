@@ -169,15 +169,15 @@ jobs:
         run: |
           chmod +x remote_juggler
 
-          # Test help command
+          # Test help command (must succeed)
           echo "=== Testing --help ==="
-          ./remote_juggler --help || echo "Help test completed"
+          ./remote_juggler --help
 
-          # Test list command
+          # Test list command (may fail without config, exit 1 is OK)
           echo "=== Testing list ==="
-          ./remote_juggler list || echo "List test completed"
+          ./remote_juggler list || true
 
-          # Test MCP mode initialization
+          # Test MCP mode initialization (exits after processing input)
           echo "=== Testing MCP mode ==="
           echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | \
             timeout 5 ./remote_juggler --mode=mcp || true
@@ -439,6 +439,65 @@ jobs:
           security delete-keychain ci-keychain.keychain 2>/dev/null || true
 
   # ===========================================================================
+  # Tray App Build & Test
+  # ===========================================================================
+
+  tray-linux-build:
+    name: Tray (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: tray/linux/go.sum
+
+      - name: Build
+        run: |
+          cd tray/linux
+          go build -ldflags "-s -w" -o ../../remote-juggler-tray .
+
+      - name: Test
+        run: |
+          cd tray/linux
+          go test -v ./...
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-tray-linux-amd64
+          path: remote-juggler-tray
+          retention-days: 7
+
+  tray-darwin-build:
+    name: Tray (macOS)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          cd tray/darwin
+          swift build -c release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-juggler-tray-darwin-arm64
+          path: tray/darwin/.build/arm64-apple-macosx/release/RemoteJugglerTray
+          retention-days: 7
+    continue-on-error: true
+
+  # ===========================================================================
   # Summary Job
   # ===========================================================================
 
@@ -457,6 +516,8 @@ jobs:
       - hsm-unit-tests
       - hsm-integration-tests
       - hsm-macos-tests
+      - tray-linux-build
+      - tray-darwin-build
     if: always()
     steps:
       - name: Summary
@@ -472,6 +533,8 @@ jobs:
           echo "| GTK GUI Lint | ${{ needs.gtk-gui-lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GTK GUI Build | ${{ needs.gtk-gui-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GTK GUI Tests | ${{ needs.gtk-gui-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tray (Linux) | ${{ needs.tray-linux-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tray (macOS) | ${{ needs.tray-darwin-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| HSM Unit Tests (Linux) | ${{ needs.hsm-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| HSM Integration Tests (Linux) | ${{ needs.hsm-integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| HSM Tests (macOS) | ${{ needs.hsm-macos-tests.result }} |" >> $GITHUB_STEP_SUMMARY
