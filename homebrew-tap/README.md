@@ -64,5 +64,5 @@ gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
 
 ## License
 
-Formulas in this tap are MIT licensed.
+Formulas in this tap are zlib licensed.
 The software they install has its own license (see individual projects).

@@ -43,9 +43,15 @@ flowchart TB
 
     subgraph Storage["Local Storage"]
         KC[Darwin Keychain]
+        KDBX[KeePassXC Store]
         SSH[SSH Config]
         GIT[Git Config]
         CFG[Config JSON]
+    end
+
+    subgraph Hardware["Hardware Security"]
+        TPM[TPM / Secure Enclave]
+        YK[YubiKey]
     end
 
     CC -->|MCP Protocol| MCP
@@ -57,9 +63,12 @@ flowchart TB
     ACP --> Core
 
     Core --> KC
+    Core --> KDBX
     Core --> SSH
     Core --> GIT
     Core --> CFG
+    Core --> TPM
+    Core --> YK
 
     Core -->|glab/gh CLI| GL
     Core -->|gh CLI| GH
@@ -70,9 +79,10 @@ flowchart TB
 
 - **Multi-Provider Support**: GitLab (including self-hosted), GitHub, Bitbucket
 - **SSH Alias Management**: Automatic SSH config host alias handling
-- **Credential Security**: macOS Keychain integration for secure token storage
+- **Credential Security**: macOS Keychain integration, KeePassXC credential authority
+- **Hardware Security**: TPM/Secure Enclave + YubiKey support, trusted workstation mode
 - **GPG Signing**: Per-identity GPG key configuration
-- **Agent Protocols**: MCP server for Claude Code, ACP server for JetBrains
+- **Agent Protocols**: MCP server (32 tools) for Claude Code/Cursor/VS Code, ACP for JetBrains
 - **Zero Dependencies**: Single static binary, no runtime requirements
 
 ## Quick Start
@@ -123,19 +133,33 @@ RemoteJuggler exposes identity management through standardized protocols:
 
 ## Source Code
 
-The implementation consists of 14 Chapel modules in `src/remote_juggler/`:
+The implementation consists of 20 Chapel modules in `src/remote_juggler/`:
 
-| Module | Purpose | Lines |
-|--------|---------|-------|
-| `Core.chpl` | Type definitions, enums | ~150 |
-| `Config.chpl` | SSH/Git config parsing | ~200 |
-| `Identity.chpl` | Identity operations | ~300 |
-| `Keychain.chpl` | macOS Security.framework FFI | ~100 |
-| `MCP.chpl` | Model Context Protocol server | ~250 |
-| `Tools.chpl` | MCP tool definitions | ~200 |
+| Module | Purpose |
+|--------|---------|
+| `Core.chpl` | Type definitions, version, enums |
+| `Config.chpl` | Configuration management |
+| `GlobalConfig.chpl` | Schema versioning |
+| `State.chpl` | State persistence |
+| `Identity.chpl` | Identity switching |
+| `Remote.chpl` | Remote URL management |
+| `Keychain.chpl` | macOS Keychain integration |
+| `GPG.chpl` | GPG signing |
+| `ProviderCLI.chpl` | Provider CLI wrappers (glab/gh) |
+| `Protocol.chpl` | JSON-RPC protocol |
+| `MCP.chpl` | MCP server |
+| `ACP.chpl` | ACP server |
+| `Tools.chpl` | MCP/ACP tool definitions (32 tools) |
+| `HSM.chpl` | TPM/Secure Enclave integration |
+| `YubiKey.chpl` | YubiKey management |
+| `TrustedWorkstation.chpl` | Auto-unlock mode |
+| `GPGAgent.chpl` | GPG agent integration |
+| `TokenHealth.chpl` | Token expiry detection |
+| `Setup.chpl` | Interactive setup wizard |
+| `KeePassXC.chpl` | Credential authority |
 
 See [Architecture](architecture/index.md) for detailed module documentation.
 
 ## License
 
-MIT License. See [LICENSE](https://gitlab.com/tinyland/projects/remote-juggler/-/blob/main/LICENSE) for details.
+zlib License. See [LICENSE](https://gitlab.com/tinyland/projects/remote-juggler/-/blob/main/LICENSE) for details.

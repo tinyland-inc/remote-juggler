@@ -5,13 +5,18 @@ _remote_juggler() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="list detect switch to validate status config token gpg debug"
-    local config_commands="show add edit remove import sync"
-    local token_commands="set get clear verify"
+    local commands="list detect switch to validate status config token gpg debug keys pin yubikey trusted-workstation security-mode setup unseal-pin verify"
+    local config_commands="show add edit remove import sync init"
+    local token_commands="set get clear verify check-expiry renew"
     local gpg_commands="status configure verify"
-    local debug_commands="ssh-config git-config keychain"
-    local options="--help --version --mode --verbose --configPath --useKeychain --gpgSign --provider"
+    local debug_commands="ssh-config git-config keychain hsm"
+    local keys_commands="init status search resolve get store delete list ingest crawl discover export"
+    local pin_commands="store clear status"
+    local yubikey_commands="info set-pin-policy set-touch configure-trusted diagnostics"
+    local tws_commands="enable disable status verify"
+    local options="--help --version --mode --verbose --debug --configPath --useKeychain --gpgSign --provider"
     local providers="gitlab github bitbucket all"
+    local security_modes="standard trusted_workstation hardware_only"
 
     case "${prev}" in
         remote-juggler)
@@ -42,10 +47,38 @@ _remote_juggler() {
             COMPREPLY=( $(compgen -W "${debug_commands}" -- "${cur}") )
             return
             ;;
+        keys|kdbx)
+            COMPREPLY=( $(compgen -W "${keys_commands}" -- "${cur}") )
+            return
+            ;;
+        pin)
+            COMPREPLY=( $(compgen -W "${pin_commands}" -- "${cur}") )
+            return
+            ;;
+        yubikey|yk)
+            COMPREPLY=( $(compgen -W "${yubikey_commands}" -- "${cur}") )
+            return
+            ;;
+        trusted-workstation|tws)
+            COMPREPLY=( $(compgen -W "${tws_commands}" -- "${cur}") )
+            return
+            ;;
+        security-mode)
+            COMPREPLY=( $(compgen -W "${security_modes}" -- "${cur}") )
+            return
+            ;;
         switch|to|validate|edit|remove|set|get|clear|configure)
             # Complete with available identity names
             local identities=$(remote-juggler list 2>/dev/null | grep -E "^  - " | sed 's/^  - //')
             COMPREPLY=( $(compgen -W "${identities}" -- "${cur}") )
+            return
+            ;;
+        --field)
+            COMPREPLY=( $(compgen -W "title username url notes" -- "${cur}") )
+            return
+            ;;
+        --format)
+            COMPREPLY=( $(compgen -W "env json shell" -- "${cur}") )
             return
             ;;
     esac

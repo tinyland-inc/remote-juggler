@@ -6,7 +6,7 @@ class RemoteJuggler < Formula
   homepage "https://gitlab.com/tinyland/projects/remote-juggler"
   url "https://gitlab.com/tinyland/projects/remote-juggler/-/archive/v2.1.0-beta.1/remote-juggler-v2.1.0-beta.1.tar.gz"
   sha256 "" # Will be filled after first release
-  license "MIT"
+  license "Zlib"
   head "https://gitlab.com/tinyland/projects/remote-juggler.git", branch: "main"
 
   depends_on "chapel" => :build

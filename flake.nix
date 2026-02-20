@@ -263,7 +263,7 @@
           meta = with pkgs.lib; {
             description = "Backend-agnostic git identity management with MCP/ACP support";
             homepage = "https://gitlab.com/tinyland/projects/remote-juggler";
-            license = licenses.mit;
+            license = licenses.zlib;
             maintainers = [ ];
             platforms = platforms.unix;
           };
@@ -321,7 +321,7 @@
           meta = with pkgs.lib; {
             description = "HSM-backed pinentry for RemoteJuggler with TPM/SecureEnclave support";
             homepage = "https://gitlab.com/tinyland/projects/remote-juggler";
-            license = licenses.mit;
+            license = licenses.zlib;
             platforms = platforms.unix;
           };
         };
@@ -351,7 +351,7 @@
             meta = with pkgs.lib; {
               description = "GTK4/Libadwaita GUI for RemoteJuggler identity management";
               homepage = "https://gitlab.com/tinyland/projects/remote-juggler";
-              license = licenses.mit;
+              license = licenses.zlib;
               platforms = platforms.linux;
             };
           }

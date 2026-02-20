@@ -955,7 +955,7 @@ package:rpm:
         --maintainer "jess@tinyland.dev" \
         --url "https://gitlab.com/tinyland/projects/remote-juggler" \
         --description "Backend-agnostic git identity management with MCP/ACP support" \
-        --license "MIT" \
+        --license "Zlib" \
         --depends "git" \
         --after-install pkg-root/post-install.sh \
         --before-remove pkg-root/pre-remove.sh \
@@ -991,7 +991,7 @@ package:deb:
         --maintainer "jess@tinyland.dev" \
         --url "https://gitlab.com/tinyland/projects/remote-juggler" \
         --description "Backend-agnostic git identity management with MCP/ACP support" \
-        --license "MIT" \
+        --license "Zlib" \
         --depends "git" \
         --after-install pkg-root/post-install.sh \
         --before-remove pkg-root/pre-remove.sh \
@@ -1024,7 +1024,7 @@ package:pacman:
         --architecture x86_64 \
         --maintainer "jess@tinyland.dev" \
         --description "Backend-agnostic git identity management with MCP/ACP support" \
-        --license "MIT" \
+        --license "Zlib" \
         --depends "git" \
         -C pkg-root \
         usr/local/bin/remote-juggler

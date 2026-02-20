@@ -314,7 +314,7 @@ class RemoteJuggler < Formula
   homepage "https://gitlab.com/tinyland/projects/remote-juggler"
   url "https://gitlab.com/tinyland/projects/remote-juggler/-/archive/v2.1.0/remote-juggler-v2.1.0.tar.gz"
   sha256 "NEW_SHA256_HERE"
-  license "MIT"
+  license "Zlib"
 end
 ```
 

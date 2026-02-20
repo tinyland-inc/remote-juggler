@@ -214,4 +214,4 @@ Debug output goes to stderr and includes:
 
 ## License
 
-MIT License - See LICENSE file in the RemoteJuggler repository.
+zlib License - See LICENSE file in the RemoteJuggler repository.

@@ -5,7 +5,7 @@
  * Supports CLI mode (default), MCP server mode, and ACP server mode.
  *
  * Copyright (c) 2026 Jess Sullivan
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: Zlib
  */
 prototype module remote_juggler {
   // Standard library imports

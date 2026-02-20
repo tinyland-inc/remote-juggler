@@ -154,6 +154,136 @@ Show GPG agent status, card information, and signing readiness.
 .B \-\-identity =\fIIDENTITY\fR
 Check status for specific identity.
 .RE
+.SS Token Management
+.TP
+.B token set \fIIDENTITY\fR
+Store a token in the system keychain. Prompts for token input.
+.TP
+.B token get \fIIDENTITY\fR
+Retrieve a stored token (masked output).
+.TP
+.B token clear \fIIDENTITY\fR
+Remove a stored token.
+.TP
+.B token verify
+Verify credential availability for all identities.
+.TP
+.B token check\-expiry
+Check token expiration status and warn about approaching expiry.
+.TP
+.B token renew \fIIDENTITY\fR
+Initiate token renewal workflow for the specified identity.
+.SS KeePassXC Credential Authority
+.TP
+.B keys init
+Initialize the KeePassXC credential store at ~/.remotejuggler/keys.kdbx.
+.TP
+.B keys status
+Show credential store status (database path, lock state, entry count, HSM binding).
+.TP
+.B keys search \fIQUERY\fR
+Fuzzy search credentials using Levenshtein distance and word boundary matching.
+.RS
+.TP
+.B \-\-field =\fIFIELD\fR
+Search specific field: \fItitle\fR, \fIusername\fR, \fIurl\fR, \fInotes\fR.
+.TP
+.B \-\-group =\fIGROUP\fR
+Filter by KeePassXC group.
+.TP
+.B \-\-json
+Output as JSON.
+.RE
+.TP
+.B keys resolve \fIQUERY\fR
+Combined search + retrieve: find a credential and return its value.
+.TP
+.B keys get \fITITLE\fR
+Retrieve a specific credential by exact title.
+.TP
+.B keys store \fITITLE\fR
+Store a new credential. Prompts for the secret value.
+.RS
+.TP
+.B \-\-username =\fIUSER\fR
+Associate a username with the credential.
+.TP
+.B \-\-url =\fIURL\fR
+Associate a URL with the credential.
+.TP
+.B \-\-group =\fIGROUP\fR
+Place in a specific KeePassXC group.
+.RE
+.TP
+.B keys delete \fITITLE\fR
+Delete a credential from the store.
+.TP
+.B keys list
+List all stored credentials.
+.RS
+.TP
+.B \-\-group =\fIGROUP\fR
+Filter by group.
+.TP
+.B \-\-json
+Output as JSON.
+.RE
+.TP
+.B keys ingest
+Ingest credentials from environment variables matching common patterns.
+.TP
+.B keys crawl [\fIPATH\fR]
+Crawl .env files for credentials and sync to the store.
+.TP
+.B keys discover
+Auto-discover credentials from environment variables, SSH keys, .env files, and provider CLIs.
+.TP
+.B keys export
+Export credentials as environment variables.
+.RS
+.TP
+.B \-\-format =\fIFORMAT\fR
+Output format: \fIenv\fR (default), \fIjson\fR, \fIshell\fR.
+.RE
+.SS YubiKey Management
+.TP
+.B yubikey info
+Show YubiKey information and status.
+.TP
+.B yubikey set\-pin\-policy \fIPOLICY\fR
+Configure YubiKey PIN caching policy.
+.TP
+.B yubikey set\-touch \fIPOLICY\fR
+Configure touch requirement for YubiKey operations.
+.TP
+.B yubikey configure\-trusted
+Configure YubiKey for trusted workstation mode.
+.TP
+.B yubikey diagnostics
+Run YubiKey diagnostic checks.
+.SS Trusted Workstation
+.TP
+.B trusted\-workstation enable
+Enable trusted workstation mode with TPM/Secure Enclave binding.
+.TP
+.B trusted\-workstation disable
+Disable trusted workstation mode.
+.TP
+.B trusted\-workstation status
+Show trusted workstation mode status.
+.TP
+.B trusted\-workstation verify
+Verify trusted workstation configuration.
+.SS Other Commands
+.TP
+.B unseal\-pin
+Unseal the HSM PIN using hardware attestation (TPM/Secure Enclave).
+.TP
+.B verify
+Verify GPG keys are valid and registered with providers.
+.TP
+.B debug hsm
+Debug HSM/TPM/Secure Enclave connectivity and attestation state.
 .SS Server Modes
 .TP
 .B \-\-mode=mcp
@@ -230,7 +360,10 @@ remote-juggler pin store my-identity
 .PP
 The custom pinentry will retrieve the PIN automatically when GPG requests it.
 .SH MCP INTEGRATION
-RemoteJuggler provides MCP tools for AI agents:
+RemoteJuggler provides 32 MCP tools for AI agents across identity management,
+security, token management, credential authority, and debugging.
+.PP
+Key tools include:
 .PP
 .RS
 .nf
@@ -239,9 +372,12 @@ juggler_switch             - Switch identity context
 juggler_status             - Get current status
 juggler_detect_identity    - Detect identity for repo
 juggler_validate           - Validate connectivity
+juggler_keys_search        - Fuzzy search credentials
+juggler_keys_resolve       - Search + retrieve credentials
+juggler_keys_discover      - Auto-discover credentials
+juggler_keys_export        - Export as env vars
 juggler_gpg_status         - Check signing readiness
-juggler_store_token        - Store provider token
-juggler_sync_config        - Sync SSH/git config
+juggler_tws_status         - Trusted workstation status
 juggler_setup              - Run setup wizard
 .fi
 .RE
@@ -280,6 +416,9 @@ SSH host alias definitions (managed section).
 .TP
 .I ~/.gitconfig
 Git URL rewrites (managed section).
+.TP
+.I ~/.remotejuggler/keys.kdbx
+KeePassXC credential authority database (created by \fBkeys init\fR).
 .TP
 .I /usr/local/bin/pinentry-remotejuggler
 Custom pinentry for Trusted Workstation mode (optional).
@@ -348,11 +487,11 @@ remote-juggler --debug detect
 .BR gpg-agent (1),
 .BR pinentry (1)
 .PP
-Project homepage: https://remote-juggler.dev
+GitHub: https://github.com/Jesssullivan/RemoteJuggler
 .br
-GitLab: https://gitlab.com/tinyland/remote-juggler
+GitLab: https://gitlab.com/tinyland/projects/remote-juggler
 .SH BUGS
-Report bugs at: https://gitlab.com/tinyland/remote-juggler/-/issues
+Report bugs at: https://github.com/Jesssullivan/RemoteJuggler/issues
 .PP
 Security issues: security@tinyland.dev
 .SH AUTHORS
@@ -362,4 +501,4 @@ Contributors are listed in the CONTRIBUTORS file.
 .SH COPYRIGHT
 Copyright \(co 2024-2026 Tinyland.
 .PP
-Licensed under the MIT License. See LICENSE file for details.
+Licensed under the zlib License. See LICENSE file for details.

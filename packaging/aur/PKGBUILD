@@ -33,8 +33,10 @@ provides=('remote-juggler' 'pinentry-remotejuggler')
 conflicts=('remote-juggler-git' 'remote-juggler-bin')
 backup=('etc/remote-juggler/config.json.example')
 install=remote-juggler.install
+_vertag="${pkgver//_/-}"  # AUR pkgver uses underscores, git tags use hyphens
+
 source=(
-    "${pkgname}-${pkgver}.tar.gz::${url}/-/archive/v${pkgver}/${pkgname}-v${pkgver}.tar.gz"
+    "${pkgname}-${pkgver}.tar.gz::https://github.com/Jesssullivan/RemoteJuggler/archive/refs/tags/v${_vertag}.tar.gz"
 )
 sha256sums=('SKIP')  # Update with: updpkgsums
 
@@ -44,7 +46,7 @@ _build_tray=0       # Set to 1 to build tray app (requires go)
 _enable_tpm=1       # Set to 1 to enable TPM support
 
 prepare() {
-    cd "${pkgname}-v${pkgver}"
+    cd "RemoteJuggler-${_vertag}"
 
     # Ensure Chapel is available
     if ! command -v chpl &>/dev/null; then
@@ -54,7 +56,7 @@ prepare() {
 }
 
 build() {
-    cd "${pkgname}-v${pkgver}"
+    cd "RemoteJuggler-${_vertag}"
 
     # Build main CLI
     msg2 "Building RemoteJuggler CLI..."
@@ -87,7 +89,7 @@ build() {
 }
 
 check() {
-    cd "${pkgname}-v${pkgver}"
+    cd "RemoteJuggler-${_vertag}"
 
     # Run unit tests
     msg2 "Running unit tests..."
@@ -101,7 +103,7 @@ check() {
 }
 
 package() {
-    cd "${pkgname}-v${pkgver}"
+    cd "RemoteJuggler-${_vertag}"
 
     # Install main binary
     install -Dm755 "target/release/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"

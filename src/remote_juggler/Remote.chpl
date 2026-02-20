@@ -47,7 +47,7 @@
 
   :author: RemoteJuggler Team
   :version: 2.0.0
-  :license: MIT
+  :license: Zlib
 */
 prototype module Remote {
   use Subprocess;

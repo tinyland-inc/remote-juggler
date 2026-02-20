@@ -16,7 +16,7 @@
  *   remote-juggler setup --import-gpg # Import GPG keys only
  *
  * Copyright (c) 2026 Jess Sullivan <jess@sulliwood.org>
- * License: MIT
+ * License: Zlib
  */
 module Setup {
   use IO;
