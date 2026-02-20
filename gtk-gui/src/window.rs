@@ -34,7 +34,6 @@ mod imp {
     #[derive(Default)]
     pub struct RemoteJugglerWindow {
         config: RefCell<Option<Config>>,
-        content_box: RefCell<Option<gtk4::Box>>,
         scrolled: RefCell<Option<gtk4::ScrolledWindow>>,
     }
 
@@ -733,7 +732,7 @@ mod imp {
                                 Ok(value) => {
                                     let display = gdk::Display::default().unwrap();
                                     let clipboard = display.clipboard();
-                                    clipboard.set_text(&value.trim());
+                                    clipboard.set_text(value.trim());
                                     status.set_text("Copied to clipboard");
                                     status.set_visible(true);
                                     status.remove_css_class("error");
@@ -901,7 +900,7 @@ mod imp {
                             .await;
                             match result {
                                 Ok(output) => {
-                                    status.set_text(&output.lines().last().unwrap_or("Done"));
+                                    status.set_text(output.lines().last().unwrap_or("Done"));
                                     status.add_css_class("success");
                                 }
                                 Err(e) => {
