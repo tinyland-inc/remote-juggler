@@ -814,11 +814,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version
+      - name: Get version and registry
         id: version
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "OWNER=$OWNER" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -827,8 +829,8 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/${{ github.repository_owner }}/remote-juggler:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository_owner }}/remote-juggler:latest
+            ghcr.io/${{ steps.version.outputs.OWNER }}/remote-juggler:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ steps.version.outputs.OWNER }}/remote-juggler:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
     continue-on-error: true
