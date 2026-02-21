@@ -49,6 +49,8 @@ jobs:
         run: |
           mason build --release
           mv target/release/remote_juggler ${{ env.PROJECT_NAME }}-linux-${{ matrix.arch }}
+        env:
+          CHPL_TARGET_CPU: none
           chmod +x ${{ env.PROJECT_NAME }}-linux-${{ matrix.arch }}
 
       - name: Upload artifact
