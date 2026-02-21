@@ -15,7 +15,7 @@ const BINARY_PATH = join(__dirname, "remote-juggler-binary");
 
 if (!existsSync(BINARY_PATH)) {
   console.error("RemoteJuggler binary not found. Run: npm install @tummycrypt/remote-juggler");
-  console.error("Or install directly: curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash");
+  console.error("Or install directly: curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash");
   process.exit(1);
 }
 

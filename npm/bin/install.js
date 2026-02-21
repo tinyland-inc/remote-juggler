@@ -37,7 +37,7 @@ function getDownloadUrl() {
       console.error("  wsl --install && wsl npm install -g @tummycrypt/remote-juggler");
       console.error("");
       console.error("Or install in WSL directly:");
-      console.error("  wsl curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash");
+      console.error("  wsl curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash");
     } else {
       console.error(
         `Unsupported platform: ${key}. Supported: ${Object.keys(PLATFORM_MAP).join(", ")}`
@@ -45,7 +45,7 @@ function getDownloadUrl() {
     }
     process.exit(1);
   }
-  return `https://github.com/Jesssullivan/RemoteJuggler/releases/download/v${VERSION}/${asset}`;
+  return `https://github.com/tinyland-inc/remote-juggler/releases/download/v${VERSION}/${asset}`;
 }
 
 function download(url) {
@@ -114,7 +114,7 @@ async function main() {
     console.error(`Failed to download RemoteJuggler: ${err.message}`);
     console.error("");
     console.error("You can install manually:");
-    console.error("  curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash");
+    console.error("  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash");
     process.exit(1);
   }
 }

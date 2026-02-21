@@ -10,9 +10,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Jesssullivan/RemoteJuggler.git"
+    "url": "git+https://github.com/tinyland-inc/remote-juggler.git"
   },
-  "homepage": "https://github.com/Jesssullivan/RemoteJuggler",
+  "homepage": "https://github.com/tinyland-inc/remote-juggler",
   "keywords": [
     "mcp",
     "git",

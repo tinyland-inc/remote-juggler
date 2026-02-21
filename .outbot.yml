@@ -21,7 +21,7 @@ github:
 # Downstream repository configuration
 downstream:
   repositories:
-    - https://github.com/Jesssullivan/RemoteJuggler.git
+    - https://github.com/tinyland-inc/remote-juggler.git
   branch_mapping:
     main: sid/outbot  # Sync main → sid/outbot branch
 

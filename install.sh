@@ -4,7 +4,7 @@
 #
 # Usage:
 #   curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/Jesssullivan/remote-juggler/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sh
 #
 # Options:
 #   --help              Show this help message
@@ -14,14 +14,14 @@ set -eu
 
 # Configuration
 GITLAB_REPO="https://gitlab.com/tinyland/projects/remote-juggler"
-GITHUB_REPO="https://github.com/Jesssullivan/RemoteJuggler"
+GITHUB_REPO="https://github.com/tinyland-inc/remote-juggler"
 BINARY_NAME="remote-juggler"
 
 # Version: use env var, or detect latest from GitHub, or fallback
 if [ -n "${REMOTE_JUGGLER_VERSION:-}" ]; then
   VERSION="$REMOTE_JUGGLER_VERSION"
 elif command -v curl >/dev/null 2>&1; then
-  VERSION=$(curl -fsSL https://api.github.com/repos/Jesssullivan/RemoteJuggler/releases/latest 2>/dev/null \
+  VERSION=$(curl -fsSL https://api.github.com/repos/tinyland-inc/remote-juggler/releases/latest 2>/dev/null \
     | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//' || echo "")
   if [ -z "$VERSION" ]; then
     VERSION="2.1.0-beta.1"
