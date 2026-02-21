@@ -63,7 +63,7 @@ For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, buil
 
 ### Latest Release
 
-**v2.1.0-beta.6** (pre-release) | 2026-02-21 | [Release Notes](https://github.com/tinyland-inc/remote-juggler/releases/tag/v2.1.0-beta.6) | [All Releases](https://github.com/tinyland-inc/remote-juggler/releases)
+**v2.1.0-beta.7** (pre-release) | 2026-02-21 | [Release Notes](https://github.com/tinyland-inc/remote-juggler/releases/tag/v2.1.0-beta.7) | [All Releases](https://github.com/tinyland-inc/remote-juggler/releases)
 
 ### Binary Downloads
 
@@ -81,10 +81,10 @@ For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, buil
 | Debian/Ubuntu | -- |
 | RHEL/Fedora | -- |
 | AppImage | -- |
-| Docker | `ghcr.io/tinyland-inc/remote-juggler:v2.1.0-beta.6` |
+| Docker | `ghcr.io/tinyland-inc/remote-juggler:v2.1.0-beta.7` |
 | npm | `npx @tummycrypt/remote-juggler@beta` |
 | Homebrew | `brew install remote-juggler` |
-| Nix | `nix profile install github:tinyland-inc/remote-juggler/v2.1.0-beta.6` |
+| Nix | `nix profile install github:tinyland-inc/remote-juggler/v2.1.0-beta.7` |
 
 ### Platform Compatibility
 
