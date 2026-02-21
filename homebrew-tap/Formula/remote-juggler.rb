@@ -17,10 +17,10 @@ class RemoteJuggler < Formula
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-arm64"
-      sha256 "aa16768b161beb9a957b90c595a567bbba05cf2808b7d550f01cc65f08b83459" # Updated by release workflow
+      sha256 "664a2ebf10c8a32f822c6be9b3980190f636b3a1c2752167c7904eef1c80d486" # Updated by release workflow
     else
       url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-amd64"
-      sha256 "f4ae82cb5eddd582005cdc770f6c45f4a5a13cc71be54178d88a44eacf5bed24" # Updated by release workflow
+      sha256 "f47a7dc709b6e8855d573392aa1df234810b3c36b8b2040856eefd8b2dbb6d02" # Updated by release workflow
     end
   end
 
