@@ -41,7 +41,7 @@ prototype module ACP {
   // ACP protocol version (single integer per spec)
   param ACP_PROTOCOL_VERSION: int = 1;
   param ACP_SERVER_NAME = "RemoteJuggler";
-  param ACP_SERVER_VERSION = "2.1.0-beta.1";
+  param ACP_SERVER_VERSION = "2.1.0-beta.7";
 
   // ACP-specific error codes
   param ACP_ERROR_AUTH_REQUIRED = -32000;
