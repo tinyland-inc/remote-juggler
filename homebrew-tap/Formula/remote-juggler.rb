@@ -11,15 +11,15 @@
 class RemoteJuggler < Formula
   desc "Backend-agnostic git identity management with MCP/ACP agent protocol support"
   homepage "https://github.com/tinyland-inc/remote-juggler"
-  version "2.1.0-beta.6"
+  version "2.1.0-beta.7"
   license "Zlib"
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.6/remote-juggler-linux-arm64"
+      url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-arm64"
       sha256 "aa16768b161beb9a957b90c595a567bbba05cf2808b7d550f01cc65f08b83459" # Updated by release workflow
     else
-      url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.6/remote-juggler-linux-amd64"
+      url "https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-amd64"
       sha256 "f4ae82cb5eddd582005cdc770f6c45f4a5a13cc71be54178d88a44eacf5bed24" # Updated by release workflow
     end
   end

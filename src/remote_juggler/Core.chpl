@@ -96,7 +96,7 @@ prototype module Core {
   /*
     Full semantic version string.
   */
-  param VERSION = "2.1.0-beta.1";
+  param VERSION = "2.1.0-beta.7";
 
   /*
     Major version number (breaking changes).
