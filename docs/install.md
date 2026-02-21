@@ -7,7 +7,7 @@ Choose the installation method that matches your platform and workflow.
 One-liner for macOS and Linux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sh
 ```
 
 This installs the CLI binary, configures shell completions, and sets up MCP server entries for supported AI agent clients.
@@ -28,7 +28,7 @@ npx @tummycrypt/remote-juggler --mode=mcp
 ## Homebrew (macOS / Linux)
 
 ```bash
-brew tap tinyland/tools https://github.com/Jesssullivan/homebrew-tap.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 brew install remote-juggler
 ```
 
@@ -36,14 +36,14 @@ brew install remote-juggler
 
 ```bash
 # Try it without installing
-nix run github:Jesssullivan/RemoteJuggler -- --version
+nix run github:tinyland-inc/remote-juggler -- --version
 
 # Install to profile
-nix profile install github:Jesssullivan/RemoteJuggler
+nix profile install github:tinyland-inc/remote-juggler
 
 # Use in a flake
 # flake.nix inputs:
-#   inputs.remote-juggler.url = "github:Jesssullivan/RemoteJuggler";
+#   inputs.remote-juggler.url = "github:tinyland-inc/remote-juggler";
 ```
 
 ### Nix Home Manager
@@ -63,14 +63,14 @@ programs.remote-juggler = {
 ## Debian / Ubuntu
 
 ```bash
-curl -LO https://github.com/Jesssullivan/RemoteJuggler/releases/latest/download/remote-juggler_amd64.deb
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/latest/download/remote-juggler_amd64.deb
 sudo dpkg -i remote-juggler_amd64.deb
 ```
 
 ## RHEL / Rocky / Fedora
 
 ```bash
-curl -LO https://github.com/Jesssullivan/RemoteJuggler/releases/latest/download/remote-juggler_x86_64.rpm
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/latest/download/remote-juggler_x86_64.rpm
 sudo rpm -i remote-juggler_x86_64.rpm
 ```
 
@@ -91,7 +91,7 @@ flatpak install dev.tinyland.RemoteJuggler
 Requires [Chapel](https://chapel-lang.org/) 2.6+:
 
 ```bash
-git clone https://github.com/Jesssullivan/RemoteJuggler.git
+git clone https://github.com/tinyland-inc/remote-juggler.git
 cd RemoteJuggler
 just release
 # Binary at target/release/remote_juggler

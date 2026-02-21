@@ -36,7 +36,7 @@ install=remote-juggler.install
 _vertag="${pkgver//_/-}"  # AUR pkgver uses underscores, git tags use hyphens
 
 source=(
-    "${pkgname}-${pkgver}.tar.gz::https://github.com/Jesssullivan/RemoteJuggler/archive/refs/tags/v${_vertag}.tar.gz"
+    "${pkgname}-${pkgver}.tar.gz::https://github.com/tinyland-inc/remote-juggler/archive/refs/tags/v${_vertag}.tar.gz"
 )
 sha256sums=('SKIP')  # Update with: updpkgsums
 

@@ -552,7 +552,7 @@ jobs:
             npx -y @tummycrypt/remote-juggler --mode=mcp
 
             # Via install script (full install with shell integration)
-            curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
             ```
 
             Or download the appropriate binary for your platform below.
@@ -630,7 +630,7 @@ jobs:
       - name: Download and compute SHA256s
         id: sha
         run: |
-          BASE_URL="https://github.com/Jesssullivan/RemoteJuggler/releases/download/${{ steps.version.outputs.VERSION }}"
+          BASE_URL="https://github.com/tinyland-inc/remote-juggler/releases/download/${{ steps.version.outputs.VERSION }}"
 
           for PLATFORM in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
             URL="${BASE_URL}/${{ env.PROJECT_NAME }}-${PLATFORM}"

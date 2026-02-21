@@ -32,7 +32,7 @@ npx @tummycrypt/remote-juggler status
 For a permanent installation with shell completions and IDE integration:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Jesssullivan/RemoteJuggler/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 ```
 
 ## What It Does
@@ -68,6 +68,6 @@ When running as an MCP server, these tools are available to AI agents:
 
 ## Links
 
-- [GitHub Repository](https://github.com/Jesssullivan/RemoteJuggler)
-- [Full Documentation](https://github.com/Jesssullivan/RemoteJuggler/blob/main/README.md)
+- [GitHub Repository](https://github.com/tinyland-inc/remote-juggler)
+- [Full Documentation](https://github.com/tinyland-inc/remote-juggler/blob/main/README.md)
 - [MCP Registry](https://modelcontextprotocol.io)

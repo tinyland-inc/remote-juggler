@@ -14,7 +14,7 @@ priority: optional
 maintainer: "Jess Sullivan <jess@sulliwood.org>"
 description: "Backend-agnostic git identity management with MCP/ACP agent protocol support"
 vendor: "Tinyland"
-homepage: "https://github.com/Jesssullivan/RemoteJuggler"
+homepage: "https://github.com/tinyland-inc/remote-juggler"
 license: Zlib
 
 contents:
