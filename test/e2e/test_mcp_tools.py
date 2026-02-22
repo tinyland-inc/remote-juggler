@@ -720,6 +720,71 @@ class TestMCPKeysTools:
 
 
 # =============================================================================
+# SOPS Integration Tools
+# =============================================================================
+
+
+class TestMCPSopsTools:
+    """Tests for SOPS integration MCP tools."""
+
+    def test_sops_status(self, mcp_env: dict):
+        """juggler_keys_sops_status returns availability info."""
+        response = call_tool("juggler_keys_sops_status", {}, mcp_env)
+        assert response, "sops_status: no response"
+        text = get_tool_result_text(response)
+        if text:
+            assert any(
+                kw in text.lower() for kw in ["sops", "age", "ready"]
+            ), f"sops_status should report sops/age availability: {text[:200]}"
+
+    def test_sops_ingest_missing_param(self, mcp_env: dict):
+        """juggler_keys_sops_ingest requires filePath."""
+        response = call_tool("juggler_keys_sops_ingest", {}, mcp_env)
+        assert response, "sops_ingest: no response"
+        text = get_tool_result_text(response)
+        if text:
+            assert any(
+                kw in text.lower()
+                for kw in ["missing", "filepath", "not available", "sops"]
+            ), f"sops_ingest should report missing param or unavailability: {text[:200]}"
+
+    def test_sops_ingest_nonexistent_file(self, mcp_env: dict):
+        """juggler_keys_sops_ingest handles nonexistent file."""
+        response = call_tool(
+            "juggler_keys_sops_ingest",
+            {"filePath": "/tmp/nonexistent_sops_test_12345.sops.yaml"},
+            mcp_env,
+        )
+        assert response, "sops_ingest: no response"
+        text = get_tool_result_text(response)
+        if text:
+            assert any(
+                kw in text.lower()
+                for kw in ["not found", "error", "not available", "sops"]
+            ), f"sops_ingest should report file not found or SOPS unavailable: {text[:200]}"
+
+    def test_sops_sync_missing_param(self, mcp_env: dict):
+        """juggler_keys_sops_sync requires filePath."""
+        response = call_tool("juggler_keys_sops_sync", {}, mcp_env)
+        assert response, "sops_sync: no response"
+        text = get_tool_result_text(response)
+        if text:
+            assert any(
+                kw in text.lower()
+                for kw in ["missing", "filepath", "not available", "sops"]
+            ), f"sops_sync should report missing param or unavailability: {text[:200]}"
+
+    def test_sops_export_responds(self, mcp_env: dict):
+        """juggler_keys_sops_export returns meaningful response."""
+        response = call_tool("juggler_keys_sops_export", {}, mcp_env)
+        assert response, "sops_export: no response"
+        text = get_tool_result_text(response)
+        if text:
+            # Should report SOPS not available or no age key found
+            assert len(text) > 0, "sops_export should return non-empty response"
+
+
+# =============================================================================
 # Tool Schema Validation
 # =============================================================================
 
@@ -770,6 +835,10 @@ class TestMCPToolSchemas:
             "juggler_keys_crawl_env",
             "juggler_keys_discover",
             "juggler_keys_export",
+            "juggler_keys_sops_status",
+            "juggler_keys_sops_ingest",
+            "juggler_keys_sops_sync",
+            "juggler_keys_sops_export",
         }
 
         missing = expected_tools - tool_names

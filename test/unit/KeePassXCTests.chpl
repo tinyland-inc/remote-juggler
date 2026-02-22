@@ -378,6 +378,163 @@ prototype module KeePassXCTests {
       passed += 1;
     }
 
+    // Test 14: isSopsFile pattern matching
+    {
+      writeln("Test 14: isSopsFile matches SOPS-encrypted file patterns");
+      var allPass = true;
+
+      // Should match
+      if !isSopsFile("secrets.sops.yaml") { writeln("  FAIL: secrets.sops.yaml"); allPass = false; }
+      if !isSopsFile("config.sops.yml") { writeln("  FAIL: config.sops.yml"); allPass = false; }
+      if !isSopsFile("secrets.sops.json") { writeln("  FAIL: secrets.sops.json"); allPass = false; }
+      if !isSopsFile("prod.sops.env") { writeln("  FAIL: prod.sops.env"); allPass = false; }
+      if !isSopsFile("secrets.sops.ini") { writeln("  FAIL: secrets.sops.ini"); allPass = false; }
+      if !isSopsFile("config.sops.toml") { writeln("  FAIL: config.sops.toml"); allPass = false; }
+      if !isSopsFile("secrets.enc.yaml") { writeln("  FAIL: secrets.enc.yaml"); allPass = false; }
+      if !isSopsFile("secrets.enc.yml") { writeln("  FAIL: secrets.enc.yml"); allPass = false; }
+      if !isSopsFile("secrets.enc.json") { writeln("  FAIL: secrets.enc.json"); allPass = false; }
+      if !isSopsFile("secrets.encrypted.yaml") { writeln("  FAIL: secrets.encrypted.yaml"); allPass = false; }
+      if !isSopsFile("secrets.encrypted.yml") { writeln("  FAIL: secrets.encrypted.yml"); allPass = false; }
+
+      // Should NOT match
+      if isSopsFile(".sops.yaml") { writeln("  FAIL: .sops.yaml (config file) matched"); allPass = false; }
+      if isSopsFile(".sops.yml") { writeln("  FAIL: .sops.yml (config file) matched"); allPass = false; }
+      if isSopsFile("README.md") { writeln("  FAIL: README.md matched"); allPass = false; }
+      if isSopsFile("config.yaml") { writeln("  FAIL: config.yaml matched"); allPass = false; }
+      if isSopsFile(".env") { writeln("  FAIL: .env matched"); allPass = false; }
+      if isSopsFile("secrets.yaml") { writeln("  FAIL: secrets.yaml matched"); allPass = false; }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 15: isSopsAvailable returns bool without crashing
+    {
+      writeln("Test 15: isSopsAvailable returns bool without crashing");
+      const avail = isSopsAvailable();
+      writeln("  sops available: ", avail);
+      writeln("  PASS");
+      passed += 1;
+    }
+
+    // Test 16: isAgeAvailable returns bool without crashing
+    {
+      writeln("Test 16: isAgeAvailable returns bool without crashing");
+      const avail = isAgeAvailable();
+      writeln("  age available: ", avail);
+      writeln("  PASS");
+      passed += 1;
+    }
+
+    // Test 17: isSopsReady returns bool without crashing
+    {
+      writeln("Test 17: isSopsReady returns bool without crashing");
+      const ready = isSopsReady();
+      writeln("  SOPS ready: ", ready);
+      writeln("  PASS");
+      passed += 1;
+    }
+
+    // Test 18: flattenSopsJson parses flat JSON
+    {
+      writeln("Test 18: flattenSopsJson parses flat JSON");
+      var allPass = true;
+
+      const flat = flattenSopsJson('{"KEY1":"value1","KEY2":"value2"}');
+      if flat.size != 2 {
+        writeln("  FAIL: expected 2 pairs, got ", flat.size);
+        allPass = false;
+      } else {
+        const (k1, v1) = flat[0];
+        const (k2, v2) = flat[1];
+        if k1 != "KEY1" || v1 != "value1" {
+          writeln("  FAIL: first pair expected KEY1=value1, got ", k1, "=", v1);
+          allPass = false;
+        }
+        if k2 != "KEY2" || v2 != "value2" {
+          writeln("  FAIL: second pair expected KEY2=value2, got ", k2, "=", v2);
+          allPass = false;
+        }
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 19: flattenSopsJson handles nested JSON
+    {
+      writeln("Test 19: flattenSopsJson handles nested JSON");
+      var allPass = true;
+
+      const nested = flattenSopsJson('{"db":{"host":"localhost","port":"5432"},"api_key":"sk-test"}');
+      if nested.size != 3 {
+        writeln("  FAIL: expected 3 pairs, got ", nested.size);
+        allPass = false;
+      } else {
+        // Check that nested keys are dot-separated
+        var foundDbHost = false;
+        var foundDbPort = false;
+        var foundApiKey = false;
+        for (k, v) in nested {
+          if k == "db.host" && v == "localhost" then foundDbHost = true;
+          if k == "db.port" && v == "5432" then foundDbPort = true;
+          if k == "api_key" && v == "sk-test" then foundApiKey = true;
+        }
+        if !foundDbHost { writeln("  FAIL: missing db.host=localhost"); allPass = false; }
+        if !foundDbPort { writeln("  FAIL: missing db.port=5432"); allPass = false; }
+        if !foundApiKey { writeln("  FAIL: missing api_key=sk-test"); allPass = false; }
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    // Test 20: flattenSopsJson handles empty and edge cases
+    {
+      writeln("Test 20: flattenSopsJson handles edge cases");
+      var allPass = true;
+
+      // Empty object
+      const empty = flattenSopsJson("{}");
+      if empty.size != 0 {
+        writeln("  FAIL: empty object should return 0 pairs, got ", empty.size);
+        allPass = false;
+      }
+
+      // Non-object
+      const nonObj = flattenSopsJson("not json");
+      if nonObj.size != 0 {
+        writeln("  FAIL: non-object should return 0 pairs, got ", nonObj.size);
+        allPass = false;
+      }
+
+      // Escaped quotes in value
+      const escaped = flattenSopsJson('{"key":"value with \\"quotes\\""}');
+      if escaped.size != 1 {
+        writeln("  FAIL: escaped quotes should return 1 pair, got ", escaped.size);
+        allPass = false;
+      }
+
+      if allPass {
+        writeln("  PASS");
+        passed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
     printSummary("KeePassXCTests", passed, failed);
 
     if failed > 0 then halt("Tests failed");

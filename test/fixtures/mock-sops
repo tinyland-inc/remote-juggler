@@ -1,0 +1,37 @@
+#!/bin/sh
+# Mock sops for CI testing.
+# Set REMOTE_JUGGLER_SOPS_PATH to this script's path.
+
+case "$1" in
+  --version)
+    echo "sops 3.9.4 (latest)"
+    exit 0
+    ;;
+  -d)
+    # Decrypt mode
+    shift
+    OUTPUT_TYPE="json"
+    FILE=""
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --output-type)
+          OUTPUT_TYPE="$2"
+          shift 2
+          ;;
+        *)
+          FILE="$1"
+          shift
+          ;;
+      esac
+    done
+    # Return mock decrypted content as JSON
+    if [ "$OUTPUT_TYPE" = "json" ]; then
+      echo '{"DATABASE_URL":"postgres://localhost/mydb","API_KEY":"sk-test-12345","SECRET":"mock-secret-value"}'
+    fi
+    exit 0
+    ;;
+  *)
+    echo "Usage: sops [OPTIONS] COMMAND [ARGS]..." >&2
+    exit 1
+    ;;
+esac

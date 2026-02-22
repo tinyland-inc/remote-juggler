@@ -654,6 +654,68 @@ prototype module Tools {
       '}'
     ));
 
+    // Tool: juggler_keys_sops_status
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_sops_status",
+      description = "Check SOPS integration availability. Reports whether sops and age binaries are installed and any SOPS-encrypted entries in the key store.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{}' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_sops_ingest
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_sops_ingest",
+      description = "Ingest a SOPS-encrypted file into the KeePassXC key store. Decrypts with sops -d and stores each key-value pair under RemoteJuggler/SOPS/{file-path}/{key}. Requires sops and age binaries.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"filePath":{' +
+            '"type":"string",' +
+            '"description":"Path to the SOPS-encrypted file (e.g., secrets.sops.yaml)"' +
+          '}' +
+        '},' +
+        '"required":["filePath"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_sops_sync
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_sops_sync",
+      description = "Sync a SOPS-encrypted file with the key store. Detects additions, updates, and deletions compared to the stored KDBX entries. Returns change counts.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"filePath":{' +
+            '"type":"string",' +
+            '"description":"Path to the SOPS-encrypted file to sync"' +
+          '}' +
+        '},' +
+        '"required":["filePath"]' +
+      '}'
+    ));
+
+    // Tool: juggler_keys_sops_export
+    tools.pushBack(new ToolDefinition(
+      name = "juggler_keys_sops_export",
+      description = "Export age public key from the key store for SOPS recipients configuration. Returns the age public key suitable for .sops.yaml creation_rules.",
+      inputSchema = '{' +
+        '"type":"object",' +
+        '"properties":{' +
+          '"format":{' +
+            '"type":"string",' +
+            '"description":"Export format: sops-age (default) for .sops.yaml recipients",' +
+            '"default":"sops-age"' +
+          '},' +
+          '"group":{' +
+            '"type":"string",' +
+            '"description":"KDBX group containing age key (default: RemoteJuggler/SOPS)"' +
+          '}' +
+        '}' +
+      '}'
+    ));
+
     return tools;
   }
 
@@ -767,6 +829,18 @@ prototype module Tools {
       }
       when "juggler_keys_export" {
         return handleKeysExportTool(params);
+      }
+      when "juggler_keys_sops_status" {
+        return handleKeysSopsStatusTool(params);
+      }
+      when "juggler_keys_sops_ingest" {
+        return handleKeysSopsIngestTool(params);
+      }
+      when "juggler_keys_sops_sync" {
+        return handleKeysSopsSyncTool(params);
+      }
+      when "juggler_keys_sops_export" {
+        return handleKeysSopsExportTool(params);
       }
       otherwise {
         stderr.writeln("Tools: Unknown tool: ", name);
@@ -3613,6 +3687,175 @@ prototype module Tools {
       return (true, content);
     } else {
       return (false, "Failed to export entries from: " + group);
+    }
+  }
+
+  /*
+   * Handle juggler_keys_sops_status tool call.
+   */
+  proc handleKeysSopsStatusTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysSopsStatusTool");
+
+    var output = "SOPS Integration Status\n";
+    output += "=======================\n\n";
+    output += "sops: " + (if KeePassXC.isSopsAvailable() then "installed" else "not found") + "\n";
+    output += "age: " + (if KeePassXC.isAgeAvailable() then "installed" else "not found") + "\n";
+    output += "Ready: " + (if KeePassXC.isSopsReady() then "yes" else "no") + "\n";
+
+    // Count SOPS entries if accessible
+    if KeePassXC.isSopsReady() && KeePassXC.canAutoUnlock() && KeePassXC.databaseExists() {
+      const (ok, password) = KeePassXC.autoUnlock();
+      if ok {
+        const dbPath = KeePassXC.getDatabasePath();
+        const (listOk, entries) = KeePassXC.listEntries(dbPath, "RemoteJuggler/SOPS", password);
+        if listOk {
+          output += "SOPS Groups: " + entries.size:string + "\n";
+        }
+      }
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_sops_ingest tool call.
+   */
+  proc handleKeysSopsIngestTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysSopsIngestTool");
+
+    if !KeePassXC.isSopsReady() {
+      return (false, "SOPS integration not available. Install sops and age binaries.");
+    }
+
+    const (hasPath, filePath) = Protocol.extractJsonString(params, "filePath");
+    if !hasPath || filePath == "" {
+      return (false, "Missing required parameter: filePath");
+    }
+
+    const expandedPath = expandTilde(filePath);
+
+    // Check file exists
+    try {
+      if !exists(expandedPath) {
+        return (false, "File not found: " + expandedPath);
+      }
+    } catch {
+      return (false, "Cannot access file: " + expandedPath);
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated) = KeePassXC.ingestSopsFile(dbPath, expandedPath, password);
+
+    var output = "SOPS File Ingestion\n";
+    output += "===================\n\n";
+    output += "File: " + expandedPath + "\n";
+    output += "Added: " + added:string + " entries\n";
+    output += "Updated: " + updated:string + " entries\n";
+
+    if added == 0 && updated == 0 {
+      output += "\nNo new or changed entries found.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_sops_sync tool call.
+   */
+  proc handleKeysSopsSyncTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysSopsSyncTool");
+
+    if !KeePassXC.isSopsReady() {
+      return (false, "SOPS integration not available. Install sops and age binaries.");
+    }
+
+    const (hasPath, filePath) = Protocol.extractJsonString(params, "filePath");
+    if !hasPath || filePath == "" {
+      return (false, "Missing required parameter: filePath");
+    }
+
+    const expandedPath = expandTilde(filePath);
+
+    // Check file exists
+    try {
+      if !exists(expandedPath) {
+        return (false, "File not found: " + expandedPath);
+      }
+    } catch {
+      return (false, "Cannot access file: " + expandedPath);
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated, deleted) = KeePassXC.syncSopsFile(dbPath, expandedPath, password);
+
+    var output = "SOPS File Sync\n";
+    output += "==============\n\n";
+    output += "File: " + expandedPath + "\n";
+    output += "Added: " + added:string + " entries\n";
+    output += "Updated: " + updated:string + " entries\n";
+    output += "Deleted: " + deleted:string + " entries\n";
+
+    if added == 0 && updated == 0 && deleted == 0 {
+      output += "\nNo changes detected.\n";
+    }
+
+    return (true, output);
+  }
+
+  /*
+   * Handle juggler_keys_sops_export tool call.
+   */
+  proc handleKeysSopsExportTool(params: string): (bool, string) {
+    stderr.writeln("Tools: handleKeysSopsExportTool");
+
+    if !KeePassXC.isSopsReady() {
+      return (false, "SOPS integration not available. Install sops and age binaries.");
+    }
+
+    const (hasGroup, group) = Protocol.extractJsonString(params, "group");
+    const exportGroup = if hasGroup && group != "" then group else "RemoteJuggler/SOPS";
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      return (false, "Cannot auto-unlock key store. Ensure HSM and YubiKey are available.");
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      return (false, "Failed to unlock key store.");
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (exportOk, pubKey) = KeePassXC.exportSopsAgeKey(dbPath, password, exportGroup);
+
+    if exportOk {
+      var output = "SOPS Age Key Export\n";
+      output += "===================\n\n";
+      output += "Public Key (for .sops.yaml recipients):\n";
+      output += pubKey + "\n";
+      return (true, output);
+    } else {
+      return (false, pubKey);
     }
   }
 }

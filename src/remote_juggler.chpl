@@ -253,6 +253,9 @@ prototype module remote_juggler {
     writeln("    keys crawl [dirs] Crawl directories for .env files");
     writeln("    keys discover     Auto-discover credentials (env, ssh)");
     writeln("    keys export <grp> Export group as .env or JSON");
+    writeln("    keys sops-ingest <f>  Ingest a SOPS-encrypted file");
+    writeln("    keys sops-sync <f>    Sync SOPS file (add/update/delete)");
+    writeln("    keys sops-export      Export age key for SOPS recipients");
     writeln();
 
     writeln("  ", bold("Debug:"));
@@ -2647,9 +2650,12 @@ prototype module remote_juggler {
       when "crawl" do handleKeysCrawl(subArgs);
       when "discover" do handleKeysDiscover(subArgs);
       when "export", "dump-env" do handleKeysExport(subArgs);
+      when "sops-ingest" do handleKeysSopsIngest(subArgs);
+      when "sops-sync" do handleKeysSopsSync(subArgs);
+      when "sops-export" do handleKeysSopsExport(subArgs);
       otherwise {
         printError("Unknown keys subcommand: " + subcommand);
-        writeln("Available: init, status, search, resolve, get, store, delete, list, ingest, crawl, discover, export");
+        writeln("Available: init, status, search, resolve, get, store, delete, list, ingest, crawl, discover, export, sops-ingest, sops-sync, sops-export");
       }
     }
   }
@@ -3284,6 +3290,14 @@ prototype module remote_juggler {
       totalDiscovered += sshDiscovered;
     }
 
+    if discoverTypes == "sops" || discoverTypes == "all" {
+      if KeePassXC.isSopsReady() {
+        writeln("  SOPS:                  ", green("available"), " (discovered via crawl)");
+      } else {
+        writeln("  SOPS:                  ", dim("not available"), " (missing sops/age)");
+      }
+    }
+
     writeln();
     if totalDiscovered > 0 {
       printSuccess("Discovered " + totalDiscovered:string + " credential(s)");
@@ -3333,6 +3347,173 @@ prototype module remote_juggler {
       writeln(content);
     } else {
       printError("Failed to export entries from: " + group);
+    }
+  }
+
+  // Handle 'keys sops-ingest <file>' - Ingest a SOPS-encrypted file
+  proc handleKeysSopsIngest(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing file path");
+      writeln("Usage: remote-juggler keys sops-ingest <path-to-sops-file>");
+      return;
+    }
+
+    if !KeePassXC.isSopsReady() {
+      printError("SOPS integration not available");
+      writeln("Install both 'sops' and 'age' binaries to use SOPS integration.");
+      return;
+    }
+
+    const sopsFilePath = expandPath(args[0]);
+    printDebug("Ingesting SOPS file: " + sopsFilePath);
+
+    // Check file exists
+    try {
+      if !FileSystem.exists(sopsFilePath) {
+        printError("File not found: " + sopsFilePath);
+        return;
+      }
+    } catch {
+      printError("Cannot access file: " + sopsFilePath);
+      return;
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    writeln("Ingesting SOPS file: ", bold(sopsFilePath));
+    writeln();
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated) = KeePassXC.ingestSopsFile(dbPath, sopsFilePath, password);
+
+    if added > 0 || updated > 0 {
+      printSuccess("Ingested SOPS file");
+      if added > 0 {
+        writeln("  Added:   ", green(added:string), " entries");
+      }
+      if updated > 0 {
+        writeln("  Updated: ", cyan(updated:string), " entries");
+      }
+    } else {
+      writeln(dim("No new or changed entries found in "), sopsFilePath);
+    }
+  }
+
+  // Handle 'keys sops-sync <file>' - Sync a SOPS file bidirectionally
+  proc handleKeysSopsSync(args: list(string)) {
+    if args.size < 1 {
+      printError("Missing file path");
+      writeln("Usage: remote-juggler keys sops-sync <path-to-sops-file>");
+      return;
+    }
+
+    if !KeePassXC.isSopsReady() {
+      printError("SOPS integration not available");
+      writeln("Install both 'sops' and 'age' binaries to use SOPS integration.");
+      return;
+    }
+
+    const sopsFilePath = expandPath(args[0]);
+    printDebug("Syncing SOPS file: " + sopsFilePath);
+
+    // Check file exists
+    try {
+      if !FileSystem.exists(sopsFilePath) {
+        printError("File not found: " + sopsFilePath);
+        return;
+      }
+    } catch {
+      printError("Cannot access file: " + sopsFilePath);
+      return;
+    }
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    writeln("Syncing SOPS file: ", bold(sopsFilePath));
+    writeln();
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (added, updated, deleted) = KeePassXC.syncSopsFile(dbPath, sopsFilePath, password);
+
+    if added > 0 || updated > 0 || deleted > 0 {
+      printSuccess("Synced SOPS file");
+      if added > 0 {
+        writeln("  Added:   ", green(added:string), " entries");
+      }
+      if updated > 0 {
+        writeln("  Updated: ", cyan(updated:string), " entries");
+      }
+      if deleted > 0 {
+        writeln("  Deleted: ", yellow(deleted:string), " entries");
+      }
+    } else {
+      writeln(dim("No changes detected in "), sopsFilePath);
+    }
+  }
+
+  // Handle 'keys sops-export' - Export age key for SOPS recipients
+  proc handleKeysSopsExport(args: list(string)) {
+    if !KeePassXC.isSopsReady() {
+      printError("SOPS integration not available");
+      writeln("Install both 'sops' and 'age' binaries to use SOPS integration.");
+      return;
+    }
+
+    // Parse optional --group flag
+    var group = "RemoteJuggler/SOPS";
+    for i in 0..<args.size {
+      if args[i] == "--group" && i + 1 < args.size {
+        group = args[i + 1];
+        break;
+      }
+    }
+
+    printDebug("Exporting SOPS age key from group: " + group);
+
+    // Auto-unlock
+    if !KeePassXC.canAutoUnlock() {
+      printError("Cannot auto-unlock key store");
+      writeln("Ensure HSM and YubiKey are available.");
+      return;
+    }
+
+    const (ok, password) = KeePassXC.autoUnlock();
+    if !ok {
+      printError("Failed to unlock key store");
+      return;
+    }
+
+    const dbPath = KeePassXC.getDatabasePath();
+    const (exportOk, pubKey) = KeePassXC.exportSopsAgeKey(dbPath, password, group);
+
+    if exportOk {
+      writeln(bold("Age Public Key (for .sops.yaml recipients):"));
+      writeln();
+      writeln(pubKey);
+    } else {
+      printError(pubKey); // Error message is in pubKey on failure
     }
   }
 
