@@ -17,12 +17,12 @@ RemoteJuggler stores configuration in JSON format at `~/.config/remote-juggler/c
 
 ## Configuration Schema
 
-The configuration file structure (see `install.sh:173-191`):
+The configuration file structure:
 
 ```json
 {
-  "$schema": "https://tinyland.gitlab.io/projects/remote-juggler/schema/v2.json",
-  "version": "2.0.0",
+  "$schema": "https://tinyland-inc.github.io/remote-juggler/schema/v2.json",
+  "version": "2.1",
   "identities": {},
   "settings": {
     "defaultProvider": "gitlab",
@@ -52,7 +52,7 @@ Each identity is keyed by name and contains:
       "hostname": "gitlab.com",
       "user": "Work User",
       "email": "work@company.com",
-      "identityFile": "~/.ssh/id_ed25519_work",
+      "sshKeyPath": "~/.ssh/id_ed25519_work",
       "tokenEnvVar": "GITLAB_WORK_TOKEN",
       "gpg": {
         "keyId": "ABC123DEF456",
@@ -74,7 +74,7 @@ Each identity is keyed by name and contains:
 | `hostname` | string | Yes | Actual hostname (e.g., `gitlab.com`) |
 | `user` | string | Yes | Git user.name for commits |
 | `email` | string | Yes | Git user.email for commits |
-| `identityFile` | string | No | Path to SSH private key |
+| `sshKeyPath` | string | No | Path to SSH private key |
 | `tokenEnvVar` | string | No | Environment variable containing API token |
 | `gpg` | object | No | GPG signing configuration |
 
@@ -116,9 +116,12 @@ Override settings via environment variables:
 
 | Variable | Overrides |
 |----------|-----------|
-| `REMOTE_JUGGLER_CONFIG` | Configuration file path |
 | `NO_COLOR` | Disable colored output |
-| `REMOTE_JUGGLER_VERBOSE` | Enable verbose logging |
+| `REMOTE_JUGGLER_KDBX_PATH` | Override KeePassXC database path |
+| `REMOTE_JUGGLER_YKMAN_PATH` | Override ykman binary path |
+| `REMOTE_JUGGLER_SOPS_PATH` | Override sops binary path |
+| `REMOTE_JUGGLER_AGE_PATH` | Override age binary path |
+| `REMOTE_JUGGLER_AGE_KEYGEN_PATH` | Override age-keygen binary path |
 
 ## CLI Configuration Flags
 
@@ -177,7 +180,7 @@ Run `remote-juggler config sync` to update these blocks from your identity confi
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "2.1",
   "identities": {
     "work-gitlab": {
       "provider": "gitlab",

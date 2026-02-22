@@ -5,7 +5,7 @@
 ### From Homebrew Tap (Recommended)
 
 ```bash
-brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 brew install remote-juggler
 ```
 
@@ -18,7 +18,7 @@ brew install --build-from-source ./Formula/remote-juggler.rb
 ### From GitLab Release
 
 ```bash
-brew install https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/Formula/remote-juggler.rb
+brew install https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/Formula/remote-juggler.rb
 ```
 
 ## Post-Installation
@@ -115,7 +115,7 @@ git push
 
 Then users can install with:
 ```bash
-brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 brew install remote-juggler
 ```
 
@@ -126,7 +126,7 @@ For faster installation, create bottles:
 ```bash
 # Build bottle for current platform
 brew install --build-bottle ./Formula/remote-juggler.rb
-brew bottle --json --root-url=https://gitlab.com/tinyland/projects/remote-juggler/-/releases remote-juggler
+brew bottle --json --root-url=https://github.com/tinyland-inc/remote-juggler/releases/download remote-juggler
 
 # Upload .tar.gz to GitLab release
 # Update formula with bottle SHA256

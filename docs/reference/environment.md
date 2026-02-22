@@ -17,26 +17,6 @@ Environment variables for configuring RemoteJuggler.
 
 ## Configuration Variables
 
-### REMOTE_JUGGLER_CONFIG
-
-Override the configuration file path.
-
-```bash
-export REMOTE_JUGGLER_CONFIG="/path/to/custom/config.json"
-```
-
-Default: `~/.config/remote-juggler/config.json`
-
-### REMOTE_JUGGLER_VERBOSE
-
-Enable verbose debug output.
-
-```bash
-export REMOTE_JUGGLER_VERBOSE=1
-```
-
-Equivalent to `--verbose` flag.
-
 ### NO_COLOR
 
 Disable colored output (follows [no-color.org](https://no-color.org) standard).
@@ -44,6 +24,27 @@ Disable colored output (follows [no-color.org](https://no-color.org) standard).
 ```bash
 export NO_COLOR=1
 ```
+
+### CLI Configuration Flags
+
+These are Chapel `config const` flags set via the command line, not environment variables:
+
+```bash
+remote-juggler --configPath=/path/to/config.json list   # Override config path
+remote-juggler --verbose status                         # Enable debug output
+```
+
+## Binary Path Overrides
+
+Override paths to external tool binaries:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REMOTE_JUGGLER_KDBX_PATH` | `~/.remotejuggler/keys.kdbx` | KeePassXC database path |
+| `REMOTE_JUGGLER_YKMAN_PATH` | `ykman` | YubiKey Manager binary |
+| `REMOTE_JUGGLER_SOPS_PATH` | `sops` | Mozilla SOPS binary |
+| `REMOTE_JUGGLER_AGE_PATH` | `age` | age encryption binary |
+| `REMOTE_JUGGLER_AGE_KEYGEN_PATH` | `age-keygen` | age key generation binary |
 
 ## Token Variables
 
@@ -79,11 +80,12 @@ export GITLAB_WORK_TOKEN="glpat-xxxxxxxxxxxx"
 
 RemoteJuggler resolves credentials in this order:
 
-1. **macOS Keychain** (if `useKeychain: true`)
-2. **Identity-specific environment variable** (if `tokenEnvVar` configured)
-3. **Provider environment variable** (`GITLAB_TOKEN`, etc.)
-4. **CLI authentication** (glab/gh stored credentials)
-5. **SSH-only mode** (if `fallbackToSSH: true`)
+1. **KeePassXC Store** (if `~/.remotejuggler/keys.kdbx` exists and is unlockable)
+2. **macOS Keychain** (if `useKeychain: true` and on macOS)
+3. **Identity-specific environment variable** (if `tokenEnvVar` configured)
+4. **Provider environment variable** (`GITLAB_TOKEN`, etc.)
+5. **CLI authentication** (glab/gh stored credentials)
+6. **SSH-only mode** (if `fallbackToSSH: true`)
 
 ## Shell Configuration
 

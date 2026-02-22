@@ -563,6 +563,40 @@ remote-juggler keys dump-env  # alias
 
 ---
 
+### keys sops-ingest
+
+Decrypt a SOPS-encrypted file and ingest its key-value pairs into the KeePassXC credential store.
+
+```bash
+remote-juggler keys sops-ingest <file>
+```
+
+Requires `sops` and `age` binaries to be installed. Stores entries under `RemoteJuggler/SOPS/{canonical-path}/{KEY}`.
+
+---
+
+### keys sops-sync
+
+Bidirectional sync of a SOPS-encrypted file with the credential store. Detects additions, updates, and deletions.
+
+```bash
+remote-juggler keys sops-sync <file>
+```
+
+Returns counts of added, updated, and deleted entries.
+
+---
+
+### keys sops-export
+
+Export the age private key from the credential store and derive the corresponding public key.
+
+```bash
+remote-juggler keys sops-export [--group=<group>]
+```
+
+---
+
 ## PIN Management
 
 The `pin` command manages HSM PINs for hardware-backed credential unlock.
@@ -822,6 +856,19 @@ remote-juggler debug secure-enclave  # alias
 Reports hardware security module status, PCR values, and attestation state.
 
 **Implementation:** `src/remote_juggler.chpl`
+
+---
+
+## Command Aliases
+
+Several top-level commands have short aliases for convenience:
+
+| Command | Alias |
+|---------|-------|
+| `list` | `ls` |
+| `keys` | `kdbx` |
+| `yubikey` | `yk` |
+| `trusted-workstation` | `tws` |
 
 ---
 

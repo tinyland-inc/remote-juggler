@@ -21,7 +21,7 @@ RemoteJuggler provides multiple installation methods for different platforms and
 The install script handles platform detection and configuration:
 
 ```sh
-curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sh
 ```
 
 The script performs these operations:
@@ -40,7 +40,7 @@ The script is POSIX-compatible and works with any POSIX shell (`sh`, `bash`, `da
 Override the default version:
 
 ```sh
-REMOTE_JUGGLER_VERSION=2.0.1 curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | sh
+REMOTE_JUGGLER_VERSION=2.0.1 curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sh
 ```
 
 Or use the `--version` flag when running the script directly:
@@ -63,7 +63,7 @@ Install via the Tinyland Homebrew tap:
 
 ```bash
 # Add the tap
-brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 
 # Install
 brew install remote-juggler
@@ -204,7 +204,7 @@ Building requires Chapel 2.6.0 or later.
 
 ```bash
 # Clone repository
-git clone https://gitlab.com/tinyland/projects/remote-juggler.git
+git clone https://github.com/tinyland-inc/remote-juggler.git
 cd remote-juggler
 
 # Build with just

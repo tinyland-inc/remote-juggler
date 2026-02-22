@@ -121,7 +121,7 @@ record GPGConfig {
 **Constants:**
 
 ```chapel
-const VERSION = "2.0.0";
+param VERSION = "2.1.0-beta.7";
 ```
 
 ---

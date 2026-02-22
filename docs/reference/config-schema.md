@@ -19,16 +19,16 @@ Reference for the RemoteJuggler configuration file format.
 
 Default: `~/.config/remote-juggler/config.json`
 
-Override: `--configPath=<path>` or `REMOTE_JUGGLER_CONFIG` environment variable.
+Override: `--configPath=<path>` CLI flag.
 
 ## Schema Version
 
-Current schema version: `2.0.0`
+Current schema version: `2.1`
 
 ```json
 {
-  "$schema": "https://tinyland.gitlab.io/projects/remote-juggler/schema/v2.json",
-  "version": "2.0.0"
+  "$schema": "https://tinyland-inc.github.io/remote-juggler/schema/v2.json",
+  "version": "2.1"
 }
 ```
 
@@ -57,7 +57,7 @@ Map of identity name to identity configuration.
 | `hostname` | string | Yes | Actual hostname (e.g., `gitlab.com`) |
 | `user` | string | Yes | Git user.name for commits |
 | `email` | string | Yes | Git user.email for commits |
-| `identityFile` | string | No | Path to SSH private key |
+| `sshKeyPath` | string | No | Path to SSH private key |
 | `tokenEnvVar` | string | No | Environment variable containing API token |
 | `credentialSource` | string | No | One of: `keychain`, `environment`, `cli`, `none` |
 | `gpg` | object | No | GPG signing configuration |
@@ -82,7 +82,7 @@ Map of identity name to identity configuration.
       "hostname": "gitlab.com",
       "user": "Work User",
       "email": "work@company.com",
-      "identityFile": "~/.ssh/id_ed25519_work",
+      "sshKeyPath": "~/.ssh/id_ed25519_work",
       "tokenEnvVar": "GITLAB_WORK_TOKEN",
       "gpg": {
         "keyId": "ABC123DEF456",
@@ -149,8 +149,8 @@ Runtime state tracking.
 
 ```json
 {
-  "$schema": "https://tinyland.gitlab.io/projects/remote-juggler/schema/v2.json",
-  "version": "2.0.0",
+  "$schema": "https://tinyland-inc.github.io/remote-juggler/schema/v2.json",
+  "version": "2.1",
   "identities": {
     "gitlab-work": {
       "provider": "gitlab",
@@ -158,7 +158,7 @@ Runtime state tracking.
       "hostname": "gitlab.com",
       "user": "Work User",
       "email": "work@company.com",
-      "identityFile": "~/.ssh/id_ed25519_work",
+      "sshKeyPath": "~/.ssh/id_ed25519_work",
       "gpg": {
         "keyId": "ABC123DEF456",
         "signCommits": true,
@@ -172,7 +172,7 @@ Runtime state tracking.
       "hostname": "gitlab.com",
       "user": "Personal User",
       "email": "personal@email.com",
-      "identityFile": "~/.ssh/id_ed25519_personal"
+      "sshKeyPath": "~/.ssh/id_ed25519_personal"
     },
     "github-oss": {
       "provider": "github",
@@ -180,7 +180,7 @@ Runtime state tracking.
       "hostname": "github.com",
       "user": "GitHub User",
       "email": "github@email.com",
-      "identityFile": "~/.ssh/id_ed25519_github",
+      "sshKeyPath": "~/.ssh/id_ed25519_github",
       "gpg": {
         "keyId": "XYZ789ABC123",
         "signCommits": true,

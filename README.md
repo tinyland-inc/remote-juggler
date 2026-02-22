@@ -46,7 +46,7 @@ npx @tummycrypt/remote-juggler@latest --version
 Or via Homebrew:
 
 ```bash
-brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 brew install remote-juggler
 ```
 

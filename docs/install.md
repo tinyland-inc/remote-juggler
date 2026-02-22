@@ -1,6 +1,6 @@
 # Install RemoteJuggler
 
-Choose the installation method that matches your platform and workflow.
+Choose the installation method that matches your platform and workflow. For detailed instructions including build prerequisites, uninstall, and troubleshooting, see the [full installation guide](getting-started/installation.md).
 
 ## Quick Install (Recommended)
 
