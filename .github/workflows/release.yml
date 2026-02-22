@@ -586,7 +586,7 @@ jobs:
             - KeePassXC credential authority with TPM/YubiKey auto-unlock
             - Darwin Keychain integration for secure credential storage
             - GPG signing configuration per identity
-            - MCP server (32 tools) for Claude Code / VS Code / Cursor
+            - MCP server (36 tools) for Claude Code / VS Code / Cursor
             - ACP server for JetBrains IDE integration
             - YubiKey / FIDO2 hardware key management
             - Trusted workstation mode (TPM/Secure Enclave)

@@ -24,7 +24,7 @@ Written primarily in [Chapel](https://chapel-lang.org/) with a great deal of car
 - **GPG Signing**: Automatic GPG key configuration per identity
 - **YubiKey / FIDO2**: Hardware key support with PIN management and touch policies
 - **Trusted Workstation Mode**: TPM/Secure Enclave-based auto-unlock for headless environments
-- **MCP Server**: 32 tools for AI agent integration (Claude Code, Cursor, VS Code, Windsurf)
+- **MCP Server**: 36 tools for AI agent integration (Claude Code, Cursor, VS Code, Windsurf)
 - **ACP Server**: **JetBrains IDE integration**
 - **System Tray Apps**: Native macOS (SwiftUI) and Linux (Go) tray applications for da humans oWo
 - **GTK4 GUI**: Libadwaita desktop app for Linux
@@ -272,7 +272,7 @@ Options:
 
 ## MCP Server Integration
 
-RemoteJuggler implements an MCP (Model Context Protocol) server with 32 tools for AI agent integration:
+RemoteJuggler implements an MCP (Model Context Protocol) server with 36 tools for AI agent integration:
 
 ```bash
 remote-juggler --mode=mcp

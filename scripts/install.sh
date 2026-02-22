@@ -21,10 +21,9 @@
 set -euo pipefail
 
 # Configuration
-REPO_URL="https://gitlab.com/tinyland/remote-juggler"
-RELEASES_URL="${REPO_URL}/-/releases"
-PACKAGE_REGISTRY_URL="${REPO_URL}/-/package_files"
-GPG_KEY_URL="${REPO_URL}/-/raw/main/keys/release-signing.asc"
+REPO_URL="https://github.com/tinyland-inc/remote-juggler"
+RELEASES_URL="${REPO_URL}/releases"
+GPG_KEY_URL="${REPO_URL}/raw/main/keys/release-signing.asc"
 DEFAULT_PREFIX="${HOME}/.local"
 PROGRAM_NAME="remote-juggler"
 
@@ -131,7 +130,7 @@ check_dependencies() {
 # Get latest version from GitLab API
 get_latest_version() {
     local channel="${1:-stable}"
-    local api_url="https://gitlab.com/api/v4/projects/tinyland%2Fremote-juggler/releases"
+    local api_url="https://api.github.com/repos/tinyland-inc/remote-juggler/releases"
 
     # Fetch releases
     local releases
@@ -343,7 +342,7 @@ post_install() {
     echo "  3. List identities: ${PROGRAM_NAME} list"
     echo ""
     echo "Documentation: https://remote-juggler.dev/docs"
-    echo "Report issues: ${REPO_URL}/-/issues"
+    echo "Report issues: ${REPO_URL}/issues"
 }
 
 # Uninstall
@@ -448,8 +447,8 @@ main() {
 
     # Construct download URL
     local archive_name="${PROGRAM_NAME}-${version}-${platform}.tar.gz"
-    local archive_url="${REPO_URL}/-/releases/v${version}/downloads/${archive_name}"
-    local checksums_url="${REPO_URL}/-/releases/v${version}/downloads/SHA256SUMS.txt"
+    local archive_url="${REPO_URL}/releases/download/v${version}/${archive_name}"
+    local checksums_url="${REPO_URL}/releases/download/v${version}/SHA256SUMS.txt"
 
     # Create temp directory
     local tmpdir

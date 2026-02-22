@@ -108,7 +108,7 @@ modules:
       - make -C pinentry install PREFIX=/app
     sources:
       - type: git
-        url: https://gitlab.com/tinyland/remote-juggler.git
+        url: https://github.com/tinyland-inc/remote-juggler.git
         tag: v2.1.0-beta.1
         # Or use local directory for development:
         # type: dir
@@ -126,7 +126,7 @@ modules:
       - install -Dm755 gtk-gui/target/release/remote-juggler-gui /app/bin/
     sources:
       - type: git
-        url: https://gitlab.com/tinyland/remote-juggler.git
+        url: https://github.com/tinyland-inc/remote-juggler.git
         tag: v2.1.0-beta.1
     modules:
       # GTK4 and Libadwaita are in the runtime
@@ -142,7 +142,7 @@ modules:
       - cd tray/linux && go build -o /app/bin/remote-juggler-tray .
     sources:
       - type: git
-        url: https://gitlab.com/tinyland/remote-juggler.git
+        url: https://github.com/tinyland-inc/remote-juggler.git
         tag: v2.1.0-beta.1
 
   # Desktop integration
@@ -157,5 +157,5 @@ modules:
       - install -Dm644 packaging/flatpak/dev.tinyland.RemoteJuggler.metainfo.xml /app/share/metainfo/dev.tinyland.RemoteJuggler.metainfo.xml
     sources:
       - type: git
-        url: https://gitlab.com/tinyland/remote-juggler.git
+        url: https://github.com/tinyland-inc/remote-juggler.git
         tag: v2.1.0-beta.1

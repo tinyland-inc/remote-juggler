@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configuration
-REPO_URL="https://gitlab.com/tinyland/remote-juggler"
+REPO_URL="https://github.com/tinyland-inc/remote-juggler"
 
 # Output format templates
 declare -A SECTION_HEADERS=(
