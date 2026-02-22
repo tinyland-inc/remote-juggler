@@ -46,7 +46,7 @@ npx @tummycrypt/remote-juggler@latest --version
 Or via Homebrew:
 
 ```bash
-brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 brew install remote-juggler
 ```
 
@@ -442,7 +442,6 @@ remote-juggler/
 │       ├── HSM.chpl             # TPM/Secure Enclave
 │       ├── YubiKey.chpl         # YubiKey management
 │       ├── TrustedWorkstation.chpl # Auto-unlock mode
-│       ├── GPGAgent.chpl        # GPG agent integration
 │       ├── TokenHealth.chpl     # Token expiry detection
 │       ├── Setup.chpl           # Interactive setup wizard
 │       └── KeePassXC.chpl       # Credential authority

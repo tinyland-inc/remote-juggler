@@ -1,6 +1,6 @@
 ---
 title: "MCP Server Integration"
-description: "How to use RemoteJuggler as an MCP server for Claude Code and other AI coding assistants. Includes protocol details, all 32 tool definitions, and configuration."
+description: "How to use RemoteJuggler as an MCP server for Claude Code and other AI coding assistants. Includes protocol details, all 36 tool definitions, and configuration."
 category: "api"
 llm_priority: 2
 keywords:
@@ -779,7 +779,7 @@ Response:
     },
     "serverInfo": {
       "name": "remote-juggler",
-      "version": "2.1.0-beta.1"
+      "version": "2.1.0-beta.7"
     }
   }
 }

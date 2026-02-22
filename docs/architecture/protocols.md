@@ -92,7 +92,7 @@ RemoteJuggler implements MCP version `2025-11-25`.
     },
     "serverInfo": {
       "name": "remote-juggler",
-      "version": "2.0.0"
+      "version": "2.1.0-beta.7"
     }
   }
 }
@@ -215,7 +215,7 @@ ACP is used by JetBrains IDEs.
   "result": {
     "serverInfo": {
       "name": "RemoteJuggler",
-      "version": "2.0.0",
+      "version": "2.1.0-beta.7",
       "description": "Git identity management"
     },
     "tools": [...]

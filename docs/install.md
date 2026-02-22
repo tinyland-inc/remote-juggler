@@ -1,16 +1,19 @@
 # Install RemoteJuggler
 
-Choose the installation method that matches your platform and workflow.
+Choose the installation method that matches your platform and workflow. For detailed instructions including build prerequisites, uninstall, and troubleshooting, see the [full installation guide](getting-started/installation.md).
 
 ## Quick Install (Recommended)
 
-One-liner for macOS and Linux:
+One-liner for Linux (amd64/arm64):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 ```
 
-This installs the CLI binary, configures shell completions, and sets up MCP server entries for supported AI agent clients.
+This downloads the pre-built binary, verifies checksums, and installs to `~/.local/bin`.
+
+!!! note "macOS"
+    Native macOS binaries are not yet available. Use npm/npx or build from source.
 
 ## npm / npx
 
@@ -18,21 +21,14 @@ Works on any platform with Node.js 18+:
 
 ```bash
 # Install globally
-npm install -g @tummycrypt/remote-juggler
+npm install -g @tummycrypt/remote-juggler@beta
 
 # Or run directly without installing
-npx @tummycrypt/remote-juggler --version
-npx @tummycrypt/remote-juggler --mode=mcp
+npx @tummycrypt/remote-juggler@beta --version
+npx @tummycrypt/remote-juggler@beta --mode=mcp
 ```
 
-## Homebrew (macOS / Linux)
-
-```bash
-brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
-brew install remote-juggler
-```
-
-## Nix
+## Nix (Linux)
 
 ```bash
 # Try it without installing
@@ -63,36 +59,25 @@ programs.remote-juggler = {
 ## Debian / Ubuntu
 
 ```bash
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/latest/download/remote-juggler_amd64.deb
-sudo dpkg -i remote-juggler_amd64.deb
+# Download the specific release (no /latest — use the version tag)
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler_2.1.0.beta.7_amd64.deb
+sudo dpkg -i remote-juggler_2.1.0.beta.7_amd64.deb
 ```
 
 ## RHEL / Rocky / Fedora
 
 ```bash
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/latest/download/remote-juggler_x86_64.rpm
-sudo rpm -i remote-juggler_x86_64.rpm
-```
-
-## AUR (Arch Linux)
-
-```bash
-yay -S remote-juggler
-```
-
-## Flatpak
-
-```bash
-flatpak install dev.tinyland.RemoteJuggler
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-2.1.0.beta.7-1.x86_64.rpm
+sudo rpm -i remote-juggler-2.1.0.beta.7-1.x86_64.rpm
 ```
 
 ## From Source
 
-Requires [Chapel](https://chapel-lang.org/) 2.6+:
+Requires [Chapel](https://chapel-lang.org/) 2.7+:
 
 ```bash
 git clone https://github.com/tinyland-inc/remote-juggler.git
-cd RemoteJuggler
+cd remote-juggler
 just release
 # Binary at target/release/remote_juggler
 ```
@@ -185,7 +170,7 @@ For environments without a persistent installation:
   "mcpServers": {
     "remote-juggler": {
       "command": "npx",
-      "args": ["-y", "@tummycrypt/remote-juggler", "--mode=mcp"]
+      "args": ["-y", "@tummycrypt/remote-juggler@beta", "--mode=mcp"]
     }
   }
 }

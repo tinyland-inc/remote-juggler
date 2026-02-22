@@ -89,7 +89,7 @@ flowchart TB
 
 ```bash
 # Install via script
-curl -sSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 
 # Import existing SSH config
 remote-juggler config import
@@ -153,7 +153,6 @@ The implementation consists of 20 Chapel modules in `src/remote_juggler/`:
 | `HSM.chpl` | TPM/Secure Enclave integration |
 | `YubiKey.chpl` | YubiKey management |
 | `TrustedWorkstation.chpl` | Auto-unlock mode |
-| `GPGAgent.chpl` | GPG agent integration |
 | `TokenHealth.chpl` | Token expiry detection |
 | `Setup.chpl` | Interactive setup wizard |
 | `KeePassXC.chpl` | Credential authority |
@@ -162,4 +161,4 @@ See [Architecture](architecture/index.md) for detailed module documentation.
 
 ## License
 
-zlib License. See [LICENSE](https://gitlab.com/tinyland/projects/remote-juggler/-/blob/main/LICENSE) for details.
+zlib License. See [LICENSE](https://github.com/tinyland-inc/remote-juggler/blob/main/LICENSE) for details.

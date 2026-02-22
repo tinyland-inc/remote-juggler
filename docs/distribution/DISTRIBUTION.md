@@ -110,8 +110,8 @@ SHA256SUMS.txt.asc
 **Verification workflow for users:**
 ```bash
 # Download checksum file and signature from GitLab releases
-curl -LO https://gitlab.com/tinyland/projects/remote-juggler/-/releases/.../SHA256SUMS.txt
-curl -LO https://gitlab.com/tinyland/projects/remote-juggler/-/releases/.../SHA256SUMS.txt.asc
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/.../SHA256SUMS.txt
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/.../SHA256SUMS.txt.asc
 
 # Verify GPG signature
 gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
@@ -126,8 +126,8 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 # Formula: remote-juggler.rb
 class RemoteJuggler < Formula
   desc "Backend-agnostic git identity management with MCP support"
-  homepage "https://gitlab.com/tinyland/projects/remote-juggler"
-  url "https://gitlab.com/tinyland/projects/remote-juggler/-/archive/v2.0.0/remote-juggler-v2.0.0.tar.gz"
+  homepage "https://github.com/tinyland-inc/remote-juggler"
+  url "https://github.com/tinyland-inc/remote-juggler/archive/refs/tags/v2.0.0.tar.gz"
   sha256 "..."
   license "Zlib"
 
@@ -302,7 +302,7 @@ detect_platform() {
 # Download and verify
 download_and_verify() {
     local platform="$1"
-    local url="https://gitlab.com/tinyland/projects/remote-juggler/-/releases/v${VERSION}/downloads"
+    local url="https://github.com/tinyland-inc/remote-juggler/releases/download/v${VERSION}"
     local binary="remote-juggler-${VERSION}-${platform}.tar.gz"
 
     echo "Downloading ${binary}..."
@@ -372,7 +372,7 @@ main "$@"
 
 **Usage:**
 ```bash
-curl -fsSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 ```
 
 ---

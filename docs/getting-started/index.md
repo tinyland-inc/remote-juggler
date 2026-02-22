@@ -21,7 +21,7 @@ RemoteJuggler provides a unified interface for managing multiple git identities 
 ## Quick Install
 
 ```bash
-curl -sSL https://gitlab.com/tinyland/projects/remote-juggler/-/raw/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 ```
 
 This script handles platform detection, binary download, and initial configuration. See [Installation](installation.md) for detailed options.
