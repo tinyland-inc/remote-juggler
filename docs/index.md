@@ -82,7 +82,7 @@ flowchart TB
 - **Credential Security**: macOS Keychain integration, KeePassXC credential authority
 - **Hardware Security**: TPM/Secure Enclave + YubiKey support, trusted workstation mode
 - **GPG Signing**: Per-identity GPG key configuration
-- **Agent Protocols**: MCP server (32 tools) for Claude Code/Cursor/VS Code, ACP for JetBrains
+- **Agent Protocols**: MCP server (36 tools) for Claude Code/Cursor/VS Code, ACP for JetBrains
 - **Zero Dependencies**: Single static binary, no runtime requirements
 
 ## Quick Start
@@ -149,7 +149,7 @@ The implementation consists of 20 Chapel modules in `src/remote_juggler/`:
 | `Protocol.chpl` | JSON-RPC protocol |
 | `MCP.chpl` | MCP server |
 | `ACP.chpl` | ACP server |
-| `Tools.chpl` | MCP/ACP tool definitions (32 tools) |
+| `Tools.chpl` | MCP/ACP tool definitions (36 tools) |
 | `HSM.chpl` | TPM/Secure Enclave integration |
 | `YubiKey.chpl` | YubiKey management |
 | `TrustedWorkstation.chpl` | Auto-unlock mode |

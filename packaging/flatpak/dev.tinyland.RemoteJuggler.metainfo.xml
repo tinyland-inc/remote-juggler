@@ -28,9 +28,9 @@
   <launchable type="desktop-id">dev.tinyland.RemoteJuggler.desktop</launchable>
 
   <url type="homepage">https://remote-juggler.dev</url>
-  <url type="bugtracker">https://gitlab.com/tinyland/remote-juggler/-/issues</url>
+  <url type="bugtracker">https://github.com/tinyland-inc/remote-juggler/issues</url>
   <url type="help">https://remote-juggler.dev/docs</url>
-  <url type="vcs-browser">https://gitlab.com/tinyland/remote-juggler</url>
+  <url type="vcs-browser">https://github.com/tinyland-inc/remote-juggler</url>
 
   <developer_name>Tinyland</developer_name>
 
@@ -80,7 +80,7 @@
       <description>
         <p>First public pre-release with comprehensive distribution:</p>
         <ul>
-          <li>32 MCP tools for AI agent integration</li>
+          <li>36 MCP tools for AI agent integration</li>
           <li>KeePassXC credential authority with auto-discovery</li>
           <li>Nix flake with Home Manager module</li>
           <li>.deb and .rpm packages</li>

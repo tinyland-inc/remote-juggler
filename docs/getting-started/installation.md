@@ -103,7 +103,7 @@ makepkg -si
 
 ```bash
 # Download .deb package from releases
-curl -LO https://gitlab.com/tinyland/remote-juggler/-/releases/download/vX.Y.Z/remote-juggler_X.Y.Z_amd64.deb
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/vX.Y.Z/remote-juggler_X.Y.Z_amd64.deb
 
 # Install
 sudo dpkg -i remote-juggler_X.Y.Z_amd64.deb
@@ -114,7 +114,7 @@ sudo apt-get install -f  # Fix dependencies if needed
 
 ```bash
 # Download .rpm package from releases
-curl -LO https://gitlab.com/tinyland/remote-juggler/-/releases/download/vX.Y.Z/remote-juggler-X.Y.Z-1.x86_64.rpm
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/vX.Y.Z/remote-juggler-X.Y.Z-1.x86_64.rpm
 
 # Install
 sudo dnf install remote-juggler-X.Y.Z-1.x86_64.rpm
@@ -124,14 +124,14 @@ sudo dnf install remote-juggler-X.Y.Z-1.x86_64.rpm
 
 ```bash
 # Ephemeral (try it out)
-nix run gitlab:tinyland/remote-juggler
+nix run github:tinyland-inc/remote-juggler
 
 # Install to profile
-nix profile install gitlab:tinyland/remote-juggler
+nix profile install github:tinyland-inc/remote-juggler
 
 # In flake.nix
 {
-  inputs.remote-juggler.url = "gitlab:tinyland/remote-juggler";
+  inputs.remote-juggler.url = "github:tinyland-inc/remote-juggler";
   # ...
   environment.systemPackages = [ inputs.remote-juggler.packages.${system}.default ];
 }
@@ -152,7 +152,7 @@ flatpak run dev.tinyland.RemoteJuggler
 
 ## Binary Download
 
-Download pre-built binaries from the [Releases page](https://gitlab.com/tinyland/remote-juggler/-/releases):
+Download pre-built binaries from the [Releases page](https://github.com/tinyland-inc/remote-juggler/releases):
 
 | Platform | Architecture | Download |
 |----------|--------------|----------|
@@ -163,7 +163,7 @@ Download pre-built binaries from the [Releases page](https://gitlab.com/tinyland
 
 ```bash
 # Example: Download and install
-curl -LO https://gitlab.com/tinyland/remote-juggler/-/releases/download/vX.Y.Z/remote-juggler-X.Y.Z-linux-amd64.tar.gz
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/vX.Y.Z/remote-juggler-X.Y.Z-linux-amd64.tar.gz
 tar -xzf remote-juggler-X.Y.Z-linux-amd64.tar.gz
 mv remote-juggler ~/.local/bin/
 chmod +x ~/.local/bin/remote-juggler

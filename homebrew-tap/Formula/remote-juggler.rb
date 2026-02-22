@@ -5,7 +5,7 @@
 # Git identity management tool with MCP/ACP agent protocol support
 #
 # Installation:
-#   brew tap tinyland/tools https://gitlab.com/tinyland/homebrew-tools.git
+#   brew tap tinyland/tools https://github.com/tinyland-inc/homebrew-tap.git
 #   brew install remote-juggler
 #
 class RemoteJuggler < Formula
@@ -52,7 +52,7 @@ class RemoteJuggler < Formula
         ~/.config/remote-juggler/config.json
 
       Documentation:
-        https://transscendsurvival.org/RemoteJuggler/
+        https://tinyland-inc.github.io/remote-juggler/
 
       macOS users: This formula currently provides Linux binaries only.
       For macOS, install via:

@@ -18,7 +18,7 @@ RemoteJuggler implements a Model Context Protocol (MCP) server for integration w
 
 ## Overview
 
-MCP is a JSON-RPC 2.0 based protocol that enables AI assistants to interact with external tools. RemoteJuggler's MCP server exposes 32 tools covering identity management, credential authority, security, and debugging.
+MCP is a JSON-RPC 2.0 based protocol that enables AI assistants to interact with external tools. RemoteJuggler's MCP server exposes 36 tools covering identity management, credential authority, security, and debugging.
 
 **Implementation:** `src/remote_juggler/MCP.chpl`
 

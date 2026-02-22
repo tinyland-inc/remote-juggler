@@ -101,7 +101,7 @@ just release
 
 ## AI Agent Setup
 
-RemoteJuggler includes a built-in MCP (Model Context Protocol) server with 32 tools for AI-assisted git identity management.
+RemoteJuggler includes a built-in MCP (Model Context Protocol) server with 36 tools for AI-assisted git identity management.
 
 ### Claude Code
 

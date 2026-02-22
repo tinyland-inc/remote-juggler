@@ -2,7 +2,7 @@
 # Contributor: Tinyland <packages@tinyland.dev>
 #
 # RemoteJuggler - Git identity management for multi-account workflows
-# https://gitlab.com/tinyland/remote-juggler
+# https://github.com/tinyland-inc/remote-juggler
 #
 # To build and install:
 #   makepkg -si
@@ -11,11 +11,11 @@
 #   updpkgsums
 
 pkgname=remote-juggler
-pkgver=2.1.0_beta.1
+pkgver=2.1.0_beta.7
 pkgrel=1
 pkgdesc="Git identity manager for seamless multi-account SSH/GPG workflows"
 arch=('x86_64' 'aarch64')
-url="https://gitlab.com/tinyland/remote-juggler"
+url="https://github.com/tinyland-inc/remote-juggler"
 license=('Zlib')
 depends=('glibc' 'openssh' 'gnupg')
 optdepends=(

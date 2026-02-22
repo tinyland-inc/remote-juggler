@@ -215,7 +215,6 @@ jobs:
           name: remote-juggler-nix-linux-aarch64
           path: remote-juggler-linux-aarch64
           retention-days: 7
-    continue-on-error: true  # aarch64 emulation can be slow/flaky
 
   # ===========================================================================
   # macOS Builds (Intel + Apple Silicon)

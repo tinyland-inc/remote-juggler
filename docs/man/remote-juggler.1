@@ -1,7 +1,7 @@
 .\" RemoteJuggler - Git identity management for multi-account workflows
-.\" Man page generated for RemoteJuggler v2.1.0-beta.1
+.\" Man page generated for RemoteJuggler v2.1.0-beta.7
 .\"
-.TH REMOTE-JUGGLER 1 "February 2026" "RemoteJuggler 2.1.0-beta.1" "User Commands"
+.TH REMOTE-JUGGLER 1 "February 2026" "RemoteJuggler 2.1.0-beta.7" "User Commands"
 .SH NAME
 remote-juggler \- Git identity management for multi-account workflows
 .SH SYNOPSIS
@@ -245,6 +245,25 @@ Export credentials as environment variables.
 .B \-\-format =\fIFORMAT\fR
 Output format: \fIenv\fR (default), \fIjson\fR, \fIshell\fR.
 .RE
+.SS SOPS Integration
+.TP
+.B keys sops\-ingest \fIFILE\fR
+Decrypt a SOPS-encrypted file and ingest its key-value pairs into the KeePassXC
+credential store under the RemoteJuggler/SOPS/{path} group.
+Requires \fBsops\fR and \fBage\fR to be installed.
+.TP
+.B keys sops\-sync \fIFILE\fR
+Bidirectional sync of a SOPS-encrypted file with the credential store.
+Detects additions, updates, and deletions. Returns counts for each operation.
+.TP
+.B keys sops\-export
+Export the age private key from the credential store.
+Derives and returns the corresponding age public key via \fBage-keygen\fR.
+.RS
+.TP
+.B \-\-group =\fIGROUP\fR
+KeePassXC group containing the age key (default: RemoteJuggler/SOPS).
+.RE
 .SS YubiKey Management
 .TP
 .B yubikey info
@@ -360,7 +379,7 @@ remote-juggler pin store my-identity
 .PP
 The custom pinentry will retrieve the PIN automatically when GPG requests it.
 .SH MCP INTEGRATION
-RemoteJuggler provides 32 MCP tools for AI agents across identity management,
+RemoteJuggler provides 36 MCP tools for AI agents across identity management,
 security, token management, credential authority, and debugging.
 .PP
 Key tools include:
@@ -376,6 +395,10 @@ juggler_keys_search        - Fuzzy search credentials
 juggler_keys_resolve       - Search + retrieve credentials
 juggler_keys_discover      - Auto-discover credentials
 juggler_keys_export        - Export as env vars
+juggler_keys_sops_status   - Check SOPS/age availability
+juggler_keys_sops_ingest   - Ingest SOPS file to KDBX
+juggler_keys_sops_sync     - Sync SOPS file with KDBX
+juggler_keys_sops_export   - Export age key from KDBX
 juggler_gpg_status         - Check signing readiness
 juggler_tws_status         - Trusted workstation status
 juggler_setup              - Run setup wizard
@@ -400,6 +423,15 @@ Enable HSM/TPM debug output.
 .TP
 .B GPG_TTY
 Required for GPG pinentry. Usually set to $(tty).
+.TP
+.B REMOTE_JUGGLER_SOPS_PATH
+Override path to sops binary (default: sops).
+.TP
+.B REMOTE_JUGGLER_AGE_PATH
+Override path to age binary (default: age).
+.TP
+.B REMOTE_JUGGLER_AGE_KEYGEN_PATH
+Override path to age-keygen binary (default: age-keygen).
 .TP
 .B SSH_AUTH_SOCK
 SSH agent socket for key management.

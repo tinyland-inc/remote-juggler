@@ -209,7 +209,7 @@
         # inside an FHS-compatible sandbox
         remote-juggler = pkgs.stdenv.mkDerivation {
           pname = "remote-juggler";
-          version = "2.1.0-beta.1";
+          version = "2.1.0-beta.7";
 
           src = pkgs.lib.cleanSourceWith {
             src = ./.;

@@ -57,7 +57,8 @@ prototype module KeePassXC {
     "RemoteJuggler/Infrastructure/sudo",
     "RemoteJuggler/Infrastructure/kubeconfig",
     "RemoteJuggler/Infrastructure/ansible-vault",
-    "RemoteJuggler/Environments"
+    "RemoteJuggler/Environments",
+    "RemoteJuggler/SOPS"
   ];
 
   // ============================================================================
@@ -361,6 +362,56 @@ prototype module KeePassXC {
     } catch {
       return false;
     }
+  }
+
+  /*
+   * Check if the sops binary is available on the system.
+   *
+   * Supports REMOTE_JUGGLER_SOPS_PATH env var to override the binary,
+   * enabling CI testing with a mock script.
+   *
+   * :returns: true if sops is found
+   */
+  proc isSopsAvailable(): bool {
+    const sopsPath = getEnvOrDefault("REMOTE_JUGGLER_SOPS_PATH", "sops");
+    try {
+      var p = spawn([sopsPath, "--version"],
+                    stdout=pipeStyle.close, stderr=pipeStyle.close);
+      p.wait();
+      return p.exitCode == 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /*
+   * Check if the age binary is available on the system.
+   *
+   * Supports REMOTE_JUGGLER_AGE_PATH env var to override the binary,
+   * enabling CI testing with a mock script.
+   *
+   * :returns: true if age is found
+   */
+  proc isAgeAvailable(): bool {
+    const agePath = getEnvOrDefault("REMOTE_JUGGLER_AGE_PATH", "age");
+    try {
+      var p = spawn([agePath, "--version"],
+                    stdout=pipeStyle.close, stderr=pipeStyle.close);
+      p.wait();
+      return p.exitCode == 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /*
+   * Check if both sops and age are available.
+   * This is the prerequisite gate for all SOPS operations.
+   *
+   * :returns: true if both sops and age binaries found
+   */
+  proc isSopsReady(): bool {
+    return isSopsAvailable() && isAgeAvailable();
   }
 
   /*
@@ -1134,6 +1185,316 @@ prototype module KeePassXC {
   }
 
   // ============================================================================
+  // SOPS File Ingestion
+  // ============================================================================
+
+  /*
+   * Flatten a JSON object into dot-separated key-value pairs.
+   *
+   * Handles nested objects with dot notation (e.g., {"db":{"host":"x"}} becomes
+   * [("db.host", "x")]). Arrays and non-object values are stored as their
+   * JSON string representation.
+   *
+   * This is a simple parser for the flat/shallow JSON that sops -d produces.
+   * Does not handle deeply nested structures or escaped quotes in values.
+   *
+   * :arg json: JSON string (output of sops -d --output-type json)
+   * :returns: list of (key, value) string pairs
+   */
+  proc flattenSopsJson(json: string): list((string, string)) {
+    var result: list((string, string));
+
+    // Simple JSON parser for flat/shallow objects from sops
+    // sops -d --output-type json typically produces {"key":"value",...}
+    var s = json.strip();
+    if s.size < 2 || s[0] != '{' then return result;
+
+    // Remove outer braces
+    s = s[1..#(s.size - 2)];
+
+    // State machine to parse key:value pairs
+    var i = 0;
+    while i < s.size {
+      // Skip whitespace and commas
+      while i < s.size && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r' ||
+                            s[i] == '\t' || s[i] == ',') {
+        i += 1;
+      }
+      if i >= s.size then break;
+
+      // Parse key (must be a quoted string)
+      if s[i] != '"' then break;
+      i += 1;
+      var key = "";
+      while i < s.size && s[i] != '"' {
+        if s[i] == '\\' && i + 1 < s.size {
+          key += s[i+1];
+          i += 2;
+        } else {
+          key += s[i];
+          i += 1;
+        }
+      }
+      if i < s.size then i += 1; // skip closing quote
+
+      // Skip whitespace and colon
+      while i < s.size && (s[i] == ' ' || s[i] == ':') do i += 1;
+
+      if i >= s.size then break;
+
+      // Parse value
+      var value = "";
+      if s[i] == '"' {
+        // String value
+        i += 1;
+        while i < s.size && s[i] != '"' {
+          if s[i] == '\\' && i + 1 < s.size {
+            value += s[i+1];
+            i += 2;
+          } else {
+            value += s[i];
+            i += 1;
+          }
+        }
+        if i < s.size then i += 1; // skip closing quote
+        result.pushBack((key, value));
+      } else if s[i] == '{' {
+        // Nested object - collect and recursively flatten
+        var depth = 1;
+        var nested = "{";
+        i += 1;
+        while i < s.size && depth > 0 {
+          if s[i] == '{' then depth += 1;
+          else if s[i] == '}' then depth -= 1;
+          if depth > 0 {
+            nested += s[i];
+          }
+          i += 1;
+        }
+        nested += "}";
+        // Recursively flatten with prefix
+        const inner = flattenSopsJson(nested);
+        for (innerKey, innerValue) in inner {
+          result.pushBack((key + "." + innerKey, innerValue));
+        }
+      } else {
+        // Number, boolean, null, or array - take as raw value
+        var raw = "";
+        var bracketDepth = 0;
+        while i < s.size {
+          if s[i] == '[' then bracketDepth += 1;
+          else if s[i] == ']' then bracketDepth -= 1;
+          else if bracketDepth == 0 && (s[i] == ',' || s[i] == '}') then break;
+          raw += s[i];
+          i += 1;
+        }
+        result.pushBack((key, raw.strip()));
+      }
+    }
+
+    return result;
+  }
+
+  /*
+   * Decrypt a SOPS-encrypted file and return its contents as key-value pairs.
+   *
+   * Uses: sops -d --output-type json <file>
+   * The --output-type json flag ensures a consistent parseable format
+   * regardless of source format (YAML, JSON, dotenv, INI).
+   *
+   * :arg filePath: Path to the SOPS-encrypted file
+   * :returns: (success, list of (key, value) pairs)
+   */
+  proc decryptSopsFile(filePath: string): (bool, list((string, string))) {
+    var empty: list((string, string));
+    const sopsPath = getEnvOrDefault("REMOTE_JUGGLER_SOPS_PATH", "sops");
+
+    try {
+      var p = spawn([sopsPath, "-d", "--output-type", "json", filePath],
+                    stdout=pipeStyle.pipe, stderr=pipeStyle.pipe);
+      p.wait();
+
+      if p.exitCode != 0 {
+        var errMsg: string;
+        p.stderr.readAll(errMsg);
+        verboseLog("KeePassXC decryptSopsFile: sops -d failed for ", filePath, ": ", errMsg.strip());
+        return (false, empty);
+      }
+
+      var output: string;
+      p.stdout.readAll(output);
+
+      if output.strip() == "" {
+        verboseLog("KeePassXC decryptSopsFile: empty output for ", filePath);
+        return (false, empty);
+      }
+
+      const pairs = flattenSopsJson(output);
+      return (true, pairs);
+    } catch e {
+      verboseLog("KeePassXC decryptSopsFile: Exception: ", e.message());
+      return (false, empty);
+    }
+  }
+
+  /*
+   * Ingest a SOPS-encrypted file into the database.
+   *
+   * Decrypts with sops -d, stores each key-value pair under
+   * RemoteJuggler/SOPS/{canonical-path}/{KEY}
+   *
+   * :arg dbPath: Path to the kdbx file
+   * :arg sopsFilePath: Path to the SOPS-encrypted file
+   * :arg password: Master password
+   * :returns: (entriesAdded, entriesUpdated)
+   */
+  proc ingestSopsFile(dbPath: string, sopsFilePath: string, password: string): (int, int) {
+    var added = 0;
+    var updated = 0;
+
+    // Decrypt
+    const (ok, pairs) = decryptSopsFile(sopsFilePath);
+    if !ok {
+      verboseLog("KeePassXC ingestSopsFile: Failed to decrypt ", sopsFilePath);
+      return (0, 0);
+    }
+
+    // Canonical path for group name
+    const canonicalPath = sopsFilePath.replace("/", "_").replace("~", "home");
+    const groupPath = "RemoteJuggler/SOPS/" + canonicalPath;
+
+    // Ensure group exists
+    try {
+      var p = spawn(["keepassxc-cli", "mkdir", dbPath, groupPath],
+                    stdin=pipeStyle.pipe, stdout=pipeStyle.close, stderr=pipeStyle.close);
+      p.stdin.write(password + "\n");
+      p.stdin.close();
+      p.wait();
+    } catch { }
+
+    // Store each key-value pair
+    for (key, value) in pairs {
+      if key == "" then continue;
+
+      const entryPath = groupPath + "/" + key;
+
+      // Check if entry already exists
+      const (existsOk, existingValue) = getEntry(dbPath, entryPath, password);
+      if existsOk {
+        if existingValue != value {
+          if setEntry(dbPath, entryPath, password, value) {
+            updated += 1;
+          }
+        }
+      } else {
+        if setEntry(dbPath, entryPath, password, value) {
+          added += 1;
+        }
+      }
+    }
+
+    return (added, updated);
+  }
+
+  /*
+   * Sync a SOPS file with the database, detecting additions, updates, and deletions.
+   *
+   * Unlike ingestSopsFile which only adds/updates, this detects entries in the
+   * database group that are no longer present in the SOPS file and deletes them.
+   *
+   * :arg dbPath: Path to the kdbx file
+   * :arg sopsFilePath: Path to the SOPS-encrypted file
+   * :arg password: Master password
+   * :returns: (added, updated, deleted) counts
+   */
+  proc syncSopsFile(dbPath: string, sopsFilePath: string, password: string): (int, int, int) {
+    // First, do the normal ingest (adds + updates)
+    const (added, updated) = ingestSopsFile(dbPath, sopsFilePath, password);
+
+    // Decrypt to get current keys
+    const (ok, pairs) = decryptSopsFile(sopsFilePath);
+    if !ok {
+      return (added, updated, 0);
+    }
+
+    var currentKeys: list(string);
+    for (key, _) in pairs {
+      if key != "" then currentKeys.pushBack(key);
+    }
+
+    // List entries currently in the database group
+    const canonicalPath = sopsFilePath.replace("/", "_").replace("~", "home");
+    const groupPath = "RemoteJuggler/SOPS/" + canonicalPath;
+    const (listOk, entries) = listEntries(dbPath, groupPath, password);
+
+    var deleted = 0;
+    if listOk {
+      for entry in entries {
+        if entry.endsWith("/") then continue; // Skip subgroups
+        var found = false;
+        for key in currentKeys {
+          if entry == key {
+            found = true;
+            break;
+          }
+        }
+        if !found {
+          const entryPath = groupPath + "/" + entry;
+          if deleteEntry(dbPath, entryPath, password) {
+            deleted += 1;
+          }
+        }
+      }
+    }
+
+    return (added, updated, deleted);
+  }
+
+  /*
+   * Export age public key from the key store for SOPS recipients configuration.
+   *
+   * Retrieves an age private key from KDBX and derives the public key
+   * using age-keygen -y, suitable for .sops.yaml creation_rules.
+   *
+   * :arg dbPath: Path to the kdbx file
+   * :arg password: Master password
+   * :arg group: Group to search for age key (default: "RemoteJuggler/SOPS")
+   * :returns: (success, age public key string)
+   */
+  proc exportSopsAgeKey(dbPath: string, password: string,
+                        group: string = "RemoteJuggler/SOPS"): (bool, string) {
+    // Look for age key entry
+    const ageKeyPath = group + "/age-key";
+    const (ok, privateKey) = getEntry(dbPath, ageKeyPath, password);
+    if !ok || privateKey == "" {
+      verboseLog("KeePassXC exportSopsAgeKey: No age key found at ", ageKeyPath);
+      return (false, "No age key found at " + ageKeyPath +
+              ". Store an age private key with: keys store " + ageKeyPath + " <key>");
+    }
+
+    // Derive public key using age-keygen -y
+    const ageKeygenPath = getEnvOrDefault("REMOTE_JUGGLER_AGE_KEYGEN_PATH", "age-keygen");
+    try {
+      var p = spawn([ageKeygenPath, "-y"],
+                    stdin=pipeStyle.pipe, stdout=pipeStyle.pipe, stderr=pipeStyle.close);
+      p.stdin.write(privateKey + "\n");
+      p.stdin.close();
+      p.wait();
+
+      if p.exitCode == 0 {
+        var pubKey: string;
+        p.stdout.readAll(pubKey);
+        return (true, pubKey.strip());
+      } else {
+        return (false, "age-keygen failed to derive public key");
+      }
+    } catch e {
+      verboseLog("KeePassXC exportSopsAgeKey: Exception: ", e.message());
+      return (false, "Failed to run age-keygen: " + e.message());
+    }
+  }
+
+  // ============================================================================
   // Auto-Discovery
   // ============================================================================
 
@@ -1203,6 +1564,13 @@ prototype module KeePassXC {
             totalAdded += added;
             totalUpdated += updated;
           }
+          // Check if this is a SOPS-encrypted file
+          else if isSopsReady() && isSopsFile(entry) {
+            filesFound += 1;
+            const (sopsAdded, sopsUpdated) = ingestSopsFile(dbPath, fullPath, password);
+            totalAdded += sopsAdded;
+            totalUpdated += sopsUpdated;
+          }
         }
       }
     } catch { }
@@ -1213,6 +1581,44 @@ prototype module KeePassXC {
     if name == ".env" then return true;
     if name.startsWith(".env.") then return true;   // .env.local, .env.production
     if name.endsWith(".env") then return true;       // app.env
+    return false;
+  }
+
+  /*
+   * Check if a filename matches SOPS-encrypted file patterns.
+   *
+   * Patterns recognized:
+   *   *.sops.yaml, *.sops.yml, *.sops.json, *.sops.env,
+   *   *.sops.ini, *.sops.toml
+   *   secrets.enc.yaml, secrets.enc.yml, secrets.enc.json
+   *   secrets.encrypted.yaml, secrets.encrypted.yml
+   *
+   * Excludes .sops.yaml (bare SOPS config file, not encrypted secrets).
+   *
+   * :arg name: File basename
+   * :returns: true if matches SOPS-encrypted file patterns
+   */
+  proc isSopsFile(name: string): bool {
+    // Bare .sops.yaml is the SOPS config file, not an encrypted file
+    if name == ".sops.yaml" || name == ".sops.yml" then return false;
+
+    // *.sops.{yaml,yml,json,env,ini,toml}
+    if name.endsWith(".sops.yaml") then return true;
+    if name.endsWith(".sops.yml") then return true;
+    if name.endsWith(".sops.json") then return true;
+    if name.endsWith(".sops.env") then return true;
+    if name.endsWith(".sops.ini") then return true;
+    if name.endsWith(".sops.toml") then return true;
+
+    // secrets.enc.{yaml,yml,json}
+    if name.endsWith(".enc.yaml") then return true;
+    if name.endsWith(".enc.yml") then return true;
+    if name.endsWith(".enc.json") then return true;
+
+    // secrets.encrypted.{yaml,yml}
+    if name.endsWith(".encrypted.yaml") then return true;
+    if name.endsWith(".encrypted.yml") then return true;
+
     return false;
   }
 
@@ -1554,6 +1960,10 @@ prototype module KeePassXC {
 
     // YubiKey
     output += "YubiKey: " + (if isYubiKeyPresent() then "present" else "not detected") + "\n";
+
+    // SOPS integration
+    output += "SOPS: " + (if isSopsAvailable() then "installed" else "not found") + "\n";
+    output += "age: " + (if isAgeAvailable() then "installed" else "not found") + "\n";
 
     // Auto-unlock
     output += "Auto-Unlock: " + (if canAutoUnlock() then "ready" else "not available") + "\n";

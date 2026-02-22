@@ -1,0 +1,18 @@
+#!/bin/sh
+# Mock age-keygen for CI testing.
+# Set REMOTE_JUGGLER_AGE_KEYGEN_PATH to this script's path.
+
+case "$1" in
+  -y)
+    # Derive public key from private key on stdin
+    echo "age1mock0publickey0for0testing0000000000000000000000000000"
+    exit 0
+    ;;
+  *)
+    # Generate new keypair
+    echo "# created: 2026-02-21T00:00:00Z"
+    echo "# public key: age1mock0publickey0for0testing0000000000000000000000000000"
+    echo "AGE-SECRET-KEY-1MOCKPRIVATEKEYFORTESTING000000000000000000000000"
+    exit 0
+    ;;
+esac

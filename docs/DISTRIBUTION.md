@@ -12,7 +12,7 @@ For **user installation instructions**, see the [Installation Guide](getting-sta
 
 | Channel | Type | Status |
 |---------|------|--------|
-| **GitLab Releases** | Source of truth | Primary |
+| **GitHub Releases** | Source of truth | Primary |
 | **Homebrew Tap** | macOS/Linux package manager | Active |
 | **AUR** | Arch User Repository | Active |
 | **Flathub** | Linux universal packages | Active |
@@ -21,11 +21,11 @@ For **user installation instructions**, see the [Installation Guide](getting-sta
 
 | Platform | Registry |
 |----------|----------|
-| GitLab | `https://gitlab.com/tinyland/remote-juggler/-/releases` |
+| GitHub | `https://github.com/tinyland-inc/remote-juggler/releases` |
 | Homebrew | `tinyland/tools/remote-juggler` |
 | AUR | `remote-juggler` |
 | Flatpak | `dev.tinyland.RemoteJuggler` |
-| Nix | `gitlab:tinyland/remote-juggler` |
+| Nix | `github:tinyland-inc/remote-juggler` |
 
 ---
 
@@ -51,7 +51,7 @@ Each release includes the following artifacts:
 
 ## CI/CD Pipeline
 
-Releases are automated via GitLab CI and triggered by version tags.
+Releases are automated via GitHub Actions and triggered by version tags.
 
 ### Trigger Rules
 
@@ -70,7 +70,7 @@ release:
 3. **Package** - Create distribution packages (.deb, .rpm, .pkg.tar.zst, .dmg, AppImage)
 4. **Sign** - Code sign macOS binaries with Developer ID
 5. **Notarize** - Submit to Apple for notarization
-6. **Release** - Upload to GitLab Package Registry
+6. **Release** - Upload to GitHub Releases
 7. **Publish** - Update downstream package managers (Homebrew tap, AUR)
 
 ### Required CI Variables
@@ -108,7 +108,7 @@ Release checksums are signed with GPG key:
 
 Import key:
 ```bash
-curl -fsSL https://gitlab.com/tinyland/remote-juggler/-/raw/main/keys/release-signing.asc | gpg --import
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/keys/release-signing.asc | gpg --import
 ```
 
 ---
@@ -150,8 +150,8 @@ libpthread.so.0
 ```ruby
 class RemoteJuggler < Formula
   desc "Agent-first git identity management utility"
-  homepage "https://gitlab.com/tinyland/remote-juggler"
-  url "https://gitlab.com/tinyland/remote-juggler/-/archive/vX.Y.Z/remote-juggler-vX.Y.Z.tar.gz"
+  homepage "https://github.com/tinyland-inc/remote-juggler"
+  url "https://github.com/tinyland-inc/remote-juggler/archive/refs/tags/vX.Y.Z.tar.gz"
   sha256 "CHECKSUM"
   license "Zlib"
 
@@ -176,11 +176,11 @@ pkgver=X.Y.Z
 pkgrel=1
 pkgdesc="Agent-first git identity management utility"
 arch=('x86_64')
-url="https://gitlab.com/tinyland/remote-juggler"
+url="https://github.com/tinyland-inc/remote-juggler"
 license=('Zlib')
 depends=('glibc')
 makedepends=('chapel')
-source=("$pkgname-$pkgver.tar.gz::https://gitlab.com/tinyland/remote-juggler/-/archive/v$pkgver/remote-juggler-v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/tinyland-inc/remote-juggler/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('CHECKSUM')
 
 build() {
@@ -217,7 +217,7 @@ modules:
       - install -Dm755 target/release/remote-juggler /app/bin/remote-juggler
     sources:
       - type: archive
-        url: https://gitlab.com/tinyland/remote-juggler/-/archive/vX.Y.Z/remote-juggler-vX.Y.Z.tar.gz
+        url: https://github.com/tinyland-inc/remote-juggler/archive/refs/tags/vX.Y.Z.tar.gz
         sha256: CHECKSUM
 ```
 
@@ -235,7 +235,7 @@ Or manually:
 
 ```bash
 # 1. Import GPG key
-curl -fsSL https://gitlab.com/tinyland/remote-juggler/-/raw/main/keys/release-signing.asc | gpg --import
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/keys/release-signing.asc | gpg --import
 
 # 2. Download checksums
 curl -LO https://gitlab.com/.../SHA256SUMS.txt

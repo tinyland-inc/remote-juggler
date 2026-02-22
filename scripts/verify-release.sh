@@ -14,10 +14,10 @@
 set -euo pipefail
 
 # Configuration
-REPO_URL="https://gitlab.com/tinyland/remote-juggler"
+REPO_URL="https://github.com/tinyland-inc/remote-juggler"
 GPG_KEY_ID="ABC123DEF456"  # Replace with actual release signing key
-GPG_KEY_URL="${REPO_URL}/-/raw/main/keys/release-signing.asc"
-COSIGN_KEY_URL="${REPO_URL}/-/raw/main/keys/cosign.pub"
+GPG_KEY_URL="${REPO_URL}/raw/main/keys/release-signing.asc"
+COSIGN_KEY_URL="${REPO_URL}/raw/main/keys/cosign.pub"
 
 # Colors
 RED='\033[0;31m'
