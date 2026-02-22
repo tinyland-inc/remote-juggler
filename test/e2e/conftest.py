@@ -398,16 +398,26 @@ def swtpm_environment(
     state_dir = tmp_path / "swtpm"
     state_dir.mkdir()
 
-    # Find available ports
+    # Find two consecutive available ports.
+    # The swtpm TCTI driver expects ctrl_port = server_port + 1,
+    # so we must bind them consecutively.
     import socket
 
-    def find_free_port() -> int:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("", 0))
-            return s.getsockname()[1]
+    def find_consecutive_ports() -> tuple:
+        """Find two consecutive free ports for swtpm server and control."""
+        for _ in range(50):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s1:
+                s1.bind(("", 0))
+                port = s1.getsockname()[1]
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+                    try:
+                        s2.bind(("", port + 1))
+                        return port, port + 1
+                    except OSError:
+                        continue
+        pytest.skip("Could not find two consecutive free ports for swtpm")
 
-    ctrl_port = find_free_port()
-    server_port = find_free_port()
+    server_port, ctrl_port = find_consecutive_ports()
 
     # Start swtpm in socket mode
     proc = subprocess.Popen(
@@ -439,6 +449,18 @@ def swtpm_environment(
 
     env = os.environ.copy()
     env["TPM2TOOLS_TCTI"] = tcti
+
+    # Send TPM2_Startup to initialize the TPM
+    startup_result = subprocess.run(
+        ["tpm2_startup", "-c"],
+        env=env,
+        capture_output=True,
+        timeout=5,
+    )
+    if startup_result.returncode != 0:
+        proc.terminate()
+        proc.wait(timeout=5)
+        pytest.skip(f"tpm2_startup failed: {startup_result.stderr.decode()}")
 
     yield {
         "state_dir": state_dir,

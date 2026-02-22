@@ -129,10 +129,10 @@ jobs:
         if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
         run: |
           # Push all build results to cache
-          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+          attic push ${{ env.ATTIC_CACHE }} ./result || echo "::warning::Failed to push to Attic"
 
           # Also push the runtime closure for faster subsequent builds
-          nix path-info --recursive result | head -100 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+          nix path-info --recursive ./result | head -100 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
 
       - name: Test CLI binary
         run: |
@@ -207,7 +207,7 @@ jobs:
       - name: Push to Attic
         if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
         run: |
-          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
+          attic push ${{ env.ATTIC_CACHE }} ./result || echo "::warning::Failed to push to Attic"
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
@@ -222,7 +222,7 @@ jobs:
 
   build-macos-x86_64:
     name: Build (macOS x86_64)
-    runs-on: macos-15  # Intel Mac (macos-13 retired)
+    runs-on: macos-15  # Apple Silicon (x86_64 via Rosetta)
     needs: flake-check
     if: always() && !cancelled()
     steps:
@@ -263,8 +263,8 @@ jobs:
       - name: Push to Attic
         if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
         run: |
-          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
-          nix path-info --recursive result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+          attic push ${{ env.ATTIC_CACHE }} ./result || echo "::warning::Failed to push to Attic"
+          nix path-info --recursive ./result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
 
       - name: Test CLI binary
         run: |
@@ -321,8 +321,8 @@ jobs:
       - name: Push to Attic
         if: env.ATTIC_CONFIGURED == 'true' && (github.event_name == 'push' || github.event.inputs.push_cache == 'true')
         run: |
-          attic push ${{ env.ATTIC_CACHE }} result || echo "::warning::Failed to push to Attic"
-          nix path-info --recursive result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
+          attic push ${{ env.ATTIC_CACHE }} ./result || echo "::warning::Failed to push to Attic"
+          nix path-info --recursive ./result | head -50 | xargs -I{} attic push ${{ env.ATTIC_CACHE }} {} || true
 
       - name: Test CLI binary
         run: |
