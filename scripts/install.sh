@@ -3,14 +3,14 @@
 # RemoteJuggler Universal Installer
 #
 # Usage:
-#   curl -fsSL https://get.remote-juggler.dev | bash
-#   curl -fsSL https://get.remote-juggler.dev | bash -s -- --version 2.0.0
+#   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.1.0-beta.7
 #
 # Options:
 #   --version VERSION    Install specific version (default: latest)
 #   --prefix PATH        Installation prefix (default: ~/.local)
-#   --no-verify          Skip GPG signature verification
-#   --channel CHANNEL    Release channel: stable, beta, nightly (default: stable)
+#   --no-verify          Skip checksum verification
+#   --channel CHANNEL    Release channel: stable, beta, nightly (default: beta)
 #   --help               Show this help message
 #
 # Environment:
@@ -62,23 +62,23 @@ Usage:
 Options:
   --version VERSION    Install specific version (default: latest)
   --prefix PATH        Installation prefix (default: ~/.local)
-  --no-verify          Skip GPG signature verification
-  --channel CHANNEL    Release channel: stable, beta, nightly (default: stable)
+  --no-verify          Skip checksum verification
+  --channel CHANNEL    Release channel: stable, beta, nightly (default: beta)
   --uninstall          Remove RemoteJuggler installation
   --help               Show this help message
 
 Examples:
-  # Install latest stable release
-  curl -fsSL https://get.remote-juggler.dev | bash
+  # Install latest beta release
+  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 
   # Install specific version
-  curl -fsSL https://get.remote-juggler.dev | bash -s -- --version 2.0.0
+  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.1.0-beta.7
 
   # Install to /usr/local (requires sudo)
-  curl -fsSL https://get.remote-juggler.dev | sudo bash -s -- --prefix /usr/local
+  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sudo bash -s -- --prefix /usr/local
 
   # Uninstall
-  curl -fsSL https://get.remote-juggler.dev | bash -s -- --uninstall
+  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --uninstall
 EOF
 }
 
@@ -109,7 +109,7 @@ detect_platform() {
 check_dependencies() {
     local missing=()
 
-    for cmd in curl tar; do
+    for cmd in curl; do
         if ! command -v "$cmd" &>/dev/null; then
             missing+=("$cmd")
         fi
@@ -118,18 +118,11 @@ check_dependencies() {
     if [[ ${#missing[@]} -gt 0 ]]; then
         die "Missing required commands: ${missing[*]}"
     fi
-
-    # Check for GPG if verification is enabled
-    if [[ "${VERIFY:-true}" == "true" ]] && ! command -v gpg &>/dev/null; then
-        warn "GPG not found. Skipping signature verification."
-        warn "Install GPG for enhanced security: brew install gnupg (macOS) or apt install gnupg (Linux)"
-        VERIFY="false"
-    fi
 }
 
-# Get latest version from GitLab API
+# Get latest version from GitHub API
 get_latest_version() {
-    local channel="${1:-stable}"
+    local channel="${1:-beta}"
     local api_url="https://api.github.com/repos/tinyland-inc/remote-juggler/releases"
 
     # Fetch releases
@@ -140,12 +133,29 @@ get_latest_version() {
     local version
     case "$channel" in
         stable)
-            # Stable releases: no pre-release suffix
+            # Stable releases: no pre-release suffix, must have assets
             version=$(echo "$releases" | grep -o '"tag_name":"v[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+            # Check if stable release has assets; if not, fall back to beta
+            if [[ -n "$version" ]]; then
+                local asset_count
+                asset_count=$(echo "$releases" | python3 -c "
+import json, sys
+releases = json.load(sys.stdin)
+for r in releases:
+    if r['tag_name'] == 'v$version' and not r['prerelease']:
+        print(len(r.get('assets', [])))
+        break
+" 2>/dev/null || echo "0")
+                if [[ "$asset_count" == "0" ]]; then
+                    warn "Stable release v${version} has no downloadable assets."
+                    warn "Falling back to latest beta release."
+                    version=$(echo "$releases" | grep -o '"tag_name":"v[0-9.]*-\(beta\|rc\)[.0-9]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+                fi
+            fi
             ;;
         beta)
             # Beta releases: -beta or -rc suffix
-            version=$(echo "$releases" | grep -o '"tag_name":"v[0-9.]*-\(beta\|rc\)[0-9]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
+            version=$(echo "$releases" | grep -o '"tag_name":"v[0-9.]*-\(beta\|rc\)[.0-9]*"' | head -1 | cut -d'"' -f4 | sed 's/^v//')
             ;;
         nightly)
             # Nightly: use latest tag regardless
@@ -177,48 +187,27 @@ download() {
     fi
 }
 
-# Verify GPG signature
-verify_signature() {
-    local archive="$1"
-    local signature="${archive}.asc"
+# Verify checksum
+verify_checksum() {
+    local binary="$1"
     local checksums="$2"
 
     if [[ "${VERIFY}" != "true" ]]; then
-        warn "Skipping signature verification (--no-verify)"
+        warn "Skipping checksum verification (--no-verify)"
         return 0
     fi
 
-    info "Verifying GPG signature..."
+    info "Verifying checksum..."
 
-    # Import release signing key
-    local keyring
-    keyring=$(mktemp)
-    trap "rm -f '$keyring'" RETURN
-
-    if ! curl -fsSL "$GPG_KEY_URL" | gpg --dearmor > "$keyring" 2>/dev/null; then
-        warn "Could not fetch GPG signing key. Skipping verification."
-        return 0
-    fi
-
-    # Verify checksums signature
-    if [[ -f "${checksums}.asc" ]]; then
-        if gpg --no-default-keyring --keyring "$keyring" --verify "${checksums}.asc" "$checksums" 2>/dev/null; then
-            success "Checksum file signature verified"
-        else
-            warn "Checksum signature verification failed"
-        fi
-    fi
-
-    # Verify checksum
     local expected_hash
-    expected_hash=$(grep "$(basename "$archive")" "$checksums" | awk '{print $1}')
+    expected_hash=$(grep "$(basename "$binary")" "$checksums" | awk '{print $1}')
 
     if [[ -n "$expected_hash" ]]; then
         local actual_hash
         if command -v sha256sum &>/dev/null; then
-            actual_hash=$(sha256sum "$archive" | awk '{print $1}')
+            actual_hash=$(sha256sum "$binary" | awk '{print $1}')
         elif command -v shasum &>/dev/null; then
-            actual_hash=$(shasum -a 256 "$archive" | awk '{print $1}')
+            actual_hash=$(shasum -a 256 "$binary" | awk '{print $1}')
         else
             warn "No SHA256 tool found. Skipping checksum verification."
             return 0
@@ -229,12 +218,14 @@ verify_signature() {
         else
             die "Checksum mismatch! Expected: $expected_hash, Got: $actual_hash"
         fi
+    else
+        warn "Binary not found in checksums file. Skipping verification."
     fi
 }
 
-# Install binary
+# Install binary from downloaded file
 install_binary() {
-    local archive="$1"
+    local binary_file="$1"
     local prefix="$2"
     local bindir="${prefix}/bin"
 
@@ -243,35 +234,8 @@ install_binary() {
     # Create directories
     mkdir -p "$bindir"
 
-    # Extract archive
-    local tmpdir
-    tmpdir=$(mktemp -d)
-    trap "rm -rf '$tmpdir'" RETURN
-
-    tar -xzf "$archive" -C "$tmpdir"
-
-    # Find and install binary
-    local binary
-    binary=$(find "$tmpdir" -name "${PROGRAM_NAME}" -type f | head -1)
-
-    if [[ -z "$binary" ]]; then
-        die "Binary not found in archive"
-    fi
-
     # Install binary
-    install -m 755 "$binary" "${bindir}/${PROGRAM_NAME}"
-
-    # Install shell completions if available
-    local completions_dir="${prefix}/share/${PROGRAM_NAME}/completions"
-    mkdir -p "$completions_dir"
-
-    for shell in bash zsh fish; do
-        local completion
-        completion=$(find "$tmpdir" -name "*${shell}*" -o -name "*.${shell}" | head -1)
-        if [[ -n "$completion" ]]; then
-            install -m 644 "$completion" "${completions_dir}/"
-        fi
-    done
+    install -m 755 "$binary_file" "${bindir}/${PROGRAM_NAME}"
 
     success "Installed ${PROGRAM_NAME} to ${bindir}/${PROGRAM_NAME}"
 }
@@ -279,34 +243,32 @@ install_binary() {
 # Install shell completions to standard locations
 install_completions() {
     local prefix="$1"
-    local completions_src="${prefix}/share/${PROGRAM_NAME}/completions"
 
-    if [[ ! -d "$completions_src" ]]; then
+    # Generate completions from the installed binary if possible
+    local binary="${prefix}/bin/${PROGRAM_NAME}"
+    if [[ ! -x "$binary" ]]; then
         return 0
     fi
 
     # Bash completions
     local bash_dir="${HOME}/.local/share/bash-completion/completions"
-    if [[ -d "${bash_dir%/*}" ]] || mkdir -p "$bash_dir"; then
-        if [[ -f "${completions_src}/${PROGRAM_NAME}.bash" ]]; then
-            ln -sf "${completions_src}/${PROGRAM_NAME}.bash" "${bash_dir}/${PROGRAM_NAME}"
-        fi
+    mkdir -p "$bash_dir"
+    if "$binary" completions bash > "${bash_dir}/${PROGRAM_NAME}" 2>/dev/null; then
+        success "Installed bash completions"
     fi
 
     # Zsh completions
     local zsh_dir="${HOME}/.zsh/completions"
-    if [[ -d "$zsh_dir" ]] || mkdir -p "$zsh_dir"; then
-        if [[ -f "${completions_src}/_${PROGRAM_NAME}" ]]; then
-            ln -sf "${completions_src}/_${PROGRAM_NAME}" "${zsh_dir}/_${PROGRAM_NAME}"
-        fi
+    mkdir -p "$zsh_dir"
+    if "$binary" completions zsh > "${zsh_dir}/_${PROGRAM_NAME}" 2>/dev/null; then
+        success "Installed zsh completions"
     fi
 
     # Fish completions
     local fish_dir="${HOME}/.config/fish/completions"
-    if [[ -d "${fish_dir%/*}" ]] || mkdir -p "$fish_dir"; then
-        if [[ -f "${completions_src}/${PROGRAM_NAME}.fish" ]]; then
-            ln -sf "${completions_src}/${PROGRAM_NAME}.fish" "${fish_dir}/${PROGRAM_NAME}.fish"
-        fi
+    mkdir -p "$fish_dir"
+    if "$binary" completions fish > "${fish_dir}/${PROGRAM_NAME}.fish" 2>/dev/null; then
+        success "Installed fish completions"
     fi
 }
 
@@ -341,7 +303,7 @@ post_install() {
     echo "  2. Run the setup wizard: ${PROGRAM_NAME} setup"
     echo "  3. List identities: ${PROGRAM_NAME} list"
     echo ""
-    echo "Documentation: https://remote-juggler.dev/docs"
+    echo "Documentation: https://tinyland-inc.github.io/remote-juggler"
     echo "Report issues: ${REPO_URL}/issues"
 }
 
@@ -381,7 +343,7 @@ uninstall() {
 main() {
     local version=""
     local prefix="${REMOTE_JUGGLER_PREFIX:-$DEFAULT_PREFIX}"
-    local channel="${REMOTE_JUGGLER_CHANNEL:-stable}"
+    local channel="${REMOTE_JUGGLER_CHANNEL:-beta}"
     local do_uninstall="false"
     VERIFY="true"
 
@@ -435,6 +397,19 @@ main() {
     platform=$(detect_platform)
     info "Detected platform: ${platform}"
 
+    # Darwin is not yet supported with native binaries
+    if [[ "$platform" == darwin-* ]]; then
+        warn "Native macOS binaries are not yet available."
+        echo ""
+        echo "Install via alternative methods:"
+        echo "  npm install -g @tummycrypt/remote-juggler"
+        echo "  nix profile install github:tinyland-inc/remote-juggler  # Linux only"
+        echo ""
+        echo "Or build from source (requires Chapel 2.7+):"
+        echo "  git clone ${REPO_URL}.git && cd remote-juggler && just release"
+        exit 1
+    fi
+
     # Get version
     if [[ -z "$version" ]]; then
         version="${REMOTE_JUGGLER_VERSION:-}"
@@ -445,9 +420,10 @@ main() {
     fi
     info "Installing version: ${version}"
 
-    # Construct download URL
-    local archive_name="${PROGRAM_NAME}-${version}-${platform}.tar.gz"
-    local archive_url="${REPO_URL}/releases/download/v${version}/${archive_name}"
+    # Construct download URL for bare binary
+    local binary_name="${PROGRAM_NAME}-${platform}"
+    local binary_url="${REPO_URL}/releases/download/v${version}/${binary_name}"
+    local checksum_url="${binary_url}.sha256"
     local checksums_url="${REPO_URL}/releases/download/v${version}/SHA256SUMS.txt"
 
     # Create temp directory
@@ -455,22 +431,35 @@ main() {
     tmpdir=$(mktemp -d)
     trap "rm -rf '$tmpdir'" EXIT
 
-    # Download archive
-    local archive="${tmpdir}/${archive_name}"
-    download "$archive_url" "$archive" || die "Failed to download ${archive_name}"
+    # Download binary
+    local binary_file="${tmpdir}/${binary_name}"
+    download "$binary_url" "$binary_file" || die "Failed to download ${binary_name} from ${binary_url}"
 
     # Download and verify checksums
     local checksums="${tmpdir}/SHA256SUMS.txt"
     if download "$checksums_url" "$checksums" 2>/dev/null; then
-        # Try to get signature
-        download "${checksums_url}.asc" "${checksums}.asc" 2>/dev/null || true
-        verify_signature "$archive" "$checksums"
+        verify_checksum "$binary_file" "$checksums"
+    elif download "$checksum_url" "${tmpdir}/checksum.sha256" 2>/dev/null; then
+        # Fall back to per-file checksum
+        local expected
+        expected=$(awk '{print $1}' "${tmpdir}/checksum.sha256")
+        local actual
+        if command -v sha256sum &>/dev/null; then
+            actual=$(sha256sum "$binary_file" | awk '{print $1}')
+        elif command -v shasum &>/dev/null; then
+            actual=$(shasum -a 256 "$binary_file" | awk '{print $1}')
+        fi
+        if [[ -n "${actual:-}" && "$expected" == "$actual" ]]; then
+            success "Checksum verified: ${actual:0:16}..."
+        elif [[ -n "${actual:-}" ]]; then
+            die "Checksum mismatch! Expected: $expected, Got: $actual"
+        fi
     else
         warn "Could not download checksums. Skipping verification."
     fi
 
     # Install
-    install_binary "$archive" "$prefix"
+    install_binary "$binary_file" "$prefix"
     install_completions "$prefix"
     post_install "$prefix"
 }

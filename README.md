@@ -442,7 +442,6 @@ remote-juggler/
 │       ├── HSM.chpl             # TPM/Secure Enclave
 │       ├── YubiKey.chpl         # YubiKey management
 │       ├── TrustedWorkstation.chpl # Auto-unlock mode
-│       ├── GPGAgent.chpl        # GPG agent integration
 │       ├── TokenHealth.chpl     # Token expiry detection
 │       ├── Setup.chpl           # Interactive setup wizard
 │       └── KeePassXC.chpl       # Credential authority

@@ -40,7 +40,6 @@ flowchart LR
         HSMod[HSM]
         YubiKey[YubiKey]
         TrustedWS[TrustedWorkstation]
-        GPGAgent[GPGAgent]
     end
 
     subgraph External["External"]
@@ -517,25 +516,6 @@ proc getTrustedWorkstationStatus(identity: string): TrustedWorkstationStatus
 proc verifyTrustedWorkstation(identity: string): VerificationResult
 proc setSecurityMode(mode: SecurityMode): bool
 proc getSecurityMode(): SecurityMode
-```
-
----
-
-### GPGAgent.chpl
-
-gpg-agent configuration management for custom pinentry.
-
-**Location:** `src/remote_juggler/GPGAgent.chpl`
-
-**Key Functions:**
-
-```chapel
-proc getGPGAgentConfPath(): string
-proc isCustomPinentryConfigured(): bool
-proc configureCustomPinentry(): bool
-proc restoreDefaultPinentry(): bool
-proc reloadGPGAgent(): bool
-proc getGPGAgentPID(): int
 ```
 
 ---

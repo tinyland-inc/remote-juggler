@@ -153,7 +153,6 @@ The implementation consists of 20 Chapel modules in `src/remote_juggler/`:
 | `HSM.chpl` | TPM/Secure Enclave integration |
 | `YubiKey.chpl` | YubiKey management |
 | `TrustedWorkstation.chpl` | Auto-unlock mode |
-| `GPGAgent.chpl` | GPG agent integration |
 | `TokenHealth.chpl` | Token expiry detection |
 | `Setup.chpl` | Interactive setup wizard |
 | `KeePassXC.chpl` | Credential authority |
