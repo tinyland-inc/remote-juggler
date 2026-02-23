@@ -19,11 +19,12 @@ tailscale_tailnet = "example.com"
 # hexstrike_results_storage_size = "5Gi"
 # aperture_hostname            = "aperture.tail1234.ts.net"
 
-# Optional: Override container images
-# setec_image         = "ghcr.io/tailscale/setec:latest"
+# Optional: Override container images (all under tinyland-inc GHCR, private)
+# Renovate auto-bumps these via # renovate: image comments in variables.tf
+# setec_image         = "ghcr.io/tinyland-inc/remote-juggler/setec:latest"
 # gateway_image       = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest"
-# openclaw_image      = "ghcr.io/openclaw/openclaw:latest"
-# hexstrike_image     = "ghcr.io/hexstrike/hexstrike-ai:latest"
+# openclaw_image      = "ghcr.io/tinyland-inc/remote-juggler/openclaw:latest"
+# hexstrike_image     = "ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest"
 # chapel_binary_image = "ghcr.io/tinyland-inc/remote-juggler:latest"
 
 # Secrets — injected via TF_VAR_* env vars by apply.sh (do NOT hardcode here)
@@ -31,3 +32,4 @@ tailscale_tailnet = "example.com"
 # tailscale_oauth_client_id      = "..."
 # tailscale_oauth_client_secret  = "..."
 # tailscale_auth_key             = "..."
+# ghcr_token                     = "..."  # GitHub PAT with read:packages

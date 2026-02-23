@@ -31,6 +31,10 @@ resource "kubernetes_deployment" "gateway" {
       }
 
       spec {
+        image_pull_secrets {
+          name = kubernetes_secret.ghcr_pull.metadata[0].name
+        }
+
         container {
           name  = "gateway"
           image = var.gateway_image

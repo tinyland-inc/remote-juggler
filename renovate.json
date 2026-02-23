@@ -1,0 +1,88 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:enableMajor",
+    ":semanticCommits"
+  ],
+  "schedule": [
+    "before 9am on Monday"
+  ],
+  "timezone": "America/New_York",
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
+  "packageRules": [
+    {
+      "description": "GHCR container images - group all RJ images together",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackagePatterns": [
+        "ghcr.io/tinyland-inc/remote-juggler/*"
+      ],
+      "groupName": "container images",
+      "automerge": false
+    },
+    {
+      "description": "Tailscale Helm chart",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchPackageNames": [
+        "tailscale-operator"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Go dependencies - group minor/patch",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "go dependencies",
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "GitHub Actions - group all",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions",
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tofu variable defaults with # renovate: image comments",
+      "fileMatch": [
+        "deploy/tofu/variables\\.tf$"
+      ],
+      "matchStrings": [
+        "default\\s*=\\s*\"(?<depName>[^:]+):(?<currentValue>[^\"]+)\"\\s*#\\s*renovate:\\s*image"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "K8s manifest images with # renovate: image comments",
+      "fileMatch": [
+        "deploy/k8s/.*\\.yaml$",
+        "deploy/agents/.*\\.yaml$"
+      ],
+      "matchStrings": [
+        "image:\\s*(?<depName>[^:]+):(?<currentValue>[^\\s#]+)\\s*#\\s*renovate:\\s*image"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ]
+}

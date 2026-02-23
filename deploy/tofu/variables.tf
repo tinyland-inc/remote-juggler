@@ -27,6 +27,22 @@ variable "tailscale_auth_key" {
 }
 
 # =============================================================================
+# Container registry (GHCR - all images private)
+# =============================================================================
+
+variable "ghcr_username" {
+  description = "GitHub username for GHCR image pulls"
+  type        = string
+  default     = "tinyland-inc"
+}
+
+variable "ghcr_token" {
+  description = "GitHub PAT or GITHUB_TOKEN with read:packages scope for GHCR pulls"
+  type        = string
+  sensitive   = true
+}
+
+# =============================================================================
 # Cluster configuration
 # =============================================================================
 
@@ -47,27 +63,27 @@ variable "namespace" {
 # =============================================================================
 
 variable "setec_image" {
-  description = "Setec server container image"
+  description = "Setec server container image (built from tailscale/setec source)"
   type        = string
-  default     = "ghcr.io/tailscale/setec:latest"
+  default     = "ghcr.io/tinyland-inc/remote-juggler/setec:latest" # renovate: image
 }
 
 variable "gateway_image" {
   description = "rj-gateway container image"
   type        = string
-  default     = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest"
+  default     = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest" # renovate: image
 }
 
 variable "openclaw_image" {
   description = "OpenClaw agent container image"
   type        = string
-  default     = "ghcr.io/openclaw/openclaw:latest"
+  default     = "ghcr.io/tinyland-inc/remote-juggler/openclaw:latest" # renovate: image
 }
 
 variable "hexstrike_image" {
   description = "HexStrike pentest agent container image"
   type        = string
-  default     = "ghcr.io/hexstrike/hexstrike-ai:latest"
+  default     = "ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest" # renovate: image
 }
 
 variable "chapel_binary_image" {

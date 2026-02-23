@@ -49,6 +49,10 @@ resource "kubernetes_deployment" "setec" {
       }
 
       spec {
+        image_pull_secrets {
+          name = kubernetes_secret.ghcr_pull.metadata[0].name
+        }
+
         # Single container — Tailscale Operator injects the sidecar
         container {
           name  = "setec"

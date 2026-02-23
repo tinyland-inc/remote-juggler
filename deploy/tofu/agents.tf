@@ -38,6 +38,10 @@ resource "kubernetes_deployment" "openclaw" {
       }
 
       spec {
+        image_pull_secrets {
+          name = kubernetes_secret.ghcr_pull.metadata[0].name
+        }
+
         # Single container — operator injects Tailscale sidecar
         container {
           name  = "openclaw"
@@ -149,6 +153,10 @@ resource "kubernetes_deployment" "hexstrike" {
       }
 
       spec {
+        image_pull_secrets {
+          name = kubernetes_secret.ghcr_pull.metadata[0].name
+        }
+
         container {
           name  = "hexstrike"
           image = var.hexstrike_image

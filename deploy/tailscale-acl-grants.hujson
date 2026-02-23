@@ -10,17 +10,17 @@
       "src": ["autogroup:member"],
       "dst": ["tag:rj-gateway"],
       "app": {
-        "tailscale.com/cap/rj-gateway": [{
+        "tinyland.dev/cap/rj-gateway": [{
           "role": "reader"
         }]
       }
     },
     {
       // Allow admin users to write secrets and view audit logs.
-      "src": ["group:admins"],
+      "src": ["autogroup:admin"],
       "dst": ["tag:rj-gateway"],
       "app": {
-        "tailscale.com/cap/rj-gateway": [{
+        "tinyland.dev/cap/rj-gateway": [{
           "role": "admin"
         }]
       }
@@ -30,7 +30,7 @@
       "src": ["tag:ci-agent"],
       "dst": ["tag:rj-gateway"],
       "app": {
-        "tailscale.com/cap/rj-gateway": [{
+        "tinyland.dev/cap/rj-gateway": [{
           "role": "reader",
           "secrets": ["github-token", "gitlab-token", "neon-database-url"]
         }]
@@ -41,7 +41,7 @@
       "src": ["tag:rj-gateway"],
       "dst": ["tag:setec"],
       "app": {
-        "tailscale.com/cap/setec": [{
+        "tinyland.dev/cap/setec": [{
           "role": "admin"
         }]
       }

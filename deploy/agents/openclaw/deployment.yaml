@@ -30,9 +30,11 @@ spec:
         app: openclaw-agent
         tier: agent
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: openclaw
-          image: ghcr.io/openclaw/openclaw:latest
+          image: ghcr.io/tinyland-inc/remote-juggler/openclaw:latest  # renovate: image
           env:
             # Route AI API calls through Aperture on tailnet
             - name: OPENAI_BASE_URL

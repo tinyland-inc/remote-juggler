@@ -33,9 +33,11 @@ spec:
         tier: agent
         security: pentest
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: hexstrike
-          image: ghcr.io/hexstrike/hexstrike-ai:latest
+          image: ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest  # renovate: image
           env:
             # Route AI calls through Aperture
             - name: ANTHROPIC_BASE_URL

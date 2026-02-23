@@ -1,0 +1,25 @@
+# Setec secret server - built from source since Tailscale provides no official image.
+# https://github.com/tailscale/setec
+#
+# Requires Go 1.25+ (setec's minimum version).
+FROM golang:1.25-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+ARG SETEC_VERSION=latest
+RUN go install github.com/tailscale/setec/cmd/setec@${SETEC_VERSION}
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /go/bin/setec /usr/local/bin/setec
+
+RUN adduser -D -u 10000 setec
+USER setec
+
+VOLUME /data
+EXPOSE 8443
+
+ENTRYPOINT ["setec"]
+CMD ["server", "--addr=:8443", "--state-dir=/data"]

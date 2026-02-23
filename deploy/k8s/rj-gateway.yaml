@@ -25,9 +25,11 @@ spec:
       labels:
         app: rj-gateway
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: gateway
-          image: ghcr.io/tinyland-inc/remote-juggler/gateway:latest
+          image: ghcr.io/tinyland-inc/remote-juggler/gateway:latest  # renovate: image
           args:
             - --config=/etc/rj-gateway/config.json
           env:

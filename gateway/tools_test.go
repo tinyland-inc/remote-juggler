@@ -1,0 +1,149 @@
+package main
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestGatewayToolsCount(t *testing.T) {
+	tools := gatewayTools()
+	if len(tools) != 5 {
+		t.Errorf("gatewayTools() returned %d tools, want 5", len(tools))
+	}
+}
+
+func TestGatewayToolNames(t *testing.T) {
+	expected := map[string]bool{
+		"juggler_resolve_composite": true,
+		"juggler_setec_list":        true,
+		"juggler_setec_get":         true,
+		"juggler_setec_put":         true,
+		"juggler_audit_log":         true,
+	}
+
+	tools := gatewayTools()
+	for _, raw := range tools {
+		var tool struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(raw, &tool); err != nil {
+			t.Fatalf("failed to unmarshal tool: %v", err)
+		}
+		if !expected[tool.Name] {
+			t.Errorf("unexpected tool name: %q", tool.Name)
+		}
+		delete(expected, tool.Name)
+	}
+
+	for name := range expected {
+		t.Errorf("missing expected tool: %q", name)
+	}
+}
+
+func TestGatewayToolsHaveSchemas(t *testing.T) {
+	tools := gatewayTools()
+	for _, raw := range tools {
+		var tool struct {
+			Name        string         `json:"name"`
+			Description string         `json:"description"`
+			InputSchema map[string]any `json:"inputSchema"`
+		}
+		if err := json.Unmarshal(raw, &tool); err != nil {
+			t.Fatalf("failed to unmarshal tool: %v", err)
+		}
+		if tool.Name == "" {
+			t.Error("tool has empty name")
+		}
+		if tool.Description == "" {
+			t.Errorf("tool %q has empty description", tool.Name)
+		}
+		if tool.InputSchema == nil {
+			t.Errorf("tool %q has nil inputSchema", tool.Name)
+		}
+		if tool.InputSchema["type"] != "object" {
+			t.Errorf("tool %q inputSchema type = %v, want 'object'", tool.Name, tool.InputSchema["type"])
+		}
+	}
+}
+
+func TestInjectGatewayTools(t *testing.T) {
+	// Simulate a Chapel tools/list response with 2 tools.
+	chapelResp := `{
+		"jsonrpc": "2.0",
+		"id": 1,
+		"result": {
+			"tools": [
+				{"name": "juggler_list", "description": "List identities", "inputSchema": {"type": "object"}},
+				{"name": "juggler_switch", "description": "Switch identity", "inputSchema": {"type": "object"}}
+			]
+		}
+	}`
+
+	modified := injectGatewayTools([]byte(chapelResp))
+
+	var msg struct {
+		Result struct {
+			Tools []json.RawMessage `json:"tools"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(modified, &msg); err != nil {
+		t.Fatalf("failed to unmarshal modified response: %v", err)
+	}
+
+	// Should have 2 Chapel tools + 5 gateway tools = 7.
+	if len(msg.Result.Tools) != 7 {
+		t.Errorf("injected response has %d tools, want 7", len(msg.Result.Tools))
+	}
+}
+
+func TestInjectGatewayToolsInvalidJSON(t *testing.T) {
+	// Should return input unchanged on parse failure.
+	input := []byte(`{invalid json`)
+	output := injectGatewayTools(input)
+	if string(output) != string(input) {
+		t.Error("expected invalid JSON to be passed through unchanged")
+	}
+}
+
+func TestIsToolsListResponse(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want bool
+	}{
+		{
+			name: "valid tools/list",
+			data: `{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"test"}]}}`,
+			want: true,
+		},
+		{
+			name: "empty tools array",
+			data: `{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}`,
+			want: true,
+		},
+		{
+			name: "non-tools response",
+			data: `{"jsonrpc":"2.0","id":1,"result":{"content":[{"text":"hi"}]}}`,
+			want: false,
+		},
+		{
+			name: "error response",
+			data: `{"jsonrpc":"2.0","id":1,"error":{"code":-1,"message":"fail"}}`,
+			want: false,
+		},
+		{
+			name: "invalid JSON",
+			data: `{garbage`,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isToolsListResponse([]byte(tt.data))
+			if got != tt.want {
+				t.Errorf("isToolsListResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

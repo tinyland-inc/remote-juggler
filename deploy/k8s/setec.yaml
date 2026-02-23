@@ -24,9 +24,11 @@ spec:
       labels:
         app: setec
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: setec
-          image: ghcr.io/tailscale/setec:latest
+          image: ghcr.io/tinyland-inc/remote-juggler/setec:latest  # renovate: image
           args:
             - server
             - --addr=:8443
