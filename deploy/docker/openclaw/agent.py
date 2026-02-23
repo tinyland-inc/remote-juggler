@@ -60,6 +60,7 @@ class OpenClawAgent:
         """
         started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         tool_calls = 0
+        tool_calls_by_name: dict[str, int] = {}
         error_msg = ""
 
         try:
@@ -90,11 +91,16 @@ class OpenClawAgent:
             user_msg = self._build_user_prompt(campaign)
             messages: list[dict[str, Any]] = [{"role": "user", "content": user_msg}]
 
-            max_iterations = 20
+            # Scale iteration limit based on campaign's token budget.
+            ai_budget = campaign.get("guardrails", {}).get("aiApiBudget", {})
+            budget_tokens = ai_budget.get("maxTokens", 50000)
+            max_iterations = max(20, budget_tokens // 4000)
+            max_response_tokens = 8192
+
             for _ in range(max_iterations):
                 response = self.client.messages.create(
                     model=self.model,
-                    max_tokens=4096,
+                    max_tokens=max_response_tokens,
                     system=system,
                     tools=tools,
                     messages=messages,
@@ -120,6 +126,9 @@ class OpenClawAgent:
                             log.info("calling tool %s", block.name)
                             result = self._call_tool(block.name, block.input)
                             tool_calls += 1
+                            tool_calls_by_name[block.name] = (
+                                tool_calls_by_name.get(block.name, 0) + 1
+                            )
                             tool_results.append(
                                 {
                                     "type": "tool_result",
@@ -279,6 +288,12 @@ class OpenClawAgent:
             "You are OpenClaw, an AI agent that executes structured campaigns using MCP tools.",
             "You have access to MCP tools via rj-gateway. Use them to accomplish the campaign objectives.",
             "",
+            "CRITICAL RULES:",
+            "- You MUST actually call the tools to gather real data. NEVER fabricate, estimate, or hallucinate results.",
+            "- Every KPI value MUST come from actual tool call results. If a tool fails, report 0 or the error — do not guess.",
+            "- Follow EVERY process step. Do not skip steps to save time.",
+            "- If a tool returns an error or 404, log it and continue to the next item.",
+            "",
             f"Campaign: {campaign.get('name', 'unnamed')}",
             f"Description: {campaign.get('description', '')}",
             "",
@@ -290,8 +305,9 @@ class OpenClawAgent:
         parts.extend(
             [
                 "",
-                "IMPORTANT: When you are done, output a JSON block with your findings.",
+                "When you are done, output a JSON block with your findings.",
                 "The JSON should have a 'kpis' object with numeric values matching the campaign's KPI names.",
+                "All KPI values must reflect actual data gathered from tool calls.",
                 "Wrap the JSON in ```json ... ``` markers.",
             ]
         )
