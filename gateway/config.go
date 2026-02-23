@@ -8,14 +8,19 @@ import (
 // Config holds the gateway configuration.
 type Config struct {
 	// Listen is the address to listen on. Use "local" to skip tsnet.
-	Listen       string          `json:"listen"`
-	ChapelBinary string          `json:"chapel_binary"`
-	SetecURL     string          `json:"setec_url"`
-	SetecPrefix  string          `json:"setec_prefix"`
-	SetecSecrets []string        `json:"setec_secrets"`
-	Precedence   []string        `json:"precedence"`
-	ApertureURL  string          `json:"aperture_url"`
-	Tailscale    TailscaleConfig `json:"tailscale"`
+	Listen string `json:"listen"`
+	// InClusterListen is an optional second listener for in-cluster HTTP (no TLS).
+	// When set (e.g. ":8080"), the gateway serves the same routes over plain HTTP
+	// alongside the tsnet TLS listener, allowing pods without tailnet access to
+	// reach the gateway via a K8s Service.
+	InClusterListen string          `json:"in_cluster_listen"`
+	ChapelBinary    string          `json:"chapel_binary"`
+	SetecURL        string          `json:"setec_url"`
+	SetecPrefix     string          `json:"setec_prefix"`
+	SetecSecrets    []string        `json:"setec_secrets"`
+	Precedence      []string        `json:"precedence"`
+	ApertureURL     string          `json:"aperture_url"`
+	Tailscale       TailscaleConfig `json:"tailscale"`
 }
 
 // TailscaleConfig holds Tailscale-specific settings.
@@ -73,6 +78,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("RJ_GATEWAY_APERTURE_URL"); v != "" {
 		cfg.ApertureURL = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_IN_CLUSTER_LISTEN"); v != "" {
+		cfg.InClusterListen = v
 	}
 
 	return cfg, nil

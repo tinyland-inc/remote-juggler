@@ -111,6 +111,17 @@ resource "kubernetes_deployment" "gateway" {
             value = "/usr/local/bin/chapel/remote-juggler"
           }
 
+          # In-cluster HTTP listener for pod-to-pod communication (no TLS).
+          env {
+            name  = "RJ_GATEWAY_IN_CLUSTER_LISTEN"
+            value = ":8080"
+          }
+
+          port {
+            container_port = 8080
+            name           = "http"
+          }
+
           resources {
             requests = {
               cpu    = "100m"
@@ -159,4 +170,29 @@ resource "kubernetes_deployment" "gateway" {
   }
 
   depends_on = [helm_release.tailscale_operator]
+}
+
+# In-cluster Service for pod-to-pod communication.
+# Agents (OpenClaw, HexStrike) reach the gateway via this service using plain
+# HTTP on port 8080, avoiding the need for tailnet DNS resolution in every pod.
+resource "kubernetes_service" "gateway_internal" {
+  metadata {
+    name      = "rj-gateway"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "rj-gateway" })
+  }
+
+  spec {
+    selector = {
+      app = "rj-gateway"
+    }
+
+    port {
+      port        = 8080
+      target_port = 8080
+      name        = "http"
+    }
+
+    type = "ClusterIP"
+  }
 }

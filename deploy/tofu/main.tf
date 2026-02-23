@@ -58,12 +58,13 @@ locals {
 
   # Gateway config JSON (mounted as secret)
   gateway_config = jsonencode({
-    listen         = ":443"
-    chapel_binary  = "remote-juggler"
-    setec_url      = local.effective_setec_url
-    setec_prefix   = var.gateway_setec_prefix
-    setec_secrets  = ["neon-database-url", "github-token", "gitlab-token", "attic-token", "anthropic-api-key"]
-    precedence     = var.gateway_precedence
+    listen             = ":443"
+    in_cluster_listen  = ":8080"
+    chapel_binary      = "remote-juggler"
+    setec_url          = local.effective_setec_url
+    setec_prefix       = var.gateway_setec_prefix
+    setec_secrets      = ["neon-database-url", "github-token", "gitlab-token", "attic-token", "anthropic-api-key"]
+    precedence         = var.gateway_precedence
     tailscale = {
       hostname  = "rj-gateway"
       state_dir = "/var/lib/rj-gateway/tsnet"

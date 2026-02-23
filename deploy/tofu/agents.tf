@@ -62,7 +62,18 @@ resource "kubernetes_deployment" "openclaw" {
 
           env {
             name  = "MCP_SERVERS"
-            value = jsonencode({ "rj-gateway" = { url = "https://rj-gateway.${var.tailscale_tailnet}/mcp", transport = "http" } })
+            value = jsonencode({ "rj-gateway" = { url = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080/mcp", transport = "http" } })
+          }
+
+          # In-cluster gateway URL for the OpenClaw Python agent (agent.py).
+          env {
+            name  = "RJ_GATEWAY_URL"
+            value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080"
+          }
+
+          port {
+            container_port = 8080
+            name           = "agent"
           }
 
           volume_mount {
@@ -92,7 +103,7 @@ resource "kubernetes_deployment" "openclaw" {
 
             args = [
               "--campaigns-dir=/etc/campaigns",
-              "--gateway-url=https://rj-gateway.${var.tailscale_tailnet}",
+              "--gateway-url=http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
               "--interval=60s",
             ]
 

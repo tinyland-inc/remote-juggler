@@ -123,6 +123,27 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
+	// Optional in-cluster HTTP listener (no TLS) for pod-to-pod communication.
+	var inClusterServer *http.Server
+	if cfg.InClusterListen != "" {
+		icLn, icErr := net.Listen("tcp", cfg.InClusterListen)
+		if icErr != nil {
+			log.Fatalf("in-cluster listen: %v", icErr)
+		}
+		inClusterServer = &http.Server{
+			Handler:      handler,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  120 * time.Second,
+		}
+		go func() {
+			if err := inClusterServer.Serve(icLn); err != http.ErrServerClosed {
+				log.Fatalf("in-cluster server error: %v", err)
+			}
+		}()
+		log.Printf("rj-gateway in-cluster listener on %s (HTTP, no TLS)", cfg.InClusterListen)
+	}
+
 	// Graceful shutdown.
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
@@ -139,6 +160,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	server.Shutdown(ctx)
+	if inClusterServer != nil {
+		inClusterServer.Shutdown(ctx)
+	}
 	setec.StopPolling()
 }
 
