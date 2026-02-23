@@ -18,10 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -32,6 +34,7 @@ func main() {
 	once := flag.Bool("once", false, "run all due campaigns once and exit")
 	campaignID := flag.String("campaign", "", "run a specific campaign by ID and exit")
 	interval := flag.Duration("interval", 60*time.Second, "scheduler check interval")
+	apiPort := flag.Int("api-port", intEnvOrDefault("CAMPAIGN_RUNNER_API_PORT", 8081), "HTTP API server port (0 to disable)")
 	flag.Parse()
 
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
@@ -97,6 +100,18 @@ func main() {
 		return
 	}
 
+	// Start HTTP API server for manual triggering and status queries.
+	if *apiPort > 0 {
+		api := NewAPIServer(scheduler, registry)
+		scheduler.OnResult = api.RecordResult
+		go func() {
+			addr := fmt.Sprintf(":%d", *apiPort)
+			if err := api.ListenAndServe(addr); err != nil {
+				log.Printf("api server error: %v", err)
+			}
+		}()
+	}
+
 	// Main loop: check for due campaigns on interval.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -127,6 +142,15 @@ func main() {
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func intEnvOrDefault(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

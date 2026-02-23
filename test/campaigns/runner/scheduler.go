@@ -14,6 +14,10 @@ type Scheduler struct {
 	registry   map[string]*Campaign
 	dispatcher *Dispatcher
 	collector  *Collector
+
+	// OnResult is called after each campaign run with the result.
+	// Used by the API server to track latest results.
+	OnResult func(*CampaignResult)
 }
 
 // NewScheduler creates a Scheduler with the given campaign registry.
@@ -48,12 +52,14 @@ func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
 	log.Printf("campaign %s: starting run %s (agent=%s, timeout=%s)",
 		campaign.ID, runID, campaign.Agent, campaign.Guardrails.MaxDuration)
 
-	// Check global kill switch.
-	if killed, err := s.collector.CheckKillSwitch(ctx); err != nil {
-		log.Printf("campaign %s: kill switch check error: %v (continuing)", campaign.ID, err)
-	} else if killed {
-		log.Printf("campaign %s: global kill switch active, skipping", campaign.ID)
-		return fmt.Errorf("global kill switch active")
+	// Check global kill switch (skip if collector not configured).
+	if s.collector != nil {
+		if killed, err := s.collector.CheckKillSwitch(ctx); err != nil {
+			log.Printf("campaign %s: kill switch check error: %v (continuing)", campaign.ID, err)
+		} else if killed {
+			log.Printf("campaign %s: global kill switch active, skipping", campaign.ID)
+			return fmt.Errorf("global kill switch active")
+		}
 	}
 
 	result := &CampaignResult{
@@ -64,6 +70,13 @@ func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
 	}
 
 	// Dispatch to agent via rj-gateway MCP.
+	if s.dispatcher == nil {
+		result.Status = "error"
+		result.Error = "no dispatcher configured"
+		result.FinishedAt = time.Now().UTC().Format(time.RFC3339)
+		s.storeResult(ctx, campaign, result)
+		return fmt.Errorf("no dispatcher configured")
+	}
 	dispatchResult, err := s.dispatcher.Dispatch(ctx, campaign, runID)
 	if err != nil {
 		result.Status = "error"
@@ -95,10 +108,15 @@ func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
 	return nil
 }
 
-// storeResult persists the campaign result via the collector.
+// storeResult persists the campaign result via the collector and notifies observers.
 func (s *Scheduler) storeResult(ctx context.Context, campaign *Campaign, result *CampaignResult) {
-	if err := s.collector.StoreResult(ctx, campaign, result); err != nil {
-		log.Printf("campaign %s: failed to store result: %v", campaign.ID, err)
+	if s.collector != nil {
+		if err := s.collector.StoreResult(ctx, campaign, result); err != nil {
+			log.Printf("campaign %s: failed to store result: %v", campaign.ID, err)
+		}
+	}
+	if s.OnResult != nil {
+		s.OnResult(result)
 	}
 }
 

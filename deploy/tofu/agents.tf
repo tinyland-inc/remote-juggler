@@ -105,7 +105,13 @@ resource "kubernetes_deployment" "openclaw" {
               "--campaigns-dir=/etc/campaigns",
               "--gateway-url=http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
               "--interval=60s",
+              "--api-port=8081",
             ]
+
+            port {
+              container_port = 8081
+              name           = "api"
+            }
 
             volume_mount {
               name       = "campaigns"
