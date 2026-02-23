@@ -33,6 +33,7 @@ type MCPProxy struct {
 	resolver *Resolver
 	setec    *SetecClient
 	audit    *AuditLog
+	aperture *ApertureClient
 }
 
 // NewMCPProxy creates a proxy for the given Chapel binary.
@@ -208,6 +209,8 @@ var gatewayToolNames = map[string]bool{
 	"juggler_setec_get":         true,
 	"juggler_setec_put":         true,
 	"juggler_audit_log":         true,
+	"juggler_campaign_status":   true,
+	"juggler_aperture_usage":    true,
 }
 
 // HandleRPC handles POST /mcp JSON-RPC requests.
@@ -354,6 +357,12 @@ func (p *MCPProxy) handleGatewayTool(id json.RawMessage, tool string, args json.
 				"text": mustMarshal(map[string]any{"entries": entries, "count": len(entries)}),
 			}},
 		})
+
+	case "juggler_campaign_status":
+		result, err = handleCampaignStatusTool(p.setec, args)
+
+	case "juggler_aperture_usage":
+		result, err = handleApertureUsageTool(p.aperture, args)
 
 	default:
 		err = fmt.Errorf("unknown gateway tool: %s", tool)

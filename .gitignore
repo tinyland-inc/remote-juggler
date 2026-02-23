@@ -54,6 +54,9 @@ test-results.xml
 chplcheck-report.txt
 *.log
 
+# Campaign runner binary
+test/campaigns/runner/campaign-runner
+
 # Temporary files
 *.tmp
 *.bak

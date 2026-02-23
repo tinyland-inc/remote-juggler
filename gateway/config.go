@@ -14,6 +14,7 @@ type Config struct {
 	SetecPrefix  string          `json:"setec_prefix"`
 	SetecSecrets []string        `json:"setec_secrets"`
 	Precedence   []string        `json:"precedence"`
+	ApertureURL  string          `json:"aperture_url"`
 	Tailscale    TailscaleConfig `json:"tailscale"`
 }
 
@@ -69,6 +70,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("TS_STATE_DIR"); v != "" {
 		cfg.Tailscale.StateDir = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_URL"); v != "" {
+		cfg.ApertureURL = v
 	}
 
 	return cfg, nil

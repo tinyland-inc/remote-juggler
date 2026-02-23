@@ -75,6 +75,7 @@ func main() {
 	proxy.resolver = resolver
 	proxy.setec = setec
 	proxy.audit = audit
+	proxy.aperture = NewApertureClient(cfg.ApertureURL, setecHTTPClient)
 
 	// Start background polling for configured secrets.
 	if setec.Configured() && len(cfg.SetecSecrets) > 0 {
