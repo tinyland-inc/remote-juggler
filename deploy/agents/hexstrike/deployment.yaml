@@ -1,0 +1,106 @@
+---
+# HexStrike AI Pentest Agent Deployment on Civo K8s (fuzzy-dev namespace)
+# Demonstrates credential-aware pentesting through rj-gateway.
+#
+# HexStrike AI uses FastMCP for tool orchestration and supports 150+ security tools.
+# Routing through Aperture provides identity-aware audit of all credential access
+# during security testing engagements.
+#
+# Prerequisites:
+#   kubectl create secret generic ts-auth -n fuzzy-dev \
+#     --from-literal=TS_AUTHKEY="tskey-auth-..."
+#
+# IMPORTANT: Only deploy for authorized security testing.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hexstrike-agent
+  namespace: fuzzy-dev
+  labels:
+    app: hexstrike-agent
+    tier: agent
+    security: pentest
+spec:
+  replicas: 0  # Scale to 1 only during active engagements
+  selector:
+    matchLabels:
+      app: hexstrike-agent
+  template:
+    metadata:
+      labels:
+        app: hexstrike-agent
+        tier: agent
+        security: pentest
+    spec:
+      containers:
+        - name: hexstrike
+          image: ghcr.io/hexstrike/hexstrike-ai:latest
+          env:
+            # Route AI calls through Aperture
+            - name: ANTHROPIC_BASE_URL
+              value: "https://aperture.tail1234.ts.net/anthropic"
+            # MCP tools via rj-gateway for credential-aware pentesting
+            - name: MCP_SERVER_URL
+              value: "https://rj-gateway.tail1234.ts.net/mcp"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: results
+              mountPath: /results
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            # HexStrike needs network tools
+            capabilities:
+              add:
+                - NET_RAW
+                - NET_ADMIN
+
+        # Tailscale sidecar
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:latest
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: ts-auth
+                  key: TS_AUTHKEY
+            - name: TS_HOSTNAME
+              value: hexstrike-agent
+            - name: TS_STATE_DIR
+              value: /var/lib/tailscale
+          volumeMounts:
+            - name: ts-state
+              mountPath: /var/lib/tailscale
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: results
+          persistentVolumeClaim:
+            claimName: hexstrike-results
+        - name: ts-state
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hexstrike-results
+  namespace: fuzzy-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

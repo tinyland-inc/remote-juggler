@@ -1,0 +1,87 @@
+---
+# OpenClaw Agent Deployment on Civo K8s (fuzzy-dev namespace)
+# Runs behind Tailscale Aperture for identity-aware credential access.
+#
+# This agent demonstrates multi-agent credential governance:
+# OpenClaw -> Aperture (identity + policy) -> rj-gateway -> secrets
+#
+# Prerequisites:
+#   kubectl create secret generic ts-auth -n fuzzy-dev \
+#     --from-literal=TS_AUTHKEY="tskey-auth-..."
+#   kubectl create secret generic openclaw-config -n fuzzy-dev \
+#     --from-file=config.yaml=openclaw-config.yaml
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openclaw-agent
+  namespace: fuzzy-dev
+  labels:
+    app: openclaw-agent
+    tier: agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openclaw-agent
+  template:
+    metadata:
+      labels:
+        app: openclaw-agent
+        tier: agent
+    spec:
+      containers:
+        - name: openclaw
+          image: ghcr.io/openclaw/openclaw:latest
+          env:
+            # Route AI API calls through Aperture on tailnet
+            - name: OPENAI_BASE_URL
+              value: "https://aperture.tail1234.ts.net/v1"
+            - name: ANTHROPIC_BASE_URL
+              value: "https://aperture.tail1234.ts.net/anthropic"
+            # MCP tools via rj-gateway on tailnet
+            - name: MCP_SERVERS
+              value: '{"rj-gateway": {"url": "https://rj-gateway.tail1234.ts.net/mcp", "transport": "http"}}'
+          volumeMounts:
+            - name: config
+              mountPath: /etc/openclaw
+              readOnly: true
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+        # Tailscale sidecar for tailnet connectivity
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:latest
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: ts-auth
+                  key: TS_AUTHKEY
+            - name: TS_HOSTNAME
+              value: openclaw-agent
+            - name: TS_STATE_DIR
+              value: /var/lib/tailscale
+          volumeMounts:
+            - name: ts-state
+              mountPath: /var/lib/tailscale
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+
+      volumes:
+        - name: config
+          secret:
+            secretName: openclaw-config
+        - name: workspace
+          emptyDir: {}
+        - name: ts-state
+          emptyDir: {}

@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "rj-gateway": {
+      "url": "https://rj-gateway.tail1234.ts.net/mcp",
+      "transport": "http",
+      "description": "RemoteJuggler gateway with credential resolution and audit logging"
+    }
+  },
+  "tools": {
+    "credential_resolution": {
+      "description": "Use juggler_resolve_composite to retrieve credentials needed during pentest engagements. All access is logged to the audit trail.",
+      "example": {
+        "query": "target-ssh-key",
+        "sources": [
+          "kdbx",
+          "setec"
+        ]
+      }
+    }
+  }
+}

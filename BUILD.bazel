@@ -44,6 +44,7 @@ filegroup(
         "src/**/*.chpl",
         "gtk-gui/src/**/*.rs",
         "tray/linux/**/*.go",
+        "gateway/**/*.go",
         "tray/darwin/Sources/**/*.swift",
         "pinentry/**/*.c",
         "pinentry/**/*.h",
@@ -98,6 +99,11 @@ alias(
 alias(
     name = "tray-linux",
     actual = "//tray/linux:remote-juggler-tray",
+)
+
+alias(
+    name = "gateway",
+    actual = "//gateway:rj-gateway",
 )
 
 # Note: Chapel CLI is built via Nix, not Bazel

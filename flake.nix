@@ -34,6 +34,7 @@
       # System-independent outputs for consumption by other flakes
       overlays.default = final: prev: {
         remote-juggler = self.packages.${prev.stdenv.hostPlatform.system}.remote-juggler;
+        rj-gateway = self.packages.${prev.stdenv.hostPlatform.system}.rj-gateway;
         pinentry-remotejuggler = self.packages.${prev.stdenv.hostPlatform.system}.pinentry-remotejuggler;
       } // (if prev.stdenv.isLinux then {
         remote-juggler-gui = self.packages.${prev.stdenv.hostPlatform.system}.remote-juggler-gui;
@@ -209,7 +210,7 @@
         # inside an FHS-compatible sandbox
         remote-juggler = pkgs.stdenv.mkDerivation {
           pname = "remote-juggler";
-          version = "2.1.0-beta.7";
+          version = "2.1.0";
 
           src = pkgs.lib.cleanSourceWith {
             src = ./.;
@@ -357,9 +358,36 @@
           }
         );
 
+        # Build the Go gateway (all platforms)
+        rj-gateway = pkgs.buildGoModule {
+          pname = "rj-gateway";
+          version = "2.1.0";
+
+          src = pkgs.lib.cleanSourceWith {
+            src = ./gateway;
+            filter = path: type:
+              let baseName = baseNameOf (toString path);
+              in !(baseName == "Dockerfile");
+          };
+
+          vendorHash = null; # Set after first build, or use goModules
+
+          # Skip vendor hash check during development
+          proxyVendor = true;
+
+          ldflags = [ "-s" "-w" ];
+
+          meta = with pkgs.lib; {
+            description = "RemoteJuggler MCP gateway with tsnet, Setec, and additive credential resolution";
+            homepage = "https://github.com/tinyland-inc/remote-juggler";
+            license = licenses.zlib;
+            platforms = platforms.unix;
+          };
+        };
+
       in {
         packages = {
-          inherit remote-juggler pinentry-remotejuggler;
+          inherit remote-juggler rj-gateway pinentry-remotejuggler;
           default = remote-juggler;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           inherit remote-juggler-gui;
@@ -398,6 +426,9 @@
 
             # KeePassXC CLI for credential authority
             pkgs.keepassxc
+
+            # Go toolchain for gateway development
+            pkgs.go
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.darwin.apple_sdk.frameworks.Security
             pkgs.darwin.apple_sdk.frameworks.CoreFoundation

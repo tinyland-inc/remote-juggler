@@ -1,0 +1,119 @@
+---
+# Setec secret server deployment for Civo K8s (fuzzy-dev namespace).
+# Setec runs with a Tailscale sidecar for tailnet connectivity.
+#
+# Prerequisites:
+#   kubectl create namespace fuzzy-dev  (if not exists)
+#   kubectl create secret generic ts-auth -n fuzzy-dev \
+#     --from-literal=TS_AUTHKEY="tskey-auth-..."
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: setec
+  namespace: fuzzy-dev
+  labels:
+    app: setec
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: setec
+  template:
+    metadata:
+      labels:
+        app: setec
+    spec:
+      containers:
+        - name: setec
+          image: ghcr.io/tailscale/setec:latest
+          args:
+            - server
+            - --addr=:8443
+            - --state-dir=/data
+          ports:
+            - containerPort: 8443
+              name: https
+          volumeMounts:
+            - name: setec-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:latest
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: ts-auth
+                  key: TS_AUTHKEY
+            - name: TS_HOSTNAME
+              value: setec
+            - name: TS_STATE_DIR
+              value: /var/lib/tailscale
+            - name: TS_SERVE_CONFIG
+              value: |
+                {
+                  "TCP": {
+                    "443": {
+                      "HTTPS": true
+                    }
+                  },
+                  "Web": {
+                    "${TS_CERT_DOMAIN}:443": {
+                      "Handlers": {
+                        "/": {
+                          "Proxy": "http://127.0.0.1:8443"
+                        }
+                      }
+                    }
+                  }
+                }
+          volumeMounts:
+            - name: ts-state
+              mountPath: /var/lib/tailscale
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+
+      volumes:
+        - name: setec-data
+          persistentVolumeClaim:
+            claimName: setec-data
+        - name: ts-state
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: setec-data
+  namespace: fuzzy-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: setec
+  namespace: fuzzy-dev
+spec:
+  selector:
+    app: setec
+  ports:
+    - port: 8443
+      targetPort: 8443
+      name: https
+  type: ClusterIP

@@ -1,0 +1,57 @@
+// Tailscale ACL grants for RemoteJuggler gateway.
+// Add these to your tailnet's ACL policy to enable identity-aware
+// secret access via Aperture + rj-gateway.
+//
+// See: https://tailscale.com/docs/features/access-control/grants/grants-app-capabilities
+{
+  "grants": [
+    {
+      // Allow all tailnet users to read secrets via rj-gateway.
+      "src": ["autogroup:member"],
+      "dst": ["tag:rj-gateway"],
+      "app": {
+        "tailscale.com/cap/rj-gateway": [{
+          "role": "reader"
+        }]
+      }
+    },
+    {
+      // Allow admin users to write secrets and view audit logs.
+      "src": ["group:admins"],
+      "dst": ["tag:rj-gateway"],
+      "app": {
+        "tailscale.com/cap/rj-gateway": [{
+          "role": "admin"
+        }]
+      }
+    },
+    {
+      // Allow CI/CD agents to read specific secrets.
+      "src": ["tag:ci-agent"],
+      "dst": ["tag:rj-gateway"],
+      "app": {
+        "tailscale.com/cap/rj-gateway": [{
+          "role": "reader",
+          "secrets": ["github-token", "gitlab-token", "neon-database-url"]
+        }]
+      }
+    },
+    {
+      // Allow rj-gateway to access setec.
+      "src": ["tag:rj-gateway"],
+      "dst": ["tag:setec"],
+      "app": {
+        "tailscale.com/cap/setec": [{
+          "role": "admin"
+        }]
+      }
+    }
+  ],
+
+  // Tags for the services.
+  "tagOwners": {
+    "tag:rj-gateway": ["autogroup:admin"],
+    "tag:setec":      ["autogroup:admin"],
+    "tag:ci-agent":   ["autogroup:admin"]
+  }
+}

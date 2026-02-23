@@ -1,6 +1,6 @@
 [package]
 name = "remote-juggler-gui"
-version = "2.1.0-beta.1"
+version = "2.1.0"
 edition = "2021"
 description = "GTK4/Libadwaita GUI for RemoteJuggler identity management"
 authors = ["Jess Sullivan <jess@sulliwood.org>"]

@@ -8,14 +8,14 @@
       "env": {}
     },
     "rj-gateway": {
-      "command": "./gateway/rj-gateway",
+      "command": "rj-gateway",
       "args": [
+        "--listen=local",
         "--chapel-bin=remote-juggler"
       ],
       "env": {
-        "RJ_GATEWAY_LISTEN": ":8443",
-        "RJ_GATEWAY_SETEC_URL": "",
-        "RJ_GATEWAY_CHAPEL_BIN": ""
+        "RJ_GATEWAY_LISTEN": "local",
+        "RJ_GATEWAY_SETEC_URL": "https://setec.tail1234.ts.net"
       }
     }
   }

@@ -1,0 +1,71 @@
+# RemoteJuggler Gateway BUILD File
+#
+# Go HTTP/SSE MCP proxy with tsnet embedded Tailscale node,
+# Setec secret client, and additive credential resolution.
+#
+# Build:
+#   bazelisk build //gateway:rj-gateway
+#
+# Test:
+#   bazelisk test //gateway:gateway_test
+
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
+
+package(default_visibility = ["//visibility:public"])
+
+# =============================================================================
+# Main Binary
+# =============================================================================
+
+go_binary(
+    name = "rj-gateway",
+    embed = [":gateway_lib"],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Library
+# =============================================================================
+
+go_library(
+    name = "gateway_lib",
+    srcs = [
+        "config.go",
+        "identity.go",
+        "main.go",
+        "mcp_proxy.go",
+        "resolver.go",
+        "setec_client.go",
+        "tools.go",
+    ],
+    importpath = "github.com/tinyland-inc/remote-juggler/gateway",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_tailscale//tsnet",
+    ],
+)
+
+# =============================================================================
+# Tests
+# =============================================================================
+
+go_test(
+    name = "gateway_test",
+    srcs = [
+        "config_test.go",
+        "resolver_test.go",
+        "tools_test.go",
+    ],
+    embed = [":gateway_lib"],
+    size = "small",
+)
+
+# =============================================================================
+# Go Module Files
+# =============================================================================
+
+exports_files([
+    "go.mod",
+    "go.sum",
+])

@@ -1,0 +1,22 @@
+{
+  "listen": ":443",
+  "chapel_binary": "remote-juggler",
+  "setec_url": "https://setec.tail1234.ts.net",
+  "setec_prefix": "remotejuggler/",
+  "setec_secrets": [
+    "neon-database-url",
+    "github-token",
+    "gitlab-token",
+    "attic-token"
+  ],
+  "precedence": [
+    "env",
+    "sops",
+    "kdbx",
+    "setec"
+  ],
+  "tailscale": {
+    "hostname": "rj-gateway",
+    "state_dir": "/var/lib/rj-gateway/tsnet"
+  }
+}

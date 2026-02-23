@@ -1,0 +1,30 @@
+[Unit]
+Description=RemoteJuggler MCP Gateway (tsnet)
+Documentation=https://github.com/tinyland-inc/remote-juggler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jsullivan2
+Group=jsullivan2
+ExecStart=/usr/local/bin/rj-gateway \
+    --config=/etc/rj-gateway/config.json
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+# Tailscale state directory for tsnet
+Environment=TS_STATE_DIR=/var/lib/rj-gateway/tsnet
+# Auth key (set via override or drop-in)
+# Environment=TS_AUTHKEY=tskey-auth-...
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/rj-gateway
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

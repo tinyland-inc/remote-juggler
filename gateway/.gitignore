@@ -1,0 +1,10 @@
+# Compiled binary
+gateway
+rj-gateway
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib

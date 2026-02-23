@@ -1,0 +1,65 @@
+---
+# rj-gateway deployment for Civo K8s (fuzzy-dev namespace).
+# Joins tailnet via embedded tsnet, exposes MCP proxy + composite resolver.
+#
+# Prerequisites:
+#   kubectl create secret generic ts-auth -n fuzzy-dev \
+#     --from-literal=TS_AUTHKEY="tskey-auth-..."
+#   kubectl create secret generic rj-gateway-config -n fuzzy-dev \
+#     --from-file=config.json=gateway-config.json
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rj-gateway
+  namespace: fuzzy-dev
+  labels:
+    app: rj-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rj-gateway
+  template:
+    metadata:
+      labels:
+        app: rj-gateway
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/tinyland-inc/remote-juggler/gateway:latest
+          args:
+            - --config=/etc/rj-gateway/config.json
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: ts-auth
+                  key: TS_AUTHKEY
+            - name: TS_HOSTNAME
+              value: rj-gateway
+            - name: TS_STATE_DIR
+              value: /var/lib/tsnet
+          ports:
+            - containerPort: 443
+              name: https
+          volumeMounts:
+            - name: config
+              mountPath: /etc/rj-gateway
+              readOnly: true
+            - name: ts-state
+              mountPath: /var/lib/tsnet
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+      volumes:
+        - name: config
+          secret:
+            secretName: rj-gateway-config
+        - name: ts-state
+          emptyDir: {}
