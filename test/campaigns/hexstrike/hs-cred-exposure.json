@@ -1,0 +1,120 @@
+{
+  "id": "hs-cred-exposure",
+  "name": "Credential Exposure Scan",
+  "description": "Scans full git history of all repos for exposed credentials using pattern matching and entropy analysis. Cross-references found secrets against KDBX/Setec inventory to assess severity. Reports never contain actual secret values — only locations and hashes.",
+  "agent": "hexstrike",
+  "trigger": {
+    "schedule": "0 1 * * 0",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-threat-detection",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "lab",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-cleanup",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_keys_search",
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for cloning access",
+    "Clone each target repo with --mirror for full history (all branches, all tags)",
+    "Run credential pattern matching against all commits: AWS keys (AKIA...), API tokens (*_TOKEN, *_KEY, *_SECRET patterns), passwords in config files, private keys (-----BEGIN * PRIVATE KEY-----)",
+    "Calculate Shannon entropy scores for suspicious strings; flag high-entropy values (>4.5 bits/char) in non-binary files",
+    "Cross-reference found credentials against KDBX/Setec inventory via juggler_keys_search and juggler_setec_list to identify known vs unknown secrets",
+    "Classify severity: P0 (live credential in current code on default branch), P1 (credential only in git history, not in current tree), P2 (test fixture, example, or documentation placeholder). Store exposure report in Setec via juggler_setec_put (metadata only — file path, commit SHA, severity, entropy score — never actual secret values)"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/hs-cred-exposure",
+    "issueLabels": [
+      "campaign",
+      "security",
+      "credential-exposure"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "45m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All repos scanned through full history, no P0 exposures",
+    "kpis": [
+      "repos_scanned",
+      "commits_analyzed",
+      "p0_exposures",
+      "p1_exposures",
+      "p2_exposures",
+      "total_findings"
+    ]
+  }
+}

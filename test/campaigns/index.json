@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "description": "RemoteJuggler campaign registry. Managed by campaign-runner sidecar.",
+  "campaigns": {
+    "cc-mcp-regression": {
+      "file": "claude-code/cc-mcp-regression.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "cc-identity-switch": {
+      "file": "claude-code/cc-identity-switch.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "cc-config-sync": {
+      "file": "claude-code/cc-config-sync.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "cc-cred-resolution": {
+      "file": "claude-code/cc-cred-resolution.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "cc-gateway-health": {
+      "file": "claude-code/cc-gateway-health.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-dep-audit": {
+      "file": "openclaw/oc-dep-audit.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-coverage-gaps": {
+      "file": "openclaw/oc-coverage-gaps.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-docs-freshness": {
+      "file": "openclaw/oc-docs-freshness.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-license-scan": {
+      "file": "openclaw/oc-license-scan.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-dead-code": {
+      "file": "openclaw/oc-dead-code.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-ts-strict": {
+      "file": "openclaw/oc-ts-strict.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-a11y-check": {
+      "file": "openclaw/oc-a11y-check.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-cred-exposure": {
+      "file": "hexstrike/hs-cred-exposure.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-dep-vuln": {
+      "file": "hexstrike/hs-dep-vuln.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-network-posture": {
+      "file": "hexstrike/hs-network-posture.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-gateway-pentest": {
+      "file": "hexstrike/hs-gateway-pentest.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-sops-rotation": {
+      "file": "hexstrike/hs-sops-rotation.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-container-vuln": {
+      "file": "hexstrike/hs-container-vuln.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "xa-audit-completeness": {
+      "file": "cross-agent/xa-audit-completeness.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "xa-cred-lifecycle": {
+      "file": "cross-agent/xa-cred-lifecycle.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "xa-acl-enforcement": {
+      "file": "cross-agent/xa-acl-enforcement.json",
+      "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    }
+  }
+}

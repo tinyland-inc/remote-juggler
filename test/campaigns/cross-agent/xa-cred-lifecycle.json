@@ -1,0 +1,69 @@
+{
+  "id": "xa-cred-lifecycle",
+  "name": "Full Credential Lifecycle",
+  "description": "Cross-agent campaign testing the complete credential lifecycle. OpenClaw discovers credentials across sources, HexStrike verifies none are exposed in git history, Claude Code verifies the composite resolver resolves each from the correct source with correct precedence.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 6 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_keys_search",
+    "juggler_keys_status",
+    "juggler_keys_crawl_env",
+    "juggler_setec_list",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_audit_log",
+    "juggler_campaign_status"
+  ],
+  "process": [
+    "Phase 1 (OpenClaw): Discover credentials via env crawl and KDBX/Setec inventory -- build comprehensive credential map",
+    "Phase 1 stores 'xa-cred-lifecycle/phase1-complete' in Setec with credential inventory (metadata only, no secret values)",
+    "Phase 2 (HexStrike, triggered by phase1-complete): Scan git history for any discovered credential appearing in commits -- verify no exposure",
+    "Phase 2 stores 'xa-cred-lifecycle/phase2-complete' in Setec with exposure scan results",
+    "Phase 3 (Claude Code, triggered by phase2-complete): For each discovered credential verify juggler_resolve_composite resolves from correct source with correct precedence",
+    "Phase 3 stores 'xa-cred-lifecycle/phase3-complete' in Setec with resolution verification results",
+    "Final: compare all phase results and generate lifecycle health report"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/xa-cred-lifecycle",
+    "issueLabels": [
+      "campaign",
+      "cross-agent",
+      "cred-lifecycle"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "1h",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 200000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All phases complete, no credential exposure found, all resolutions from correct source",
+    "kpis": [
+      "credentials_discovered",
+      "exposures_found",
+      "resolutions_correct",
+      "resolutions_wrong_source",
+      "phases_completed"
+    ]
+  }
+}

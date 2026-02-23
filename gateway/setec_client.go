@@ -168,10 +168,11 @@ func (c *SetecClient) List(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("setec not configured")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/list", nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/api/list", bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Sec-X-Tailscale-No-Browsers", "setec")
 
 	resp, err := c.httpClient.Do(req)

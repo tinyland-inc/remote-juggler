@@ -1,0 +1,72 @@
+{
+  "id": "oc-dead-code",
+  "name": "Dead Code Detection",
+  "description": "Detects unused exports, orphan modules, and dead code across key TypeScript and Go repos. Creates removal PRs for confirmed dead code.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 3 1,15 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For TypeScript repos: analyze import/export graphs via GitHub API to find unused exports",
+    "For Go repos: analyze package dependencies to find unused internal packages",
+    "Cross-reference with test files to identify dead test helpers",
+    "Generate removal report with confidence scores and create PRs for high-confidence removals"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-dead-code",
+    "issueLabels": [
+      "campaign",
+      "dead-code"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler",
+    "prBranchPrefix": "sid/campaign-deadcode-"
+  },
+  "guardrails": {
+    "maxDuration": "25m",
+    "readOnly": false,
+    "allowedBranches": [
+      "sid/campaign-deadcode-*"
+    ],
+    "requireApproval": true,
+    "aiApiBudget": {
+      "maxTokens": 100000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": true,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All target repos analyzed, dead code identified with confidence scores",
+    "kpis": [
+      "repos_analyzed",
+      "unused_exports",
+      "orphan_modules",
+      "dead_test_helpers",
+      "prs_created"
+    ]
+  }
+}

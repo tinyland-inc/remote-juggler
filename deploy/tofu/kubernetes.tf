@@ -43,6 +43,19 @@ resource "kubernetes_secret" "ghcr_pull" {
   }
 }
 
+# Agent API keys (for direct AI backend access, bypassing Aperture for now)
+resource "kubernetes_secret" "agent_api_keys" {
+  metadata {
+    name      = "agent-api-keys"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = local.labels
+  }
+
+  data = {
+    ANTHROPIC_API_KEY = var.anthropic_api_key
+  }
+}
+
 # Gateway configuration secret
 resource "kubernetes_secret" "gateway_config" {
   metadata {

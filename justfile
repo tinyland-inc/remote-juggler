@@ -1081,6 +1081,40 @@ tofu-output:
     deploy/tofu/apply.sh output
 
 # =============================================================================
+# Campaigns
+# =============================================================================
+
+# Run a specific campaign by ID
+[group('campaigns')]
+campaign-run id:
+    cd test/campaigns/runner && go run . --campaigns-dir=.. --campaign={{id}} --gateway-url=${RJ_GATEWAY_URL:-https://rj-gateway:443}
+
+# List campaigns from the registry
+[group('campaigns')]
+campaign-list:
+    @cat test/campaigns/index.json | python3 -c "import json,sys; idx=json.load(sys.stdin); [print(f'  {k}: enabled={v[\"enabled\"]}') for k,v in idx['campaigns'].items()]"
+
+# Run all due campaigns once (for testing)
+[group('campaigns')]
+campaign-once:
+    cd test/campaigns/runner && go run . --campaigns-dir=.. --once --gateway-url=${RJ_GATEWAY_URL:-https://rj-gateway:443}
+
+# Build campaign runner binary
+[group('campaigns')]
+campaign-build:
+    cd test/campaigns/runner && go build -o ../../../target/release/campaign-runner .
+
+# Run campaign runner tests
+[group('campaigns')]
+campaign-test:
+    cd test/campaigns/runner && go test -v ./...
+
+# Scale HexStrike agent (0=dormant, 1=active)
+[group('campaigns')]
+campaign-scale-hexstrike replicas="0":
+    kubectl scale deploy/hexstrike-agent -n fuzzy-dev --replicas={{replicas}}
+
+# =============================================================================
 # CI Helpers
 # =============================================================================
 

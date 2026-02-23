@@ -78,6 +78,36 @@ func gatewayTools() []json.RawMessage {
 				},
 			},
 		},
+		{
+			"name":        "juggler_campaign_status",
+			"description": "Query campaign run results stored in Setec. Returns latest results for a specific campaign or lists all campaign results.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"campaign_id": map[string]any{
+						"type":        "string",
+						"description": "Campaign ID to query (e.g. 'oc-dep-audit'). Omit to list all campaigns.",
+					},
+				},
+			},
+		},
+		{
+			"name":        "juggler_aperture_usage",
+			"description": "Query AI API usage metrics from Aperture. Returns token counts and call frequency, optionally filtered by campaign or agent.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"campaign_id": map[string]any{
+						"type":        "string",
+						"description": "Filter usage by campaign ID",
+					},
+					"agent": map[string]any{
+						"type":        "string",
+						"description": "Filter usage by agent name (openclaw, hexstrike, claude-code)",
+					},
+				},
+			},
+		},
 	}
 
 	var raw []json.RawMessage

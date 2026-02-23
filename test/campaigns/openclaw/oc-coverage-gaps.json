@@ -1,0 +1,74 @@
+{
+  "id": "oc-coverage-gaps",
+  "name": "Test Coverage Gap Analysis",
+  "description": "Analyzes test coverage across key repos to find untested files and functions. Cross-references test directories with source code to identify gaps.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 3 * * 2",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: fetch source and test file trees via GitHub API",
+    "Map test files to source files using convention-based matching (e.g., foo.ts -> foo.test.ts, foo.go -> foo_test.go)",
+    "Identify source files with no corresponding test file",
+    "Rank gaps by file complexity: lines of code, number of imports, exported symbols",
+    "Store prioritized gap report in Setec and create/update tracking issue"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-coverage-gaps",
+    "issueLabels": [
+      "campaign",
+      "test-coverage"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "20m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All target repos analyzed, coverage gaps identified and ranked",
+    "kpis": [
+      "repos_analyzed",
+      "source_files",
+      "test_files",
+      "uncovered_files",
+      "coverage_ratio"
+    ]
+  }
+}

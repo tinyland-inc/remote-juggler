@@ -1,0 +1,72 @@
+{
+  "id": "xa-audit-completeness",
+  "name": "Audit Trail Completeness Verification",
+  "description": "Cross-agent campaign that verifies every credential operation from every agent appears in the rj-gateway audit log. Each agent performs distinct operations, then OpenClaw queries the audit log to verify completeness.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 4 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_keys_search",
+    "juggler_keys_status",
+    "juggler_setec_list",
+    "juggler_setec_get",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Phase 1 (all agents in parallel): Each agent performs 3-5 distinct credential operations via rj-gateway",
+    "  OpenClaw: resolve_composite('github-token'), keys_search('test'), keys_status(), setec_list(), audit_log(count=5)",
+    "  HexStrike (if scaled up): resolve_composite('gitlab-token'), setec_list(), setec_get('test-secret')",
+    "  Claude Code: resolve_composite('GITHUB_TOKEN'), setec_list(), keys_status(), campaign_status(), aperture_usage()",
+    "Phase 2 (OpenClaw, after all agents complete): Query audit_log for the campaign time window",
+    "  Verify: every operation from Phase 1 appears in the audit log",
+    "  Verify: caller identity correctly identifies each agent (node name matches)",
+    "  Verify: timestamps are monotonically increasing within each agent's operations",
+    "  Verify: allowed/denied fields are correct (expected operations should be allowed)",
+    "  Calculate: audit_completeness_score = matched_entries / expected_entries",
+    "Store results in Setec; create issue if completeness < 100%"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/xa-audit-completeness",
+    "issueLabels": [
+      "campaign",
+      "audit-completeness",
+      "cross-agent"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "10m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 50000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "audit_completeness_score = 1.0 (all operations captured)",
+    "kpis": [
+      "audit_completeness_score",
+      "expected_entries",
+      "matched_entries",
+      "missing_entries",
+      "agents_participating"
+    ]
+  }
+}

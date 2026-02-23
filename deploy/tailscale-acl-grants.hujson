@@ -37,12 +37,35 @@
       }
     },
     {
-      // Allow rj-gateway to access setec.
+      // Allow rj-gateway to manage secrets in setec.
+      // Capability domain must be tailscale.com/cap/secrets (Setec's built-in).
       "src": ["tag:rj-gateway"],
       "dst": ["tag:setec"],
       "app": {
-        "tinyland.dev/cap/setec": [{
-          "role": "admin"
+        "tailscale.com/cap/secrets": [{
+          "action": ["get", "info", "put", "activate", "delete"],
+          "secret": ["*"]
+        }]
+      }
+    },
+    {
+      // Allow admin users to manage secrets in setec directly.
+      "src": ["autogroup:admin"],
+      "dst": ["tag:setec"],
+      "app": {
+        "tailscale.com/cap/secrets": [{
+          "action": ["get", "info", "put", "activate", "delete"],
+          "secret": ["*"]
+        }]
+      }
+    },
+    {
+      // Allow CI agents to route AI API calls through Aperture.
+      "src": ["tag:ci-agent"],
+      "dst": ["tag:aperture"],
+      "app": {
+        "tinyland.dev/cap/aperture": [{
+          "role": "agent"
         }]
       }
     }
@@ -52,6 +75,7 @@
   "tagOwners": {
     "tag:rj-gateway": ["autogroup:admin"],
     "tag:setec":      ["autogroup:admin"],
-    "tag:ci-agent":   ["autogroup:admin"]
+    "tag:ci-agent":   ["autogroup:admin"],
+    "tag:aperture":   ["autogroup:admin"]
   }
 }

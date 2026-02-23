@@ -1,0 +1,68 @@
+{
+  "id": "hs-container-vuln",
+  "name": "Container Image Vulnerability Scan",
+  "description": "Scans all GHCR container images for vulnerabilities using trivy-style analysis. Checks base image age, known CVEs in OS packages and application dependencies, and verifies images are built from expected Dockerfiles.",
+  "agent": "hexstrike",
+  "trigger": {
+    "event": "push",
+    "pathFilters": [
+      "deploy/docker/Dockerfile.*",
+      ".github/workflows/containers.yml"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GHCR registry access",
+    "Enumerate all 5 GHCR images: ghcr.io/tinyland-inc/remote-juggler/{cli, gateway, setec, openclaw, hexstrike}",
+    "For each image: pull manifest and layer metadata, identify base image (alpine, golang, etc.) and its version",
+    "Analyze base image and OS packages for known CVEs against vulnerability databases; classify by severity (critical, high, medium, low)",
+    "Check application-level dependencies within each image layer for known vulnerabilities",
+    "Verify each image was built from the expected Dockerfile by checking OCI labels and annotations (org.opencontainers.image.source). Generate vulnerability report with severity classification and store in Setec via juggler_setec_put"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/hs-container-vuln",
+    "pvcPath": "/results/container-vuln",
+    "issueLabels": [
+      "campaign",
+      "security",
+      "container-vuln"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "20m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 60000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All 5 images scanned, CVEs enumerated, base image age assessed",
+    "kpis": [
+      "images_scanned",
+      "cve_critical",
+      "cve_high",
+      "cve_medium",
+      "base_image_age_days",
+      "images_up_to_date"
+    ]
+  }
+}

@@ -37,6 +37,11 @@ resource "kubernetes_deployment" "setec" {
   spec {
     replicas = 1
 
+    # Recreate strategy required: Setec's PVC is ReadWriteOnce.
+    strategy {
+      type = "Recreate"
+    }
+
     selector {
       match_labels = {
         app = "setec"
@@ -73,6 +78,11 @@ resource "kubernetes_deployment" "setec" {
                 key  = "TS_AUTHKEY"
               }
             }
+          }
+
+          env {
+            name  = "TSNET_FORCE_LOGIN"
+            value = "1"
           }
 
           volume_mount {

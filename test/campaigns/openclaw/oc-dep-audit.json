@@ -1,0 +1,122 @@
+{
+  "id": "oc-dep-audit",
+  "name": "Cross-Repo Dependency Audit",
+  "description": "Audits dependency manifests across all Tinyland repos to find version divergence (same package, different versions) and known CVEs. Builds a cross-repo dependency graph and flags inconsistencies.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 2 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-threat-detection",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "lab",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-cleanup",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_get",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: fetch dependency manifests via GitHub API (package.json, go.mod, Cargo.toml, pyproject.toml)",
+    "Build cross-repo dependency graph: map each dependency to all repos and versions that use it",
+    "Flag version divergences: same package used at different versions across repos",
+    "Run vulnerability checks: npm audit (TypeScript), govulncheck (Go), cargo audit (Rust), pip-audit (Python)",
+    "Aggregate CVEs by severity: critical (CVSS >= 9), high (>= 7), medium (>= 4)",
+    "Cross-reference CVEs with dependency graph to identify blast radius",
+    "Store results in Setec and create/update pinned issue on remote-juggler",
+    "Compare with previous run to detect new divergences or resolved CVEs"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-dep-audit",
+    "issueLabels": [
+      "campaign",
+      "dependency-audit"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "30m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 100000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All target repos scanned, dependency graph built, CVEs enumerated",
+    "kpis": [
+      "repos_scanned",
+      "total_dependencies",
+      "version_divergences",
+      "cve_critical",
+      "cve_high",
+      "cve_medium",
+      "cve_low"
+    ]
+  }
+}

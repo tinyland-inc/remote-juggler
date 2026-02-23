@@ -52,13 +52,17 @@ locals {
     ci_agent = "tag:ci-agent"
   }
 
+  # Setec URL: use override if set, otherwise derive from tailnet.
+  # Tailscale Operator may append a suffix (e.g. setec -> setec-1).
+  effective_setec_url = var.gateway_setec_url != "" ? var.gateway_setec_url : "https://setec.${var.tailscale_tailnet}"
+
   # Gateway config JSON (mounted as secret)
   gateway_config = jsonencode({
     listen         = ":443"
     chapel_binary  = "remote-juggler"
-    setec_url      = var.gateway_setec_url
+    setec_url      = local.effective_setec_url
     setec_prefix   = var.gateway_setec_prefix
-    setec_secrets  = ["neon-database-url", "github-token", "gitlab-token", "attic-token"]
+    setec_secrets  = ["neon-database-url", "github-token", "gitlab-token", "attic-token", "anthropic-api-key"]
     precedence     = var.gateway_precedence
     tailscale = {
       hostname  = "rj-gateway"

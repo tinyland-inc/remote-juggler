@@ -1,0 +1,102 @@
+{
+  "id": "cc-mcp-regression",
+  "name": "MCP Tool Regression Testing",
+  "description": "Validates all 43 MCP tools (36 Chapel + 7 gateway) respond correctly. Starts a local rj-gateway, calls tools/list, then exercises each tool with valid and invalid parameters to detect regressions in tool schemas, names, or behavior.",
+  "agent": "claude-code",
+  "trigger": {
+    "event": "push",
+    "pathFilters": [
+      "src/remote_juggler/Tools.chpl",
+      "gateway/*.go"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_list_identities",
+    "juggler_detect_identity",
+    "juggler_switch",
+    "juggler_status",
+    "juggler_validate",
+    "juggler_store_token",
+    "juggler_sync_config",
+    "juggler_config_show",
+    "juggler_setup",
+    "juggler_gpg_status",
+    "juggler_debug_ssh",
+    "juggler_token_verify",
+    "juggler_token_get",
+    "juggler_token_clear",
+    "juggler_pin_store",
+    "juggler_pin_clear",
+    "juggler_pin_status",
+    "juggler_security_mode",
+    "juggler_tws_status",
+    "juggler_tws_enable",
+    "juggler_keys_status",
+    "juggler_keys_search",
+    "juggler_keys_get",
+    "juggler_keys_store",
+    "juggler_keys_ingest_env",
+    "juggler_keys_list",
+    "juggler_keys_init",
+    "juggler_keys_resolve",
+    "juggler_keys_delete",
+    "juggler_keys_crawl_env",
+    "juggler_keys_discover",
+    "juggler_keys_export",
+    "juggler_keys_sops_status",
+    "juggler_keys_sops_ingest",
+    "juggler_keys_sops_sync",
+    "juggler_keys_sops_export",
+    "juggler_resolve_composite",
+    "juggler_setec_list",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_aperture_usage"
+  ],
+  "process": [
+    "Start rj-gateway in local mode (--listen=local)",
+    "Send tools/list -- verify 43 tools present (36 Chapel + 7 gateway)",
+    "For each tool: call with valid params, verify response has 'content' array",
+    "For each tool: call with invalid params, verify graceful error (not crash)",
+    "For each tool: call with missing required params, verify error response",
+    "Compare tool count and schemas against known-good baseline stored in Setec",
+    "If tool count or schema changes: flag as regression or intentional change"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/cc-mcp-regression",
+    "issueLabels": [
+      "campaign",
+      "mcp-regression"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "killSwitch": "kill the local rj-gateway process"
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All 43 tools respond to valid params without error; tool count matches baseline",
+    "kpis": [
+      "tool_count",
+      "tools_passing",
+      "tools_failing",
+      "schema_changes"
+    ]
+  }
+}

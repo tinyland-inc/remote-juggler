@@ -1,0 +1,120 @@
+{
+  "id": "hs-dep-vuln",
+  "name": "Dependency Vulnerability Deep Scan",
+  "description": "Extends the OpenClaw dependency audit with deeper vulnerability analysis. Checks exploitability of discovered CVEs, verifies if vulnerable code paths are actually reachable, and assesses blast radius.",
+  "agent": "hexstrike",
+  "trigger": {
+    "schedule": "0 2 * * 0",
+    "event": "dependent",
+    "dependsOn": [
+      "oc-dep-audit"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-threat-detection",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "lab",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-cleanup",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_setec_get",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Fetch oc-dep-audit results from Setec via juggler_setec_get for the latest CVE list and dependency graph",
+    "For each CVE with CVSS >= 7.0: analyze whether the vulnerable code path is reachable in our usage (import chains, function calls, conditional compilation)",
+    "Check if any existing mitigation (WAF rules, input validation, network segmentation) reduces exploitability for reachable CVEs",
+    "Assess blast radius for exploitable CVEs: which services, endpoints, and data stores are affected if the vulnerability is exploited",
+    "Generate prioritized remediation report with specific upgrade paths, patch availability, and estimated effort. Store in Setec via juggler_setec_put"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/hs-dep-vuln",
+    "issueLabels": [
+      "campaign",
+      "security",
+      "dependency-vuln"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "30m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 100000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All high/critical CVEs assessed for exploitability",
+    "kpis": [
+      "cves_analyzed",
+      "exploitable",
+      "mitigated",
+      "needs_upgrade",
+      "blast_radius_services"
+    ]
+  }
+}

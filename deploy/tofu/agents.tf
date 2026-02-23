@@ -1,8 +1,10 @@
 # =============================================================================
-# OpenClaw Agent
+# OpenClaw Agent + Campaign Runner Sidecar
 # =============================================================================
 #
 # AI agent that routes through Aperture for identity-aware credential access.
+# Campaign runner sidecar reads campaign definitions from a mounted ConfigMap,
+# evaluates triggers, and dispatches work to agents via rj-gateway MCP.
 # Tailscale Operator handles sidecar injection via service annotation.
 # =============================================================================
 
@@ -42,19 +44,20 @@ resource "kubernetes_deployment" "openclaw" {
           name = kubernetes_secret.ghcr_pull.metadata[0].name
         }
 
-        # Single container — operator injects Tailscale sidecar
+        # OpenClaw agent container
         container {
           name  = "openclaw"
           image = var.openclaw_image
 
           env {
-            name  = "OPENAI_BASE_URL"
-            value = "https://${var.aperture_hostname}/v1"
-          }
-
-          env {
-            name  = "ANTHROPIC_BASE_URL"
-            value = "https://${var.aperture_hostname}/anthropic"
+            name  = "ANTHROPIC_API_KEY"
+            value_from {
+              secret_key_ref {
+                name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                key      = "ANTHROPIC_API_KEY"
+                optional = true
+              }
+            }
           }
 
           env {
@@ -79,9 +82,51 @@ resource "kubernetes_deployment" "openclaw" {
           }
         }
 
+        # Campaign runner sidecar — orchestrates test campaigns
+        # Gated on campaign_runner_enabled (image must be built first)
+        dynamic "container" {
+          for_each = var.campaign_runner_enabled ? [1] : []
+          content {
+            name  = "campaign-runner"
+            image = var.campaign_runner_image
+
+            args = [
+              "--campaigns-dir=/etc/campaigns",
+              "--gateway-url=https://rj-gateway.${var.tailscale_tailnet}/mcp",
+              "--interval=60s",
+            ]
+
+            volume_mount {
+              name       = "campaigns"
+              mount_path = "/etc/campaigns"
+              read_only  = true
+            }
+
+            resources {
+              requests = {
+                cpu    = "50m"
+                memory = "64Mi"
+              }
+              limits = {
+                cpu    = "200m"
+                memory = "128Mi"
+              }
+            }
+          }
+        }
+
         volume {
           name = "workspace"
           empty_dir {}
+        }
+
+        # Campaign definitions ConfigMap (always mounted, used when sidecar is enabled)
+        volume {
+          name = "campaigns"
+          config_map {
+            name     = kubernetes_config_map.campaign_definitions.metadata[0].name
+            optional = true
+          }
         }
       }
     }

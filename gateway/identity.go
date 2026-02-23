@@ -63,13 +63,14 @@ func IdentityMiddleware(next http.Handler) http.Handler {
 
 // AuditEntry records a credential access event.
 type AuditEntry struct {
-	Timestamp time.Time      `json:"timestamp"`
-	Caller    CallerIdentity `json:"caller"`
-	Action    string         `json:"action"`
-	Query     string         `json:"query"`
-	Source    string         `json:"source,omitempty"`
-	Allowed   bool           `json:"allowed"`
-	Reason    string         `json:"reason,omitempty"`
+	Timestamp  time.Time      `json:"timestamp"`
+	Caller     CallerIdentity `json:"caller"`
+	Action     string         `json:"action"`
+	Query      string         `json:"query"`
+	Source     string         `json:"source,omitempty"`
+	Allowed    bool           `json:"allowed"`
+	Reason     string         `json:"reason,omitempty"`
+	CampaignID string         `json:"campaign_id,omitempty"`
 }
 
 // AuditLog provides structured logging for credential access events.

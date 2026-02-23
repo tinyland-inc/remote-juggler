@@ -1,0 +1,74 @@
+{
+  "id": "cc-identity-switch",
+  "name": "Identity Switching Correctness",
+  "description": "Tests that identity detection and switching works correctly across all supported forges (GitHub, GitLab, Codeberg). Creates temp clones, detects identity, switches, validates SSH connectivity, and runs rapid switch stress test.",
+  "agent": "claude-code",
+  "trigger": {
+    "event": "push",
+    "pathFilters": [
+      "src/remote_juggler/Config.chpl",
+      "src/remote_juggler/GlobalConfig.chpl",
+      "src/remote_juggler/Core.chpl"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "gitlab",
+      "org": "tinyland/projects",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_detect_identity",
+    "juggler_switch",
+    "juggler_validate",
+    "juggler_sync_config",
+    "juggler_list_identities",
+    "juggler_status",
+    "juggler_config_show",
+    "juggler_audit_log"
+  ],
+  "process": [
+    "List all configured identities via juggler_list_identities",
+    "Create temp clones from each forge (GitHub, GitLab) into /tmp/campaign-identity-test-*",
+    "Call juggler_detect_identity on each clone -- verify correct identity detected per forge",
+    "Call juggler_switch to each identity -- verify git config updated correctly",
+    "Call juggler_validate -- verify SSH connectivity for each identity",
+    "Rapid switch stress test: 10x identity switches verifying no state corruption"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/cc-identity-switch",
+    "issueLabels": [
+      "campaign",
+      "identity-switch"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "10m",
+    "readOnly": true,
+    "killSwitch": "rm -rf /tmp/campaign-identity-test-*"
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All identities detected and switched correctly, SSH validates for each, no state corruption in stress test",
+    "kpis": [
+      "identities_tested",
+      "detections_correct",
+      "switches_correct",
+      "validations_passed",
+      "stress_test_cycles"
+    ]
+  }
+}

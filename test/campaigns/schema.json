@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RemoteJuggler Campaign Definition",
+  "description": "Declarative test campaign for agent-driven code analysis, security scanning, and self-improvement.",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "agent",
+    "trigger",
+    "targets",
+    "tools",
+    "outputs",
+    "guardrails"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Unique campaign identifier (lowercase, hyphenated)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable campaign name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of what the campaign does and why"
+    },
+    "agent": {
+      "enum": [
+        "openclaw",
+        "hexstrike",
+        "claude-code"
+      ],
+      "description": "Which agent executes this campaign"
+    },
+    "trigger": {
+      "type": "object",
+      "properties": {
+        "schedule": {
+          "type": "string",
+          "description": "Cron expression for scheduled runs (e.g. '0 2 * * 1' for Mon 2am)"
+        },
+        "event": {
+          "enum": [
+            "push",
+            "pr",
+            "manual",
+            "dependent"
+          ],
+          "description": "Event type that triggers this campaign"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Campaign IDs that must complete before this one starts (for cross-agent orchestration)"
+        },
+        "pathFilters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns that trigger on push/PR events (e.g. 'gateway/*.go')"
+        }
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "forge",
+          "org",
+          "repo"
+        ],
+        "properties": {
+          "forge": {
+            "enum": [
+              "github",
+              "gitlab",
+              "codeberg"
+            ],
+            "description": "Which forge hosts the target repo"
+          },
+          "org": {
+            "type": "string",
+            "description": "Organization or group name"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repository name (use '*' for all repos in org)"
+          },
+          "branch": {
+            "type": "string",
+            "default": "main",
+            "description": "Branch to analyze"
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "MCP tool names this campaign uses (for documentation and validation)"
+    },
+    "process": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Ordered steps the campaign executes"
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "setecKey": {
+          "type": "string",
+          "description": "Setec key prefix for storing results (e.g. 'remotejuggler/campaigns/oc-dep-audit')"
+        },
+        "pvcPath": {
+          "type": "string",
+          "description": "PVC path for large result artifacts (HexStrike only)"
+        },
+        "issueLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Labels applied to auto-created GitHub issues"
+        },
+        "issueRepo": {
+          "type": "string",
+          "description": "Repo for issue creation (org/repo format, defaults to target repo)"
+        },
+        "prBranchPrefix": {
+          "type": "string",
+          "description": "Branch prefix for auto-created PRs (e.g. 'sid/campaign-docs-')"
+        }
+      },
+      "additionalProperties": false
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "maxDuration"
+      ],
+      "properties": {
+        "maxDuration": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$",
+          "description": "Maximum campaign duration (e.g. '30m', '2h')"
+        },
+        "readOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, campaign cannot create branches, PRs, or modify repos"
+        },
+        "allowedBranches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Branch name patterns the campaign may create (requires readOnly=false)"
+        },
+        "requireApproval": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, PRs require human approval before merge"
+        },
+        "killSwitch": {
+          "type": "string",
+          "description": "Command to immediately stop this campaign"
+        },
+        "aiApiBudget": {
+          "type": "object",
+          "properties": {
+            "maxTokens": {
+              "type": "integer",
+              "description": "Maximum AI API tokens per run"
+            },
+            "maxCostUSD": {
+              "type": "number",
+              "description": "Maximum AI API cost per run in USD"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "feedback": {
+      "type": "object",
+      "properties": {
+        "createIssues": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-create GitHub issues with findings"
+        },
+        "createPRs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-create PRs for fixable issues"
+        },
+        "closeResolvedIssues": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-close issues when subsequent run shows fix"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "successCriteria": {
+          "type": "string",
+          "description": "Human-readable description of what constitutes a successful run"
+        },
+        "kpis": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Key performance indicators tracked over time (e.g. 'version_divergences', 'cve_count')"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

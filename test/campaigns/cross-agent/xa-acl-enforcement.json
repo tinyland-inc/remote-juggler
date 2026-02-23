@@ -1,0 +1,67 @@
+{
+  "id": "xa-acl-enforcement",
+  "name": "ACL Grant Enforcement Verification",
+  "description": "Cross-agent campaign where each agent attempts operations at and beyond their ACL grant scope. Verifies that allowed operations succeed, denied operations fail with proper error, and every denial has an audit entry.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 5 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_setec_list",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_audit_log",
+    "juggler_campaign_status"
+  ],
+  "process": [
+    "Phase 1 (all agents in parallel): Each agent attempts both allowed and forbidden operations",
+    "  OpenClaw: read secrets (expect SUCCESS), write secrets as admin (expect SUCCESS)",
+    "  HexStrike (if scaled): read secrets (expect SUCCESS), write secrets (expect DENIED -- reader role)",
+    "  Claude Code: read secrets (expect SUCCESS), attempt admin-only operations (expect DENIED -- reader role)",
+    "Phase 2 (OpenClaw verifies): Query audit_log for campaign time window",
+    "  Verify: every denied operation has an audit entry with allowed=false; build ACL enforcement matrix (agent x operation x expected_result x actual_result)",
+    "Store enforcement matrix in Setec and flag any mismatches"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/xa-acl-enforcement",
+    "issueLabels": [
+      "campaign",
+      "cross-agent",
+      "acl-enforcement"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "10m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All ACL grants enforced correctly, every denial logged",
+    "kpis": [
+      "operations_tested",
+      "allowed_correct",
+      "denied_correct",
+      "enforcement_mismatches",
+      "audit_gaps",
+      "agents_participating"
+    ]
+  }
+}

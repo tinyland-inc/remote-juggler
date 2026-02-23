@@ -46,6 +46,12 @@ export TF_VAR_civo_token=$(resolve "civo-token")
 export AWS_ACCESS_KEY_ID=$(resolve "civo-object-storage-key")
 export AWS_SECRET_ACCESS_KEY=$(resolve "civo-object-storage-secret")
 
+# Agent credentials (seeded into Setec for runtime resolution)
+export TF_VAR_github_token=$(resolve "github-token" 2>/dev/null || echo "")
+export TF_VAR_gitlab_token=$(resolve "gitlab-token" 2>/dev/null || echo "")
+export TF_VAR_anthropic_api_key=$(resolve "anthropic-api-key" 2>/dev/null || echo "")
+export TF_VAR_ghcr_token=$(resolve "ghcr-token")
+
 echo "Secrets resolved. Running: tofu $*"
 
 cd "$(dirname "$0")"

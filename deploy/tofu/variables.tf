@@ -27,6 +27,31 @@ variable "tailscale_auth_key" {
 }
 
 # =============================================================================
+# Agent credentials (seeded into Setec for runtime resolution)
+# =============================================================================
+
+variable "github_token" {
+  description = "GitHub PAT for API access (seeded into Setec as github-token)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "gitlab_token" {
+  description = "GitLab PAT for API access (seeded into Setec as gitlab-token)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key for agent AI backends (seeded into Setec as anthropic-api-key)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# =============================================================================
 # Container registry (GHCR - all images private)
 # =============================================================================
 
@@ -92,6 +117,18 @@ variable "chapel_binary_image" {
   default     = "ghcr.io/tinyland-inc/remote-juggler:latest"
 }
 
+variable "campaign_runner_image" {
+  description = "Campaign runner sidecar image (OpenClaw pod)"
+  type        = string
+  default     = "ghcr.io/tinyland-inc/remote-juggler/campaign-runner:latest" # renovate: image
+}
+
+variable "campaign_runner_enabled" {
+  description = "Enable campaign runner sidecar on OpenClaw pod (requires image to be built)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Resource sizing
 # =============================================================================
@@ -119,9 +156,9 @@ variable "hexstrike_replicas" {
 # =============================================================================
 
 variable "gateway_setec_url" {
-  description = "URL for Setec server (tailnet hostname)"
+  description = "URL for Setec server (tailnet hostname). Override if Tailscale Operator appends a suffix."
   type        = string
-  default     = "https://setec.tail1234.ts.net"
+  default     = ""
 }
 
 variable "gateway_setec_prefix" {

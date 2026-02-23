@@ -16,17 +16,19 @@ on:
       - 'Dockerfile'
       - 'gateway/**'
       - 'deploy/docker/**'
+      - 'test/campaigns/runner/**'
       - '.github/workflows/containers.yml'
   pull_request:
     paths:
       - 'Dockerfile'
       - 'gateway/**'
       - 'deploy/docker/**'
+      - 'test/campaigns/runner/**'
       - '.github/workflows/containers.yml'
   workflow_dispatch:
     inputs:
       images:
-        description: 'Comma-separated images to build (all,cli,gateway,setec,openclaw,hexstrike)'
+        description: 'Comma-separated images to build (all,cli,gateway,setec,openclaw,hexstrike,campaign-runner)'
         required: false
         default: 'all'
 
@@ -54,7 +56,7 @@ jobs:
           FILTER="${{ github.event.inputs.images || 'all' }}"
 
           # Full matrix of all images (compact JSON — GITHUB_OUTPUT requires single line)
-          ALL='[{"name":"cli","context":".","file":"Dockerfile","image":"remote-juggler"},{"name":"gateway","context":"gateway","file":"gateway/Dockerfile","image":"remote-juggler/gateway"},{"name":"setec","context":".","file":"deploy/docker/Dockerfile.setec","image":"remote-juggler/setec"},{"name":"openclaw","context":".","file":"deploy/docker/Dockerfile.openclaw","image":"remote-juggler/openclaw"},{"name":"hexstrike","context":".","file":"deploy/docker/Dockerfile.hexstrike","image":"remote-juggler/hexstrike"}]'
+          ALL='[{"name":"cli","context":".","file":"Dockerfile","image":"remote-juggler"},{"name":"gateway","context":"gateway","file":"gateway/Dockerfile","image":"remote-juggler/gateway"},{"name":"setec","context":".","file":"deploy/docker/Dockerfile.setec","image":"remote-juggler/setec"},{"name":"openclaw","context":".","file":"deploy/docker/Dockerfile.openclaw","image":"remote-juggler/openclaw"},{"name":"hexstrike","context":".","file":"deploy/docker/Dockerfile.hexstrike","image":"remote-juggler/hexstrike"},{"name":"campaign-runner","context":"test/campaigns/runner","file":"test/campaigns/runner/Dockerfile","image":"remote-juggler/campaign-runner"}]'
 
           if [ "$FILTER" = "all" ]; then
             echo "matrix={\"include\":$ALL}" >> "$GITHUB_OUTPUT"

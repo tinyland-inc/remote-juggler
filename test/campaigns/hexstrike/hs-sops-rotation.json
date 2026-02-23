@@ -1,0 +1,76 @@
+{
+  "id": "hs-sops-rotation",
+  "name": "SOPS Key Rotation Compliance",
+  "description": "Checks SOPS-encrypted files across repos for key age, orphan keys (keys in .sops.yaml that no longer exist), and rotation compliance. Verifies age keys are not expired and SOPS configs reference valid recipients.",
+  "agent": "hexstrike",
+  "trigger": {
+    "schedule": "0 4 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_keys_sops_status",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: fetch .sops.yaml and enumerate all SOPS-encrypted files via GitHub API (matching creation_rules patterns)",
+    "Extract age and PGP recipient keys from each .sops.yaml creation_rules entry; cross-reference with juggler_keys_sops_status",
+    "Verify each recipient key exists and check creation date to determine rotation age",
+    "Identify orphan keys (referenced in .sops.yaml but no longer valid or accessible) and over-age keys (creation date >365 days ago requiring rotation)",
+    "Store rotation compliance report in Setec via juggler_setec_put; create issue for orphan keys and overdue rotations"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/hs-sops-rotation",
+    "issueLabels": [
+      "campaign",
+      "security",
+      "sops-rotation"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "15m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 40000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All SOPS configs analyzed, key ages assessed",
+    "kpis": [
+      "repos_scanned",
+      "sops_files",
+      "keys_total",
+      "keys_overdue_rotation",
+      "keys_orphaned"
+    ]
+  }
+}

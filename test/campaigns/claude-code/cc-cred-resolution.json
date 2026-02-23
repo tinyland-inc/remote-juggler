@@ -1,0 +1,65 @@
+{
+  "id": "cc-cred-resolution",
+  "name": "Credential Resolution E2E",
+  "description": "End-to-end test of the composite credential resolver. Tests resolution from each source (env, SOPS, KDBX, Setec) individually and in combination, verifying precedence order and fallback behavior.",
+  "agent": "claude-code",
+  "trigger": {
+    "event": "push",
+    "pathFilters": [
+      "gateway/resolver.go",
+      "gateway/config.go"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_keys_status",
+    "juggler_keys_search",
+    "juggler_setec_list",
+    "juggler_setec_get",
+    "juggler_audit_log"
+  ],
+  "process": [
+    "Start local gateway in local mode (--listen=local)",
+    "Test env resolution: set known env var and resolve it via juggler_resolve_composite",
+    "Test Setec resolution: resolve a secret known to exist in Setec (github-token)",
+    "Test precedence: when same key exists in multiple sources verify highest-precedence wins",
+    "Test fallback: when primary source fails verify fallback to next source",
+    "Verify all resolution attempts appear in audit log with correct source attribution"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/cc-cred-resolution",
+    "issueLabels": [
+      "campaign",
+      "cred-resolution"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "killSwitch": "kill the local rj-gateway process"
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All resolution sources tested, precedence order verified, audit trail complete",
+    "kpis": [
+      "sources_tested",
+      "resolutions_correct",
+      "precedence_verified",
+      "fallback_verified",
+      "audit_entries_matched"
+    ]
+  }
+}

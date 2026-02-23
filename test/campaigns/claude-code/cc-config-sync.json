@@ -1,0 +1,62 @@
+{
+  "id": "cc-config-sync",
+  "name": "Config Sync Verification",
+  "description": "Verifies that sync_config correctly propagates identity configuration to SSH config and git config. Tests with various config permutations to ensure no data loss or corruption.",
+  "agent": "claude-code",
+  "trigger": {
+    "event": "push",
+    "pathFilters": [
+      "src/remote_juggler/Config.chpl",
+      "src/remote_juggler/GlobalConfig.chpl"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_sync_config",
+    "juggler_config_show",
+    "juggler_list_identities",
+    "juggler_status",
+    "juggler_audit_log"
+  ],
+  "process": [
+    "Backup current SSH and git config",
+    "Call juggler_config_show to capture current state",
+    "Call juggler_sync_config and verify SSH config includes all identity Host entries",
+    "Verify git config includeIf blocks reference correct identity configs",
+    "Restore original config (cleanup)"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/cc-config-sync",
+    "issueLabels": [
+      "campaign",
+      "config-sync"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "killSwitch": "restore SSH/git config from backup"
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All identity configs synced correctly to SSH and git config",
+    "kpis": [
+      "identities_synced",
+      "ssh_entries_correct",
+      "git_includes_correct",
+      "sync_errors"
+    ]
+  }
+}

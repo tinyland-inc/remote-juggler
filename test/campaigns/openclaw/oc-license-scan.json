@@ -1,0 +1,114 @@
+{
+  "id": "oc-license-scan",
+  "name": "License Compliance Scan",
+  "description": "Scans all repos for license compliance. Checks for missing LICENSE files, flags GPL/AGPL dependencies in non-GPL projects, and verifies license headers in source files.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 1 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-threat-detection",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "lab",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-cleanup",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: check for LICENSE or LICENSE.md file via GitHub API",
+    "Parse dependency manifests for license metadata (npm: license field, Go: go-licenses, Cargo: cargo-license)",
+    "Flag copyleft dependencies (GPL/AGPL/LGPL) in permissively-licensed projects",
+    "Generate compliance report and store in Setec"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-license-scan",
+    "issueLabels": [
+      "campaign",
+      "license-compliance"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "20m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 60000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All repos scanned, license compliance report generated",
+    "kpis": [
+      "repos_scanned",
+      "missing_license_files",
+      "copyleft_flags",
+      "compliance_score"
+    ]
+  }
+}

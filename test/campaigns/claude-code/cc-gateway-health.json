@@ -1,0 +1,57 @@
+{
+  "id": "cc-gateway-health",
+  "name": "Gateway Health Check",
+  "description": "Quick health check of the rj-gateway on startup. Verifies all endpoints respond, tool list is complete, Setec connectivity works, and audit logging is functional.",
+  "agent": "claude-code",
+  "trigger": {
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_aperture_usage"
+  ],
+  "process": [
+    "Call /health endpoint and verify 200 OK",
+    "Call tools/list and verify 43 tools present",
+    "Call juggler_setec_list and verify Setec connectivity",
+    "Call juggler_audit_log and verify logging is functional",
+    "Call juggler_campaign_status and juggler_aperture_usage to verify gateway-only tools respond"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/cc-gateway-health",
+    "issueLabels": [
+      "campaign",
+      "gateway-health"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "2m",
+    "readOnly": true
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All health checks pass, all tools respond, Setec reachable",
+    "kpis": [
+      "health_status",
+      "tool_count",
+      "setec_reachable",
+      "audit_functional"
+    ]
+  }
+}

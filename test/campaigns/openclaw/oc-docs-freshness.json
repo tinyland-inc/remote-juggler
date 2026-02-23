@@ -1,0 +1,128 @@
+{
+  "id": "oc-docs-freshness",
+  "name": "Documentation Freshness Audit",
+  "description": "Evaluates README accuracy across all GitHub repos by comparing claims against actual file structure, verifying install instructions match release artifacts, and checking for dead links.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 4 1,15 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-threat-detection",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "lab",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-cleanup",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "fuzzy-crush",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: fetch README.md content via GitHub API",
+    "Compare README claims against actual file structure by listing repo tree via API",
+    "Verify install instructions match latest GitHub Release artifacts",
+    "HTTP HEAD check all links in README to identify dead links (404, 410, timeout)",
+    "Score each README as fresh/stale/broken and create PRs for auto-fixable issues (version bumps, dead link removal)"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-docs-freshness",
+    "issueLabels": [
+      "campaign",
+      "docs-freshness"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler",
+    "prBranchPrefix": "sid/campaign-docs-"
+  },
+  "guardrails": {
+    "maxDuration": "25m",
+    "readOnly": false,
+    "allowedBranches": [
+      "sid/campaign-docs-*"
+    ],
+    "requireApproval": true,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": true,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All repos scored, dead links identified, fixable issues have PRs",
+    "kpis": [
+      "repos_scored",
+      "fresh_count",
+      "stale_count",
+      "broken_count",
+      "dead_links",
+      "prs_created"
+    ]
+  }
+}

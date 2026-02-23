@@ -1,6 +1,7 @@
 ---
-# OpenClaw Agent Deployment on Civo K8s (fuzzy-dev namespace)
+# OpenClaw Agent + Campaign Runner Sidecar Deployment
 # Runs behind Tailscale Aperture for identity-aware credential access.
+# Campaign runner sidecar orchestrates test campaigns via rj-gateway MCP.
 #
 # This agent demonstrates multi-agent credential governance:
 # OpenClaw -> Aperture (identity + policy) -> rj-gateway -> secrets
@@ -10,6 +11,11 @@
 #     --from-literal=TS_AUTHKEY="tskey-auth-..."
 #   kubectl create secret generic openclaw-config -n fuzzy-dev \
 #     --from-file=config.yaml=openclaw-config.yaml
+#   kubectl create configmap campaign-definitions -n fuzzy-dev \
+#     --from-file=test/campaigns/index.json \
+#     --from-file=test/campaigns/claude-code/cc-mcp-regression.json \
+#     --from-file=test/campaigns/openclaw/oc-dep-audit.json \
+#     --from-file=test/campaigns/cross-agent/xa-audit-completeness.json
 #
 apiVersion: apps/v1
 kind: Deployment
@@ -36,11 +42,13 @@ spec:
         - name: openclaw
           image: ghcr.io/tinyland-inc/remote-juggler/openclaw:latest  # renovate: image
           env:
-            # Route AI API calls through Aperture on tailnet
-            - name: OPENAI_BASE_URL
-              value: "https://aperture.tail1234.ts.net/v1"
-            - name: ANTHROPIC_BASE_URL
-              value: "https://aperture.tail1234.ts.net/anthropic"
+            # AI API key from Setec (direct, Aperture integration deferred to issue #2)
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-keys
+                  key: ANTHROPIC_API_KEY
+                  optional: true
             # MCP tools via rj-gateway on tailnet
             - name: MCP_SERVERS
               value: '{"rj-gateway": {"url": "https://rj-gateway.tail1234.ts.net/mcp", "transport": "http"}}'
@@ -57,6 +65,25 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+
+        # Campaign runner sidecar — orchestrates test campaigns
+        - name: campaign-runner
+          image: ghcr.io/tinyland-inc/remote-juggler/campaign-runner:latest  # renovate: image
+          args:
+            - --campaigns-dir=/etc/campaigns
+            - --gateway-url=https://rj-gateway.tail1234.ts.net/mcp
+            - --interval=60s
+          volumeMounts:
+            - name: campaigns
+              mountPath: /etc/campaigns
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
 
         # Tailscale sidecar for tailnet connectivity
         - name: tailscale
@@ -87,3 +114,6 @@ spec:
           emptyDir: {}
         - name: ts-state
           emptyDir: {}
+        - name: campaigns
+          configMap:
+            name: campaign-definitions

@@ -1,0 +1,224 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestLoadCampaign(t *testing.T) {
+	// Use the actual campaign definitions from the repo.
+	defs := []string{
+		"../claude-code/cc-mcp-regression.json",
+		"../openclaw/oc-dep-audit.json",
+		"../cross-agent/xa-audit-completeness.json",
+	}
+	for _, path := range defs {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			c, err := LoadCampaign(path)
+			if err != nil {
+				t.Fatalf("LoadCampaign(%s): %v", path, err)
+			}
+			if c.ID == "" {
+				t.Error("campaign ID is empty")
+			}
+			if c.Agent == "" {
+				t.Error("campaign agent is empty")
+			}
+			if len(c.Tools) == 0 {
+				t.Error("campaign has no tools")
+			}
+			if c.Guardrails.MaxDuration == "" {
+				t.Error("campaign has no maxDuration guardrail")
+			}
+		})
+	}
+}
+
+func TestLoadIndex(t *testing.T) {
+	index, err := LoadIndex("../index.json")
+	if err != nil {
+		t.Fatalf("LoadIndex: %v", err)
+	}
+	if index.Version == "" {
+		t.Error("index version is empty")
+	}
+	if len(index.Campaigns) == 0 {
+		t.Error("index has no campaigns")
+	}
+	for id, entry := range index.Campaigns {
+		if entry.File == "" {
+			t.Errorf("campaign %s has no file", id)
+		}
+	}
+}
+
+func TestLoadIndexMissing(t *testing.T) {
+	_, err := LoadIndex("/nonexistent/index.json")
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}
+
+func TestCronMatches(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+		time time.Time
+		want bool
+	}{
+		{
+			name: "exact match",
+			expr: "0 4 1 1 *",
+			time: time.Date(2026, 1, 1, 4, 0, 0, 0, time.UTC),
+			want: true,
+		},
+		{
+			name: "all wildcards",
+			expr: "* * * * *",
+			time: time.Now(),
+			want: true,
+		},
+		{
+			name: "wrong minute",
+			expr: "30 4 * * *",
+			time: time.Date(2026, 1, 1, 4, 0, 0, 0, time.UTC),
+			want: false,
+		},
+		{
+			name: "wrong hour",
+			expr: "0 2 * * 1",
+			time: time.Date(2026, 1, 1, 4, 0, 0, 0, time.UTC), // hour=4, want 2
+			want: false,
+		},
+		{
+			name: "weekly monday 2am",
+			expr: "0 2 * * 1",
+			time: time.Date(2026, 2, 23, 2, 0, 0, 0, time.UTC), // Monday
+			want: true,
+		},
+		{
+			name: "monthly 1st 4am",
+			expr: "0 4 1 * *",
+			time: time.Date(2026, 3, 1, 4, 0, 0, 0, time.UTC),
+			want: true,
+		},
+		{
+			name: "invalid expression",
+			expr: "bad cron",
+			time: time.Now(),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cronMatches(tt.expr, tt.time)
+			if got != tt.want {
+				t.Errorf("cronMatches(%q, %v) = %v, want %v", tt.expr, tt.time, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsDue(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+
+	tests := []struct {
+		name     string
+		campaign *Campaign
+		want     bool
+	}{
+		{
+			name: "manual only",
+			campaign: &Campaign{
+				ID:      "manual-only",
+				Trigger: CampaignTrigger{Event: "manual"},
+			},
+			want: false,
+		},
+		{
+			name: "push event",
+			campaign: &Campaign{
+				ID:      "push-triggered",
+				Trigger: CampaignTrigger{Event: "push"},
+			},
+			want: false,
+		},
+		{
+			name: "no trigger",
+			campaign: &Campaign{
+				ID:      "no-trigger",
+				Trigger: CampaignTrigger{},
+			},
+			want: false,
+		},
+	}
+
+	now := time.Now().UTC()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := scheduler.isDue(tt.campaign, now)
+			if got != tt.want {
+				t.Errorf("isDue(%s) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseDuration(t *testing.T) {
+	tests := []struct {
+		input string
+		want  time.Duration
+	}{
+		{"5m", 5 * time.Minute},
+		{"30m", 30 * time.Minute},
+		{"1h", time.Hour},
+		{"invalid", 30 * time.Minute}, // default
+		{"", 30 * time.Minute},        // default
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := parseDuration(tt.input)
+			if got != tt.want {
+				t.Errorf("parseDuration(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnvOrDefault(t *testing.T) {
+	// Unset env returns default.
+	if got := envOrDefault("CAMPAIGN_TEST_NONEXISTENT_VAR", "fallback"); got != "fallback" {
+		t.Errorf("expected 'fallback', got %q", got)
+	}
+
+	// Set env returns value.
+	os.Setenv("CAMPAIGN_TEST_VAR", "override")
+	defer os.Unsetenv("CAMPAIGN_TEST_VAR")
+	if got := envOrDefault("CAMPAIGN_TEST_VAR", "fallback"); got != "override" {
+		t.Errorf("expected 'override', got %q", got)
+	}
+}
+
+func TestNewDispatcher(t *testing.T) {
+	d := NewDispatcher("https://example.com")
+	if d.gatewayURL != "https://example.com" {
+		t.Errorf("expected gateway URL 'https://example.com', got %q", d.gatewayURL)
+	}
+	if d.httpClient == nil {
+		t.Error("httpClient is nil")
+	}
+}
+
+func TestNewCollector(t *testing.T) {
+	c := NewCollector("https://example.com")
+	if c.gatewayURL != "https://example.com" {
+		t.Errorf("expected gateway URL 'https://example.com', got %q", c.gatewayURL)
+	}
+	if c.dispatcher == nil {
+		t.Error("dispatcher is nil")
+	}
+}

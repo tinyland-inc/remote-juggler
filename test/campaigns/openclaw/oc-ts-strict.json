@@ -1,0 +1,85 @@
+{
+  "id": "oc-ts-strict",
+  "name": "TypeScript Strict Mode Tracking",
+  "description": "Tracks TypeScript strict mode adoption across all TS repos. Analyzes tsconfig.json settings, counts type errors in strict mode, and tracks migration progress over time.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 2 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland.dev",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-auth",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-a11y-engine",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-otel",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "pp",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Resolve github-token via juggler_resolve_composite for GitHub API access",
+    "For each target repo: fetch tsconfig.json via GitHub API",
+    "Analyze strict mode flags (strict, noImplicitAny, strictNullChecks, strictFunctionTypes, strictBindCallApply, strictPropertyInitialization, noImplicitThis, alwaysStrict)",
+    "Categorize repos by strictness level: full (strict: true), partial (some flags), none (no strict flags)",
+    "Compare with previous run stored in Setec to track migration progress over time"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-ts-strict",
+    "issueLabels": [
+      "campaign",
+      "typescript-strict"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "15m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 50000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All TS repos analyzed, strict mode status tracked",
+    "kpis": [
+      "repos_analyzed",
+      "strict_full",
+      "strict_partial",
+      "strict_none",
+      "migration_progress_pct"
+    ]
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "id": "hs-network-posture",
+  "name": "Network Posture Audit",
+  "description": "Audits network security posture of the K8s cluster and tailnet services. Checks TLS certificate validity, open ports, service mesh policies, and network segmentation.",
+  "agent": "hexstrike",
+  "trigger": {
+    "schedule": "0 3 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Enumerate all tailnet services: rj-gateway, setec, openclaw-agent, hexstrike-agent",
+    "For each service: verify TLS certificate validity, expiration date, and certificate chain completeness",
+    "Check for unexpected open ports via port scan within the tailnet (expected ports only: 443/HTTPS, 8080/health, SSE endpoints)",
+    "Verify Tailscale ACL grants match expected configuration from deploy/tailscale-acl-grants.hujson",
+    "Check K8s NetworkPolicy enforcement: verify pod-to-pod communication is restricted to declared policies, no default-allow",
+    "Generate network diagram and posture report; store in Setec via juggler_setec_put and create issue for any findings"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/hs-network-posture",
+    "pvcPath": "/results/network-posture",
+    "issueLabels": [
+      "campaign",
+      "security",
+      "network-posture"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "20m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 60000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All services audited, TLS valid, no unexpected open ports",
+    "kpis": [
+      "services_audited",
+      "tls_valid",
+      "tls_expiring_soon",
+      "unexpected_ports",
+      "acl_mismatches"
+    ]
+  }
+}

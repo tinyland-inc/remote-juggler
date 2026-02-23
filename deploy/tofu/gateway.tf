@@ -7,6 +7,25 @@
 # only for DNS registration if desired, but tsnet handles connectivity.
 # =============================================================================
 
+resource "kubernetes_persistent_volume_claim" "gateway_tsnet" {
+  metadata {
+    name      = "rj-gateway-tsnet"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "rj-gateway" })
+  }
+
+  wait_until_bound = false
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "256Mi"
+      }
+    }
+  }
+}
+
 resource "kubernetes_deployment" "gateway" {
   wait_for_rollout = false
 
@@ -18,6 +37,11 @@ resource "kubernetes_deployment" "gateway" {
 
   spec {
     replicas = 1
+
+    # Recreate strategy required: tsnet PVC is ReadWriteOnce.
+    strategy {
+      type = "Recreate"
+    }
 
     selector {
       match_labels = {
@@ -98,7 +122,9 @@ resource "kubernetes_deployment" "gateway" {
 
         volume {
           name = "ts-state"
-          empty_dir {}
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.gateway_tsnet.metadata[0].name
+          }
         }
       }
     }
