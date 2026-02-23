@@ -28,7 +28,13 @@
     },
     "cc-gateway-health": {
       "file": "claude-code/cc-gateway-health.json",
-      "enabled": false,
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-gateway-smoketest": {
+      "file": "openclaw/oc-gateway-smoketest.json",
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },

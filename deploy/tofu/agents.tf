@@ -92,7 +92,7 @@ resource "kubernetes_deployment" "openclaw" {
 
             args = [
               "--campaigns-dir=/etc/campaigns",
-              "--gateway-url=https://rj-gateway.${var.tailscale_tailnet}/mcp",
+              "--gateway-url=https://rj-gateway.${var.tailscale_tailnet}",
               "--interval=60s",
             ]
 

@@ -1,0 +1,46 @@
+{
+  "id": "oc-gateway-smoketest",
+  "name": "OpenClaw Gateway Smoke Test",
+  "description": "Simple AI-powered test: verify gateway MCP tools respond correctly and produce a structured health report. This is the minimal OpenClaw campaign -- validates the agent can call tools and reason about results.",
+  "agent": "openclaw",
+  "trigger": {
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_campaign_status"
+  ],
+  "process": [
+    "Call juggler_setec_list to verify Setec connectivity and count available secrets",
+    "Call juggler_audit_log to retrieve recent audit entries and count them",
+    "Call juggler_campaign_status to check if any campaigns have run before",
+    "Produce a structured JSON report with kpis: setec_secret_count, audit_entry_count, campaigns_found"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-gateway-smoketest"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 10000
+    }
+  },
+  "metrics": {
+    "successCriteria": "All 3 tools called successfully, structured report produced with numeric KPIs",
+    "kpis": [
+      "setec_secret_count",
+      "audit_entry_count",
+      "campaigns_found"
+    ]
+  }
+}

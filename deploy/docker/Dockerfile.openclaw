@@ -1,29 +1,28 @@
-# OpenClaw AI agent scaffold.
+# OpenClaw AI agent.
 #
-# Minimal MCP-aware agent that connects to rj-gateway for credential
-# resolution and routes AI calls through Aperture on the tailnet.
-#
-# Replace this scaffold with the real OpenClaw implementation when ready.
+# Claude-powered campaign agent that connects to rj-gateway for MCP tool
+# access and credential resolution. Runs campaigns dispatched by the
+# campaign-runner sidecar in the same pod.
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl jq \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir httpx mcp
+COPY deploy/docker/openclaw/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 RUN useradd -m -u 10000 agent
 USER agent
 WORKDIR /home/agent
 
-COPY deploy/docker/openclaw-entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY deploy/docker/openclaw/ /home/agent/
 
 ENV RJ_GATEWAY_URL="https://rj-gateway.tail1234.ts.net"
-ENV APERTURE_URL="https://aperture.tail1234.ts.net/v1"
 
 HEALTHCHECK --interval=30s --timeout=5s \
   CMD curl -sf http://localhost:8080/health || exit 1
 
 EXPOSE 8080
 
-ENTRYPOINT ["entrypoint.sh"]
+CMD ["python3", "/home/agent/server.py"]

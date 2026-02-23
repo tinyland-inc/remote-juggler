@@ -126,7 +126,7 @@ variable "campaign_runner_image" {
 variable "campaign_runner_enabled" {
   description = "Enable campaign runner sidecar on OpenClaw pod (requires image to be built)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 # =============================================================================

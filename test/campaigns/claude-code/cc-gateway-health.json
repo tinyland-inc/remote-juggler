@@ -4,6 +4,7 @@
   "description": "Quick health check of the rj-gateway on startup. Verifies all endpoints respond, tool list is complete, Setec connectivity works, and audit logging is functional.",
   "agent": "claude-code",
   "trigger": {
+    "schedule": "0 * * * *",
     "event": "manual"
   },
   "targets": [

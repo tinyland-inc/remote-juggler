@@ -71,7 +71,7 @@ spec:
           image: ghcr.io/tinyland-inc/remote-juggler/campaign-runner:latest  # renovate: image
           args:
             - --campaigns-dir=/etc/campaigns
-            - --gateway-url=https://rj-gateway.tail1234.ts.net/mcp
+            - --gateway-url=https://rj-gateway.tail1234.ts.net
             - --interval=60s
           volumeMounts:
             - name: campaigns

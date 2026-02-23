@@ -35,9 +35,110 @@ func NewDispatcher(gatewayURL string) *Dispatcher {
 	}
 }
 
-// Dispatch executes a campaign by calling the agent's tools via rj-gateway MCP.
-// It calls each tool in the campaign's tools list sequentially, collecting results.
+// Dispatch executes a campaign by routing to the appropriate agent.
+// For "openclaw" and "hexstrike" agents, it dispatches to the agent container
+// running in the same pod (localhost:8080). For other agents (e.g. "claude-code"),
+// it fires tools sequentially via rj-gateway MCP (direct dispatch).
 func (d *Dispatcher) Dispatch(ctx context.Context, campaign *Campaign, runID string) (*DispatchResult, error) {
+	switch campaign.Agent {
+	case "openclaw":
+		return d.dispatchToAgent(ctx, campaign, runID, "http://localhost:8080")
+	case "hexstrike":
+		return d.dispatchToAgent(ctx, campaign, runID, "http://localhost:8080")
+	default:
+		return d.dispatchDirect(ctx, campaign, runID)
+	}
+}
+
+// dispatchToAgent sends a campaign to an agent container for AI-powered execution.
+// The agent runs asynchronously; we poll for completion.
+func (d *Dispatcher) dispatchToAgent(ctx context.Context, campaign *Campaign, runID string, agentURL string) (*DispatchResult, error) {
+	payload := map[string]any{
+		"campaign": campaign,
+		"run_id":   runID,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal campaign: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, agentURL+"/campaign", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("dispatch to agent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("agent returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("campaign %s: dispatched to agent at %s", campaign.ID, agentURL)
+
+	// Poll agent /status for completion.
+	return d.pollAgentStatus(ctx, campaign, agentURL)
+}
+
+// pollAgentStatus polls the agent's /status endpoint until the campaign completes or context expires.
+func (d *Dispatcher) pollAgentStatus(ctx context.Context, campaign *Campaign, agentURL string) (*DispatchResult, error) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return &DispatchResult{Error: "context expired while waiting for agent"}, nil
+		case <-ticker.C:
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, agentURL+"/status", nil)
+			if err != nil {
+				continue
+			}
+			resp, err := d.httpClient.Do(req)
+			if err != nil {
+				log.Printf("campaign %s: agent status poll error: %v", campaign.ID, err)
+				continue
+			}
+
+			var status struct {
+				Status     string `json:"status"`
+				LastResult *struct {
+					Status    string         `json:"status"`
+					ToolCalls int            `json:"tool_calls"`
+					KPIs      map[string]any `json:"kpis"`
+					Error     string         `json:"error"`
+				} `json:"last_result"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+				resp.Body.Close()
+				continue
+			}
+			resp.Body.Close()
+
+			if status.Status == "running" {
+				continue
+			}
+
+			// Agent finished.
+			result := &DispatchResult{KPIs: make(map[string]any)}
+			if status.LastResult != nil {
+				result.ToolCalls = status.LastResult.ToolCalls
+				result.KPIs = status.LastResult.KPIs
+				result.Error = status.LastResult.Error
+			}
+			return result, nil
+		}
+	}
+}
+
+// dispatchDirect fires campaign tools sequentially via rj-gateway MCP.
+// Used for "claude-code" and other non-container agents.
+func (d *Dispatcher) dispatchDirect(ctx context.Context, campaign *Campaign, runID string) (*DispatchResult, error) {
 	result := &DispatchResult{
 		KPIs: make(map[string]any),
 	}
