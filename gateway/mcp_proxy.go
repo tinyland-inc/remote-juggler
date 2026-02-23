@@ -43,22 +43,25 @@ func NewMCPProxy(binaryPath string) *MCPProxy {
 	}
 }
 
-// Start launches the Chapel MCP subprocess.
+// Start launches the Chapel MCP subprocess and sends the MCP initialize
+// handshake so the subprocess is ready to handle tool calls.
 func (p *MCPProxy) Start() error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	cmd := exec.Command(p.binaryPath, "--mode=mcp")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
+		p.mu.Unlock()
 		return fmt.Errorf("stdin pipe: %w", err)
 	}
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
+		p.mu.Unlock()
 		return fmt.Errorf("stdout pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
+		p.mu.Unlock()
 		return fmt.Errorf("start subprocess: %w", err)
 	}
 
@@ -68,6 +71,26 @@ func (p *MCPProxy) Start() error {
 	// readLoop is the sole reader from stdout. It routes responses to
 	// responseCh and broadcasts notifications to SSE subscribers.
 	go p.readLoop(bufio.NewReader(stdoutPipe))
+
+	p.mu.Unlock()
+
+	// Send MCP initialize handshake so the subprocess is ready for tool calls.
+	initReq, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      0,
+		"method":  "initialize",
+		"params": map[string]any{
+			"protocolVersion": "2025-03-26",
+			"capabilities":    map[string]any{},
+			"clientInfo": map[string]any{
+				"name":    "rj-gateway",
+				"version": "2.1.0",
+			},
+		},
+	})
+	if _, err := p.SendRequest(initReq); err != nil {
+		log.Printf("warning: mcp initialize failed: %v", err)
+	}
 
 	return nil
 }
