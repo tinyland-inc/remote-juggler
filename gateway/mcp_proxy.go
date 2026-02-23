@@ -130,12 +130,14 @@ func (p *MCPProxy) readLoop(stdout *bufio.Reader) {
 			return
 		}
 
-		// Trim whitespace/BOM that Chapel may emit before JSON.
+		// Trim whitespace/BOM that Chapel may emit around JSON.
+		// Also strip NUL bytes that Chapel's string handling may embed.
 		line = bytes.TrimSpace(line)
+		line = bytes.ReplaceAll(line, []byte{0}, nil)
 		if len(line) == 0 {
 			continue
 		}
-		log.Printf("mcp: readLoop got line (%d bytes, first5=%x): %.200s", len(line), line[:min(5, len(line))], string(line))
+		log.Printf("mcp: readLoop got line (%d bytes): %.200s", len(line), string(line))
 
 		var msg map[string]json.RawMessage
 		if err := json.Unmarshal(line, &msg); err != nil {
