@@ -1,180 +1,102 @@
 # Chapel Setup for Nix
 
-This document explains how RemoteJuggler handles Chapel in the Nix environment.
+This document explains how RemoteJuggler builds Chapel from source in the Nix environment.
 
-## The Problem
+## Overview
 
-Chapel 2.7 Ubuntu binaries were built against Ubuntu's LLVM 18, which includes all target backends (including exotic ones like M68k for Motorola 68000). Nix's LLVM 18 is optimized for smaller size and excludes these unused targets.
+Chapel 2.7.0 is built from source using Nix's system LLVM 18. This produces native binaries on all platforms without requiring FHS sandboxing, bubblewrap, or Homebrew.
 
-When using the standard `autoPatchelf` approach to make Ubuntu binaries work in Nix, Chapel tries to load LLVM symbols that don't exist:
+The approach is adapted from [twesterhout/nix-chapel](https://github.com/twesterhout/nix-chapel), which demonstrated that Chapel can be built with `CHPL_LLVM=system` pointing at Nix's LLVM.
 
-```
-undefined symbol: LLVMInitializeM68kAsmParser
-```
-
-## The Solution: FHS Environment
-
-We use `pkgs.buildFHSEnv` to create an FHS-compatible sandbox where Chapel can run with its bundled dependencies. This approach:
-
-1. Provides Ubuntu-like filesystem layout (`/lib`, `/usr/lib`, etc.)
-2. Isolates Chapel from Nix's LLVM
-3. Uses Chapel's bundled LLVM instead of Nix's
-
-## Usage
-
-### Development
-
-Enter the Nix development shell:
+## Quick Start
 
 ```bash
-nix develop
-```
-
-This gives you access to `chapel-fhs`, an FHS wrapper for Chapel. To compile:
-
-```bash
-# Enter the FHS environment
-chapel-fhs
-
-# Now you're in an FHS sandbox with Chapel available
-chpl --version
-just release
-```
-
-Or run commands directly:
-
-```bash
-chapel-fhs -c 'chpl --version'
-chapel-fhs -c 'just release'
-```
-
-### Building with Nix
-
-```bash
-# Build the RemoteJuggler binary
+# Build RemoteJuggler (builds Chapel from source on first run, ~25 min)
 nix build .#remote-juggler
+./result/bin/remote-juggler --help
 
-# Build the Chapel FHS environment itself
-nix build .#chapel-fhs
+# Build just the Chapel compiler
+nix build .#chapel
+./result/bin/chpl --version
+
+# Enter development shell (includes Chapel + Rust + Go toolchains)
+nix develop
+chpl --version
 ```
-
-### Available Packages
-
-| Package | Description |
-|---------|-------------|
-| `remote-juggler` | Main RemoteJuggler binary (built with FHS Chapel) |
-| `chapel-fhs` | FHS wrapper for Chapel (enter with `chapel-fhs`) |
-| `chapel-legacy` | Legacy autoPatchelf approach (may not work) |
-| `pinentry-remotejuggler` | HSM-backed pinentry |
-| `remote-juggler-gui` | GTK4 GUI (doesn't need Chapel) |
-
-### Dev Shells
-
-| Shell | Command | Description |
-|-------|---------|-------------|
-| `default` | `nix develop` | Full development environment |
-| `chapel` | `nix develop .#chapel` | Chapel-only (uses FHS) |
-| `tpm` | `nix develop .#tpm` | TPM/HSM development |
 
 ## How It Works
 
-The FHS environment is created in `nix/chapel-fhs.nix`:
+The derivation in `nix/chapel.nix`:
 
-1. **Extract Chapel .deb**: The Ubuntu .deb package is extracted to a Nix store path
-2. **Create FHS sandbox**: `buildFHSEnv` creates a filesystem with standard Linux paths
-3. **Set up environment**: The `profile` sets `CHPL_HOME`, `PATH`, and other Chapel vars
-4. **Bundle dependencies**: Required libs (glibc, zlib, etc.) are available in the FHS
+1. Takes the Chapel 2.7.0 source from the `chapel-src` flake input
+2. Configures Chapel with `CHPL_LLVM=system`, pointing at Nix's LLVM 18.1.8
+3. Patches M68k macro detection (Nix's LLVM excludes exotic backends)
+4. Builds Chapel in-place with `make -j$NIX_BUILD_CORES`
+5. Selectively copies build artifacts to `$out` (avoiding `/build/` path references)
+6. Wraps the `chpl` binary with proper `CHPL_HOME` and compiler flags
 
-When you run `chapel-fhs -c 'command'`, it:
-1. Enters the FHS sandbox
-2. Runs the profile script to set up Chapel
-3. Executes your command
-4. Exits the sandbox
+### Key Build Settings
 
-## Troubleshooting
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `CHPL_LLVM` | `system` | Use Nix's pre-built LLVM (avoids 1-3hr bundled LLVM build) |
+| `CHPL_LLVM_CONFIG` | `llvm-config` from `llvmPackages_18` | Points at LLVM 18.1.8 |
+| `CHPL_RE2` | `bundled` | Simpler than wiring system re2 |
+| `CHPL_GMP` | `bundled` | Simpler than wiring system gmp |
+| `CHPL_TARGET_CPU` | `none` | Portable binaries |
+| `CHPL_UNWIND` | `none` | Avoid libunwind dependency complexity |
 
-### "chpl: command not found"
+### The M68k Patch
 
-Make sure you're inside the FHS environment:
+Nix's LLVM doesn't include exotic target backends (M68k, AArch64BE, etc.). Chapel's `util/chplenv/chpl_llvm.py` validates that all LLVM target macros are present, which fails. The fix disables this check:
 
-```bash
-chapel-fhs -c 'chpl --version'
-# NOT: chpl --version (outside FHS)
+```nix
+substituteInPlace util/chplenv/chpl_llvm.py \
+  --replace-warn 'if macro in out' 'if False'
 ```
 
-### "undefined symbol" errors
+This is the same approach used by `twesterhout/nix-chapel`. It should be upstreamed to Chapel.
 
-This means you're trying to run Chapel outside the FHS sandbox. Always use `chapel-fhs`:
+## Available Packages
 
-```bash
-# Wrong - runs outside FHS
-./result/bin/chpl test.chpl
+| Package | Description | Platforms |
+|---------|-------------|-----------|
+| `remote-juggler` | Main RemoteJuggler CLI binary | Linux, macOS |
+| `chapel` | Chapel 2.7.0 compiler (from source) | Linux, macOS |
+| `rj-gateway` | Go MCP gateway | Linux, macOS |
+| `pinentry-remotejuggler` | HSM-backed pinentry | Linux, macOS |
+| `remote-juggler-gui` | GTK4 GUI | Linux only |
+| `chapel-fhs` | Legacy FHS wrapper (deprecated) | Linux only |
 
-# Correct - runs inside FHS
-chapel-fhs -c 'chpl test.chpl'
-```
+## Dev Shells
 
-### Build fails in CI
+| Shell | Command | Description |
+|-------|---------|-------------|
+| `default` | `nix develop` | Full dev environment (Chapel + Rust + Go) |
+| `chapel` | `nix develop .#chapel` | Chapel-only development |
+| `tpm` | `nix develop .#tpm` | TPM/HSM development (Linux) |
 
-Check that the CI is using the FHS-based build. The `gitlab-nix.yml` should have:
+## Using Custom Chapel Source
 
-```yaml
-script:
-  - nix build .#remote-juggler --print-build-logs
-```
-
-This automatically uses the FHS approach.
-
-### "bwrap: setting up uid map: Permission denied"
-
-The FHS environment uses `bubblewrap` for user namespace isolation. This requires
-unprivileged user namespaces to be enabled on the host system.
-
-**GitHub Actions**: User namespaces are not enabled by default on GitHub-hosted
-runners. The Nix CI workflow marks these jobs as `continue-on-error: true`.
-The main CI workflow (`ci.yml`) uses Chapel Docker images which work correctly.
-
-**GitLab CI**: Depends on runner configuration. Docker executors may need
-`--privileged` or the host must have `kernel.unprivileged_userns_clone=1`.
-
-**Workarounds**:
-1. Use the main CI workflow (`ci.yml`) which uses Chapel Docker images
-2. Run Nix builds locally where user namespaces are typically available
-3. Configure runners with user namespace support
-
-## Chapel Sourcing Tiers
-
-RemoteJuggler supports multiple Chapel sources for flexibility:
-
-| Tier | Source | Platform | Use Case |
-|------|--------|----------|----------|
-| 1 | **FHS Environment** | Linux | Default - Ubuntu binaries in FHS sandbox |
-| 2 | **System Chapel** | macOS | Homebrew passthrough |
-| 3 | **Container** | CI/CD | Docker/Podman fallback |
-| 4 | **Custom Fork** | Development | Build from custom Chapel source |
-
-### Using Custom Chapel Fork
-
-For Chapel development or testing patches:
+Override the Chapel source at build time:
 
 ```bash
-# Override Chapel source at build time
+# Use a custom Chapel fork/branch
 nix build --override-input chapel-src github:jesssullivan/chapel/sid-nix-support .#remote-juggler
 
-# Update flake.lock to use your fork
+# Update flake.lock to pin a different Chapel source
 nix flake lock --override-input chapel-src github:your-user/chapel/your-branch
 ```
 
-The `chapel-src` input is defined in `flake.nix` and defaults to the official Chapel 2.7.0 release.
-
 ## CI/CD Integration
 
-### GitLab CI
+### GitHub Actions
 
-Nix builds are configured in `ci/gitlab-nix.yml`. The builds:
-- Use the `nixos/nix:2.28.3` image
-- Build with `--print-build-logs` for debugging
-- Push artifacts to Attic binary cache
+The Nix CI workflow (`.github/workflows/nix-ci.yml`) builds on all four platforms:
+- Linux x86_64 (native)
+- Linux aarch64 (QEMU emulation)
+- macOS x86_64 (Intel runner)
+- macOS aarch64 (Apple Silicon)
 
 ### Attic Binary Cache
 
@@ -183,20 +105,40 @@ Pre-built packages are cached at:
 https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
 ```
 
-The cache is automatically used (configured in `flake.nix`). First builds may be slow, but subsequent builds should be fast.
+The cache is configured in `flake.nix`. First builds take ~25 min (Chapel compilation), but cached builds are instant.
 
-## Future Work
+## Build Times
 
-Long-term, we plan to:
-1. Contribute Chapel packaging to nixpkgs upstream
-2. Work with Chapel team to support Nix's LLVM (configure Chapel to not require M68k, AArch64BE, etc.)
-3. Build Chapel from source with Nix's LLVM once upstream supports it
+| Component | Cold Build | Cached |
+|-----------|-----------|--------|
+| Chapel compiler | ~23 min | instant |
+| RemoteJuggler CLI | ~1 min | instant |
+| Go gateway | ~30 sec | instant |
 
-For now, the FHS approach provides a reliable workaround.
+## Troubleshooting
+
+### Build takes a long time
+
+Chapel compilation from source takes ~23 minutes. This is expected for cold builds. The Attic binary cache eliminates this for subsequent builds.
+
+### "utf8-decoder.h not found"
+
+This header-only library must be present in the Chapel installation. If you see this error after modifying `nix/chapel.nix`, ensure the installPhase includes:
+```nix
+cp -r third-party/utf8-decoder $out/third-party/
+```
+
+### "hsm.h not found"
+
+Chapel's `HSM.chpl` module has `require "hsm.h"` which is always compiled. The RemoteJuggler build includes `-I$src/pinentry` to find this header.
+
+### LLVM version mismatch
+
+The derivation uses `llvmPackages_18` from nixpkgs 24.11. Chapel 2.7.0 supports LLVM 14-20. If you change the nixpkgs pin, you may need to adjust the LLVM version.
 
 ## Related Files
 
-- `flake.nix` - Main Nix flake with Chapel version pinning
-- `nix/chapel-fhs.nix` - FHS environment implementation
-- `ci/gitlab-nix.yml` - GitLab CI Nix configuration
-- `.github/workflows/nix.yml` - GitHub Actions Nix configuration
+- `flake.nix` - Main flake with Chapel version pinning and package definitions
+- `nix/chapel.nix` - Chapel from-source derivation
+- `nix/chapel-fhs.nix` - Legacy FHS environment (deprecated, Linux only)
+- `.github/workflows/nix-ci.yml` - GitHub Actions Nix CI

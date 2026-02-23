@@ -1,12 +1,12 @@
-# Chapel FHS Environment for Nix
+# DEPRECATED: Use nix/chapel.nix (from-source build) instead.
 #
-# Chapel 2.7 Ubuntu binaries require an FHS-compatible environment because
-# they were built against Ubuntu's LLVM 18 which includes all target backends.
-# Nix's LLVM 18 is built with fewer targets, causing runtime errors like:
-#   "undefined symbol: LLVMInitializeM68kAsmParser"
+# This FHS environment is kept for backward compatibility but is no longer
+# used by default. Chapel is now built from source with system LLVM,
+# eliminating the need for FHS sandboxing and bubblewrap.
 #
-# This module provides an FHS environment that sandboxes Chapel with the
-# correct library dependencies, avoiding LLVM symbol issues.
+# Original purpose: Chapel 2.7 Ubuntu binaries required an FHS-compatible
+# environment because they were built against Ubuntu's LLVM 18 which includes
+# all target backends. Nix's LLVM 18 is built with fewer targets.
 #
 # Usage:
 #   nix develop .#chapel-fhs   # Enter FHS-based Chapel environment

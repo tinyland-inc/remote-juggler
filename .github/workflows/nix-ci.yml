@@ -1,11 +1,14 @@
 # RemoteJuggler Nix CI Workflow
 # Nix flake-based builds with Attic binary cache
 #
-# This workflow runs alongside the existing ci.yml and provides:
-# - Reproducible Nix builds for all platforms
-# - Attic binary cache for fast rebuilds
-# - Multi-arch Linux via QEMU emulation
-# - Native macOS builds (Intel + Apple Silicon)
+# Chapel is built from source using system LLVM 18 (nix/chapel.nix).
+# No FHS/bubblewrap sandbox needed — works natively on all platforms.
+#
+# Build matrix:
+# - Linux x86_64: native build (~25 min cold, instant with cache)
+# - Linux aarch64: QEMU emulation (~60 min cold)
+# - macOS x86_64: Intel runner (macos-13)
+# - macOS aarch64: Apple Silicon (macos-15)
 #
 # Required GitHub Secrets:
 #   ATTIC_TOKEN - Attic server authentication token
@@ -57,11 +60,9 @@ jobs:
 
       - name: Check flake
         run: nix flake check --no-build
-        continue-on-error: true  # May fail if flake.nix doesn't exist yet
 
       - name: Show flake info
         run: nix flake show
-        continue-on-error: true
 
   # ===========================================================================
   # Linux Builds (x86_64 + aarch64 via QEMU)
@@ -72,12 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: flake-check
     if: always() && !cancelled()
-    # NOTE: The Chapel FHS environment uses bubblewrap (bwrap) which requires
-    # unprivileged user namespaces. GitHub Actions runners don't enable this by default.
-    # This job will fail with "bwrap: setting up uid map: Permission denied"
-    # until we implement a non-FHS build path or GitHub enables user namespaces.
-    # The main CI workflow (ci.yml) uses Chapel Docker images and works correctly.
-    continue-on-error: true
+    # Chapel is now built from source (nix/chapel.nix) — no FHS/bubblewrap needed
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -160,8 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: flake-check
     if: always() && !cancelled()
-    # NOTE: Same bubblewrap/user namespace issue as x86_64 build
-    continue-on-error: true
+    # Chapel built from source — no FHS/bubblewrap needed
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -222,7 +217,7 @@ jobs:
 
   build-macos-x86_64:
     name: Build (macOS x86_64)
-    runs-on: macos-15  # Apple Silicon (x86_64 via Rosetta)
+    runs-on: macos-13  # Intel runner (last available x86_64-darwin)
     needs: flake-check
     if: always() && !cancelled()
     steps:
@@ -280,7 +275,7 @@ jobs:
 
   build-macos-aarch64:
     name: Build (macOS aarch64)
-    runs-on: macos-14  # Apple Silicon
+    runs-on: macos-15  # Apple Silicon
     needs: flake-check
     if: always() && !cancelled()
     steps:
@@ -359,12 +354,10 @@ jobs:
       - name: Check devShell builds
         run: |
           nix develop --command echo "DevShell OK"
-        continue-on-error: true
 
       - name: List devShell environment
         run: |
           nix develop --command bash -c 'echo "PATH: $PATH"; which chpl || true; which cargo || true'
-        continue-on-error: true
 
   # ===========================================================================
   # Summary Job
@@ -398,5 +391,5 @@ jobs:
           echo "| Flake Check | ${{ needs.flake-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| DevShell | ${{ needs.devshell-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> **Note:** This workflow requires a \`flake.nix\` in the repository root." >> $GITHUB_STEP_SUMMARY
+          echo "> Chapel is built from source with system LLVM 18 (no FHS/bubblewrap)." >> $GITHUB_STEP_SUMMARY
           echo "> Builds are cached via Attic at \`${{ env.ATTIC_SERVER }}\`" >> $GITHUB_STEP_SUMMARY

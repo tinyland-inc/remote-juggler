@@ -58,104 +58,17 @@
         # Chapel version configuration
         chapelVersion = "2.7.0";
 
-        # Import FHS-based Chapel environment for Linux
-        # This solves the LLVM symbol compatibility issue by sandboxing Chapel
-        # in an FHS environment where Ubuntu binaries work correctly.
+        # Chapel built from source using system LLVM.
+        # Works on both Linux and macOS without FHS/bubblewrap.
+        chapel = import ./nix/chapel.nix {
+          inherit pkgs chapel-src;
+        };
+
+        # Legacy: FHS-based Chapel environment for Linux (kept for backward compat)
         chapelFhs = if pkgs.stdenv.isLinux then
           import ./nix/chapel-fhs.nix { inherit pkgs chapelVersion; }
         else
           null;
-
-        # Chapel environment selection via CHAPEL_VARIANT env var:
-        #   - "fhs" (default on Linux): Use FHS sandbox for Ubuntu binary compatibility
-        #   - "system": Use system Chapel (Homebrew on macOS, or user-installed)
-        #   - "legacy": Use autoPatchelf approach (may have LLVM issues)
-        #
-        # The FHS approach is recommended for Linux as it avoids the LLVM M68k
-        # symbol issue that affects the autoPatchelf approach.
-
-        # Legacy Chapel derivation (autoPatchelf - may have LLVM issues)
-        # Kept for reference and fallback, but FHS is preferred
-        chapel-legacy = if pkgs.stdenv.isLinux then
-          pkgs.stdenv.mkDerivation rec {
-            pname = "chapel";
-            version = chapelVersion;
-
-            src = if pkgs.stdenv.isAarch64 then
-              pkgs.fetchurl {
-                url = "https://github.com/chapel-lang/chapel/releases/download/${version}/chapel-${version}-1.ubuntu24.arm64.deb";
-                sha256 = "1yc03izg1fgrbx5gyw2z47i542f6s6ia2y2wcbxdjl8bz50lfdpc";
-              }
-            else
-              pkgs.fetchurl {
-                url = "https://github.com/chapel-lang/chapel/releases/download/${version}/chapel-${version}-1.ubuntu24.amd64.deb";
-                sha256 = "1vvny92jhm98zylpc80xvxx0hrcfi7rlbrnis3fq266gnqs1vq0b";
-              };
-
-            nativeBuildInputs = [ pkgs.dpkg pkgs.autoPatchelfHook ];
-
-            # Runtime dependencies Chapel binaries need
-            buildInputs = with pkgs; [
-              glibc
-              gcc.cc.lib
-              zlib
-              llvmPackages_18.llvm
-              llvmPackages_18.libclang
-              gmp
-              hwloc
-              libunwind
-              python3
-              ncurses
-            ];
-
-            dontUnpack = true;
-            dontBuild = true;
-
-            installPhase = ''
-              mkdir -p $out
-              dpkg-deb -x $src $out
-
-              # Move files from /usr to package root
-              if [ -d $out/usr ]; then
-                cp -r $out/usr/* $out/ || true
-                rm -rf $out/usr
-              fi
-
-              # Fix shebangs
-              patchShebangs $out/bin || true
-            '';
-
-            meta = with pkgs.lib; {
-              description = "Chapel programming language compiler (legacy autoPatchelf)";
-              homepage = "https://chapel-lang.org/";
-              license = licenses.asl20;
-              platforms = platforms.linux;
-            };
-          }
-        else
-          null;
-
-        # System Chapel shim for macOS (uses Homebrew)
-        chapel-system = pkgs.writeShellScriptBin "chpl" ''
-          if command -v /opt/homebrew/bin/chpl &>/dev/null; then
-            exec /opt/homebrew/bin/chpl "$@"
-          elif command -v /usr/local/bin/chpl &>/dev/null; then
-            exec /usr/local/bin/chpl "$@"
-          else
-            echo "Error: Chapel not found. Install via: brew install chapel" >&2
-            exit 1
-          fi
-        '';
-
-        # Select Chapel based on platform
-        # Linux: Use FHS environment (avoids LLVM compatibility issues)
-        # macOS: Use system Chapel (Homebrew)
-        chapel = if pkgs.stdenv.isLinux then
-          # For Nix builds, we use the extracted Chapel with FHS wrapper
-          # The actual chpl binary is accessed through the FHS environment
-          chapelFhs.chapel-fhs
-        else
-          chapel-system;
 
         # Rust toolchain for GTK GUI
         # Using Rust 1.85+ for edition2024 support (required by cfg-expr crate)
@@ -192,9 +105,6 @@
           pkgs.tpm2-tools
         ];
 
-        # Architecture string for Chapel binaries
-        chapelArch = if pkgs.stdenv.isAarch64 then "linux64-aarch64" else "linux64-x86_64";
-
         # Common build inputs for Chapel projects
         chapelBuildInputs = [
           chapel
@@ -205,9 +115,7 @@
           pkgs.darwin.apple_sdk.frameworks.CoreFoundation
         ];
 
-        # Build the Chapel CLI binary using FHS environment
-        # This avoids LLVM symbol compatibility issues by running Chapel
-        # inside an FHS-compatible sandbox
+        # Build the Chapel CLI binary using Chapel built from source
         remote-juggler = pkgs.stdenv.mkDerivation {
           pname = "remote-juggler";
           version = "2.1.0";
@@ -227,37 +135,24 @@
 
           nativeBuildInputs = chapelBuildInputs ++ [ pkgs.which ];
 
-          # Skip build on macOS unless Chapel is installed via Homebrew
-          dontBuild = pkgs.stdenv.isDarwin;
-
-          buildPhase = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+          buildPhase = ''
             export HOME=$(mktemp -d)
             mkdir -p target/release
 
-            # Build with chpl inside FHS environment
-            # The FHS wrapper provides Ubuntu-like compatibility for Chapel binaries
-            # The profile in chapel-fhs.nix sets up CHPL_HOME, PATH, and CHPL_* env vars
-            ${chapel}/bin/chapel-fhs -c "
-              chpl \
-                -M src/remote_juggler \
-                --fast \
-                -o target/release/remote_juggler \
-                src/remote_juggler.chpl
-            "
+            # HSM header is needed for Chapel's extern declarations even when
+            # HSM_NATIVE_AVAILABLE=false (module is defined but not used at runtime).
+            ${chapel}/bin/chpl \
+              -M src/remote_juggler \
+              --ccflags="-I$src/pinentry" \
+              -sHSM_NATIVE_AVAILABLE=false \
+              --fast \
+              -o target/release/remote_juggler \
+              src/remote_juggler.chpl
           '';
 
-          installPhase = if pkgs.stdenv.isLinux then ''
+          installPhase = ''
             mkdir -p $out/bin
             cp target/release/remote_juggler $out/bin/remote-juggler
-            chmod +x $out/bin/remote-juggler
-          '' else ''
-            mkdir -p $out/bin
-            cat > $out/bin/remote-juggler << 'EOF'
-            #!/bin/sh
-            echo "RemoteJuggler: macOS Nix builds require Chapel via Homebrew"
-            echo "Install: brew install chapel && just release"
-            exit 1
-            EOF
             chmod +x $out/bin/remote-juggler
           '';
 
@@ -387,17 +282,15 @@
 
       in {
         packages = {
-          inherit remote-juggler rj-gateway pinentry-remotejuggler;
+          inherit remote-juggler rj-gateway pinentry-remotejuggler chapel;
           default = remote-juggler;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           inherit remote-juggler-gui;
-          # Chapel FHS environment for Linux
-          chapel = chapel;
+          # Legacy FHS Chapel environment (kept for backward compat)
           chapel-fhs = chapelFhs.chapel-fhs;
-          chapel-legacy = chapel-legacy;
         };
 
-        # Development shell with all tools (uses FHS Chapel on Linux)
+        # Development shell with all tools
         devShells.default = pkgs.mkShell {
           name = "remote-juggler-dev";
 
@@ -405,7 +298,7 @@
             # Rust toolchain
             rustToolchain
 
-            # Chapel FHS environment (on Linux) or shim (on macOS)
+            # Chapel (built from source with system LLVM)
             chapel
 
             # GTK4 development (Linux)
@@ -445,17 +338,8 @@
             echo "RemoteJuggler Development Environment"
             echo "======================================"
             echo ""
-            echo "Chapel version: ${chapelVersion}"
-            ${if pkgs.stdenv.isLinux then ''
-              echo "Chapel: FHS environment (avoids LLVM compatibility issues)"
-              echo "  Enter with: chapel-fhs"
-              echo "  Quick test: chapel-fhs -c 'chpl --version'"
-              echo ""
-              echo "Build with Chapel:"
-              echo "  chapel-fhs -c 'just release'"
-            '' else ''
-              echo "Chapel: Using system Chapel (install via: brew install chapel)"
-            ''}
+            echo "Chapel version: ${chapelVersion} (built from source with LLVM 18)"
+            echo "  Quick test: chpl --version"
             echo ""
             echo "Available commands:"
             echo "  just build        - Build Chapel CLI (debug)"
@@ -490,21 +374,18 @@
             (pkgs.lib.makeSearchPath "lib/pkgconfig" gtkDeps);
         };
 
-        # Chapel FHS shell for minimal Chapel-only builds (Linux)
-        # This drops you directly into the FHS environment with Chapel
-        devShells.chapel = if pkgs.stdenv.isLinux then
-          chapelFhs.devShell
-        else
-          pkgs.mkShell {
-            name = "remote-juggler-chapel";
-            buildInputs = chapelBuildInputs;
+        # Chapel-only development shell (all platforms)
+        devShells.chapel = pkgs.mkShell {
+          name = "remote-juggler-chapel";
+          buildInputs = chapelBuildInputs;
 
-            shellHook = ''
-              echo "Chapel Development Shell (macOS)"
-              echo "================================"
-              echo "Chapel: Using system Chapel (install via: brew install chapel)"
-            '';
-          };
+          shellHook = ''
+            echo "Chapel Development Shell"
+            echo "========================"
+            echo "Chapel ${chapelVersion} (from source, LLVM 18)"
+            echo "  chpl --version"
+          '';
+        };
 
         # TPM development shell (Linux only) for HSM testing
         devShells.tpm = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux (pkgs.mkShell {
@@ -539,13 +420,12 @@
         });
 
         # For `nix flake check`
-        checks = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          # Test that Chapel FHS environment works
-          chapel-fhs-version = pkgs.runCommand "check-chapel-fhs-version" {
+        checks = {
+          # Test that Chapel from-source build works
+          chapel-version = pkgs.runCommand "check-chapel-version" {
             nativeBuildInputs = [ chapel ];
           } ''
-            # Test that FHS environment can execute Chapel
-            ${chapel}/bin/chapel-fhs -c 'chpl --version' > $out
+            ${chapel}/bin/chpl --version > $out
           '';
         };
       }
