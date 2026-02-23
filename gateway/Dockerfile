@@ -7,10 +7,11 @@ RUN go mod download
 COPY *.go ./
 RUN CGO_ENABLED=0 go build -o rj-gateway .
 
-FROM debian:bookworm-slim
+# Use Ubuntu 24.04 to match the Chapel CLI binary's glibc (2.38+).
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libhwloc15 \
+    ca-certificates libhwloc15 libunwind8 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/rj-gateway /usr/local/bin/rj-gateway
