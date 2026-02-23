@@ -1,5 +1,6 @@
 """OpenClaw AI agent: Claude-powered campaign execution via rj-gateway MCP tools."""
 
+import base64
 import json
 import logging
 import time
@@ -9,6 +10,32 @@ import anthropic
 import httpx
 
 log = logging.getLogger("openclaw.agent")
+
+# Local tool definition for github_fetch (not an MCP tool).
+GITHUB_FETCH_TOOL = {
+    "name": "github_fetch",
+    "description": (
+        "Fetch a file from a GitHub repository. Uses the GitHub Contents API. "
+        "Returns the file content as text. Works with any public or authorized private repo."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "owner": {
+                "type": "string",
+                "description": "Repository owner (user or org)",
+            },
+            "repo": {"type": "string", "description": "Repository name"},
+            "path": {"type": "string", "description": "File path within the repo"},
+            "ref": {
+                "type": "string",
+                "description": "Git ref (branch, tag, or commit SHA). Defaults to main.",
+                "default": "main",
+            },
+        },
+        "required": ["owner", "repo", "path"],
+    },
+}
 
 
 class OpenClawAgent:
@@ -24,6 +51,7 @@ class OpenClawAgent:
         self.client = anthropic.Anthropic(api_key=anthropic_key)
         self.model = model
         self.http = httpx.Client(timeout=60)
+        self._github_token: str | None = None
 
     def run_campaign(self, campaign: dict, run_id: str) -> dict:
         """Execute a campaign using Claude tool_use loop.
@@ -43,6 +71,10 @@ class OpenClawAgent:
                 for t in all_tools
                 if t["name"] in campaign_tool_names
             ]
+
+            # Add local tools (not in gateway) if requested by campaign.
+            if "github_fetch" in campaign_tool_names:
+                tools.append(GITHUB_FETCH_TOOL)
 
             if not tools:
                 return self._make_result(
@@ -133,6 +165,12 @@ class OpenClawAgent:
         return data.get("result", {}).get("tools", [])
 
     def _call_tool(self, name: str, args: dict) -> Any:
+        """Call a tool — local tools are handled directly, MCP tools via rj-gateway."""
+        if name == "github_fetch":
+            return self._github_fetch(args)
+        return self._call_mcp_tool(name, args)
+
+    def _call_mcp_tool(self, name: str, args: dict) -> Any:
         """Call an MCP tool via rj-gateway HTTP."""
         payload = {
             "jsonrpc": "2.0",
@@ -154,6 +192,76 @@ class OpenClawAgent:
             texts = [c.get("text", "") for c in content if c.get("type") == "text"]
             return "\n".join(texts) if texts else content
         return result
+
+    def _resolve_github_token(self) -> str:
+        """Resolve GitHub token via rj-gateway composite resolver, with caching."""
+        if self._github_token:
+            return self._github_token
+        result = self._call_mcp_tool(
+            "juggler_resolve_composite",
+            {"name": "github-token"},
+        )
+        # Result is a text string with JSON; parse to extract the value.
+        if isinstance(result, str):
+            try:
+                data = json.loads(result)
+                self._github_token = data.get("value", result)
+            except json.JSONDecodeError:
+                self._github_token = result
+        elif isinstance(result, dict):
+            self._github_token = result.get("value", str(result))
+        else:
+            self._github_token = str(result)
+        return self._github_token
+
+    def _github_fetch(self, args: dict) -> str:
+        """Fetch a file from GitHub using the Contents API."""
+        owner = args.get("owner", "")
+        repo = args.get("repo", "")
+        path = args.get("path", "")
+        ref = args.get("ref", "main")
+
+        if not owner or not repo or not path:
+            return json.dumps({"error": "owner, repo, and path are required"})
+
+        token = self._resolve_github_token()
+        url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        params = {"ref": ref}
+
+        try:
+            resp = self.http.get(url, headers=headers, params=params)
+            if resp.status_code == 404:
+                return json.dumps({"error": f"not found: {owner}/{repo}/{path}@{ref}"})
+            resp.raise_for_status()
+            data = resp.json()
+
+            # GitHub returns base64-encoded content for files.
+            if data.get("type") == "file" and data.get("content"):
+                content = base64.b64decode(data["content"]).decode(
+                    "utf-8", errors="replace"
+                )
+                return content
+            elif data.get("type") == "dir":
+                # Return directory listing.
+                entries = [{"name": e["name"], "type": e["type"]} for e in data]
+                return json.dumps({"type": "directory", "entries": entries})
+            else:
+                return json.dumps(
+                    {"error": f"unexpected content type: {data.get('type')}"}
+                )
+        except httpx.HTTPStatusError as e:
+            return json.dumps(
+                {
+                    "error": f"GitHub API error {e.response.status_code}: {e.response.text[:200]}"
+                }
+            )
+        except Exception as e:
+            return json.dumps({"error": f"github_fetch failed: {e}"})
 
     def _mcp_to_anthropic_tool(self, mcp_tool: dict) -> dict:
         """Convert MCP tool schema to Anthropic tool format."""

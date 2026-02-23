@@ -74,11 +74,12 @@
     "juggler_audit_log",
     "juggler_campaign_status",
     "juggler_setec_get",
-    "juggler_setec_put"
+    "juggler_setec_put",
+    "github_fetch"
   ],
   "process": [
     "Resolve github-token via juggler_resolve_composite for GitHub API access",
-    "For each target repo: fetch dependency manifests via GitHub API (package.json, go.mod, Cargo.toml, pyproject.toml)",
+    "For each target repo: use github_fetch to retrieve dependency manifests (package.json, go.mod, Cargo.toml, pyproject.toml). Skip files that return 404.",
     "Build cross-repo dependency graph: map each dependency to all repos and versions that use it",
     "Flag version divergences: same package used at different versions across repos",
     "Run vulnerability checks: npm audit (TypeScript), govulncheck (Go), cargo audit (Rust), pip-audit (Python)",
