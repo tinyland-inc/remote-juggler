@@ -7,7 +7,7 @@ set export
 
 # Project configuration
 binary := "remote-juggler"
-version := "2.1.0-beta.1"
+version := "2.1.0"
 chapel_version := "2.7.0"
 
 # Installation paths
@@ -523,6 +523,40 @@ tray-test:
     cd tray/darwin && swift test
 
 # =============================================================================
+# Gateway
+# =============================================================================
+
+# Build gateway binary
+[group('gateway')]
+gateway-build:
+    cd gateway && go build -o ../target/release/rj-gateway .
+
+# Run gateway in local mode (no tsnet)
+[group('gateway')]
+gateway-run: gateway-build
+    ./target/release/rj-gateway --listen=localhost:8443 --chapel-bin=./target/release/remote_juggler
+
+# Run gateway tests
+[group('gateway')]
+gateway-test:
+    cd gateway && go test -v ./...
+
+# Lint gateway
+[group('gateway')]
+gateway-lint:
+    cd gateway && go vet ./...
+
+# Build gateway Docker image
+[group('gateway')]
+gateway-docker:
+    cd gateway && docker build -t ghcr.io/tinyland-inc/remote-juggler/gateway:latest .
+
+# Build gateway with Nix
+[group('gateway')]
+gateway-nix:
+    nix build .#rj-gateway
+
+# =============================================================================
 # Nix
 # =============================================================================
 
@@ -581,6 +615,11 @@ bazel-tray:
 [macos]
 bazel-tray:
     bazelisk build //tray/darwin:RemoteJugglerTray
+
+# Build gateway with Bazel
+[group('bazel')]
+bazel-gateway:
+    bazelisk build //gateway:rj-gateway
 
 # Build HSM library with Bazel
 [group('bazel')]
@@ -1011,6 +1050,35 @@ dist-flatpak:
 [group('dist')]
 dist-test-install:
     ./scripts/install.sh --help
+
+# =============================================================================
+# OpenTofu Infrastructure
+# =============================================================================
+
+# Initialize OpenTofu (download providers, connect state backend)
+[group('tofu')]
+tofu-init:
+    deploy/tofu/apply.sh init
+
+# Preview infrastructure changes
+[group('tofu')]
+tofu-plan:
+    deploy/tofu/apply.sh plan
+
+# Apply infrastructure changes
+[group('tofu')]
+tofu-apply:
+    deploy/tofu/apply.sh apply
+
+# Destroy all managed infrastructure
+[group('tofu')]
+tofu-destroy:
+    deploy/tofu/apply.sh destroy
+
+# Show current infrastructure outputs
+[group('tofu')]
+tofu-output:
+    deploy/tofu/apply.sh output
 
 # =============================================================================
 # CI Helpers

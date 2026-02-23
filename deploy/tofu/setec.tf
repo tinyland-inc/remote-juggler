@@ -1,0 +1,128 @@
+# =============================================================================
+# Setec Secret Server
+# =============================================================================
+#
+# Setec stores and serves secrets over the tailnet. The Tailscale Operator
+# handles sidecar injection via the service annotation — no manual sidecar.
+# =============================================================================
+
+resource "kubernetes_persistent_volume_claim" "setec_data" {
+  metadata {
+    name      = "setec-data"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "setec" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = var.setec_storage_size
+      }
+    }
+  }
+
+  # Prevent accidental deletion of persistent data
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "kubernetes_deployment" "setec" {
+  metadata {
+    name      = "setec"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "setec" })
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "setec"
+      }
+    }
+
+    template {
+      metadata {
+        labels = merge(local.labels, { app = "setec" })
+      }
+
+      spec {
+        # Single container — Tailscale Operator injects the sidecar
+        container {
+          name  = "setec"
+          image = var.setec_image
+
+          args = [
+            "server",
+            "--addr=:8443",
+            "--state-dir=/data",
+          ]
+
+          port {
+            container_port = 8443
+            name           = "https"
+          }
+
+          volume_mount {
+            name       = "setec-data"
+            mount_path = "/data"
+          }
+
+          resources {
+            requests = {
+              cpu    = "50m"
+              memory = "64Mi"
+            }
+            limits = {
+              cpu    = "200m"
+              memory = "128Mi"
+            }
+          }
+        }
+
+        volume {
+          name = "setec-data"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.setec_data.metadata[0].name
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [helm_release.tailscale_operator]
+}
+
+resource "kubernetes_service" "setec" {
+  metadata {
+    name      = "setec"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "setec" })
+
+    annotations = {
+      # Tailscale Operator: expose this service on the tailnet
+      "tailscale.com/expose"   = "true"
+      "tailscale.com/hostname" = "setec"
+      "tailscale.com/tags"     = local.tailscale_tags.setec
+    }
+  }
+
+  spec {
+    selector = {
+      app = "setec"
+    }
+
+    port {
+      port        = 8443
+      target_port = 8443
+      name        = "https"
+    }
+
+    type = "ClusterIP"
+  }
+
+  depends_on = [helm_release.tailscale_operator]
+}

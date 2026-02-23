@@ -1,0 +1,33 @@
+# =============================================================================
+# Example variable values for RemoteJuggler OpenTofu
+# =============================================================================
+#
+# Copy to terraform.tfvars and fill in values, OR use ./apply.sh which
+# resolves secrets automatically from rj-gateway.
+#
+# NEVER commit terraform.tfvars — it's in .gitignore.
+# =============================================================================
+
+# Required: Tailscale tailnet name
+tailscale_tailnet = "example.com"
+
+# Optional: Override defaults
+# namespace                    = "fuzzy-dev"
+# kubeconfig_path              = "~/.kube/config"
+# setec_storage_size           = "1Gi"
+# hexstrike_replicas           = 0
+# hexstrike_results_storage_size = "5Gi"
+# aperture_hostname            = "aperture.tail1234.ts.net"
+
+# Optional: Override container images
+# setec_image         = "ghcr.io/tailscale/setec:latest"
+# gateway_image       = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest"
+# openclaw_image      = "ghcr.io/openclaw/openclaw:latest"
+# hexstrike_image     = "ghcr.io/hexstrike/hexstrike-ai:latest"
+# chapel_binary_image = "ghcr.io/tinyland-inc/remote-juggler:latest"
+
+# Secrets — injected via TF_VAR_* env vars by apply.sh (do NOT hardcode here)
+# civo_token                     = "..."
+# tailscale_oauth_client_id      = "..."
+# tailscale_oauth_client_secret  = "..."
+# tailscale_auth_key             = "..."
