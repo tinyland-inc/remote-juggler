@@ -17,6 +17,8 @@ resource "helm_release" "tailscale_operator" {
   chart            = "tailscale-operator"
   namespace        = "tailscale"
   create_namespace = true
+  timeout          = 600
+  wait             = true
 
   set_sensitive {
     name  = "oauth.clientId"

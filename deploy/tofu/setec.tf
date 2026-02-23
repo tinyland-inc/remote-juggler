@@ -13,6 +13,8 @@ resource "kubernetes_persistent_volume_claim" "setec_data" {
     labels    = merge(local.labels, { app = "setec" })
   }
 
+  wait_until_bound = false
+
   spec {
     access_modes = ["ReadWriteOnce"]
     resources {
@@ -21,14 +23,11 @@ resource "kubernetes_persistent_volume_claim" "setec_data" {
       }
     }
   }
-
-  # Prevent accidental deletion of persistent data
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "kubernetes_deployment" "setec" {
+  wait_for_rollout = false
+
   metadata {
     name      = "setec"
     namespace = kubernetes_namespace.main.metadata[0].name

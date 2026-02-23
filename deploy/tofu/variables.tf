@@ -9,13 +9,13 @@ variable "civo_token" {
 }
 
 variable "tailscale_oauth_client_id" {
-  description = "Tailscale OAuth client ID for the operator"
+  description = "Tailscale OAuth client ID for the operator and provider auth"
   type        = string
   sensitive   = true
 }
 
 variable "tailscale_oauth_client_secret" {
-  description = "Tailscale OAuth client secret for the operator"
+  description = "Tailscale OAuth client secret for the operator and provider auth"
   type        = string
   sensitive   = true
 }

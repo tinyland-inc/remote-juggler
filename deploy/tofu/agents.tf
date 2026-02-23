@@ -7,6 +7,8 @@
 # =============================================================================
 
 resource "kubernetes_deployment" "openclaw" {
+  wait_for_rollout = false
+
   metadata {
     name      = "openclaw-agent"
     namespace = kubernetes_namespace.main.metadata[0].name
@@ -93,6 +95,8 @@ resource "kubernetes_deployment" "openclaw" {
 # =============================================================================
 
 resource "kubernetes_persistent_volume_claim" "hexstrike_results" {
+  wait_until_bound = false
+
   metadata {
     name      = "hexstrike-results"
     namespace = kubernetes_namespace.main.metadata[0].name
@@ -107,13 +111,11 @@ resource "kubernetes_persistent_volume_claim" "hexstrike_results" {
       }
     }
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "kubernetes_deployment" "hexstrike" {
+  wait_for_rollout = false
+
   metadata {
     name      = "hexstrike-agent"
     namespace = kubernetes_namespace.main.metadata[0].name

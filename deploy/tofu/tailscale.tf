@@ -1,59 +1,17 @@
 # =============================================================================
-# Tailscale ACL Policy + Auth Keys
+# Tailscale Auth Keys
 # =============================================================================
 #
-# Manages the Tailscale ACL grants that control identity-aware access to
-# rj-gateway and setec. Replaces the static tailscale-acl-grants.hujson.
+# IMPORTANT: The tailnet ACL policy is NOT managed here. The tailscale_acl
+# resource is a destructive singleton that overwrites the ENTIRE tailnet
+# policy. ACL grants for RemoteJuggler should be added manually via the
+# Tailscale admin console or merged into the tailnet's existing policy.
+#
+# Reference grants are in: deploy/tailscale-acl-grants.hujson
+#
+# Tags (tag:rj-gateway, tag:setec, tag:ci-agent, tag:k8s) must be defined
+# in the tailnet ACL tagOwners before auth keys below will work.
 # =============================================================================
-
-resource "tailscale_acl" "remotejuggler" {
-  acl = jsonencode({
-    grants = [
-      {
-        # Allow all tailnet members to read secrets via rj-gateway
-        src = ["autogroup:member"]
-        dst = [local.tailscale_tags.gateway]
-        app = {
-          "tailscale.com/cap/rj-gateway" = [{ role = "reader" }]
-        }
-      },
-      {
-        # Allow admin users to write secrets and view audit logs
-        src = ["group:admins"]
-        dst = [local.tailscale_tags.gateway]
-        app = {
-          "tailscale.com/cap/rj-gateway" = [{ role = "admin" }]
-        }
-      },
-      {
-        # Allow CI/CD agents to read specific secrets
-        src = [local.tailscale_tags.ci_agent]
-        dst = [local.tailscale_tags.gateway]
-        app = {
-          "tailscale.com/cap/rj-gateway" = [{
-            role    = "reader"
-            secrets = ["github-token", "gitlab-token", "neon-database-url"]
-          }]
-        }
-      },
-      {
-        # Allow rj-gateway to access setec
-        src = [local.tailscale_tags.gateway]
-        dst = [local.tailscale_tags.setec]
-        app = {
-          "tailscale.com/cap/setec" = [{ role = "admin" }]
-        }
-      },
-    ]
-
-    tagOwners = {
-      "tag:rj-gateway" = ["autogroup:admin"]
-      "tag:setec"       = ["autogroup:admin"]
-      "tag:ci-agent"    = ["autogroup:admin"]
-      "tag:k8s"         = ["autogroup:admin"]
-    }
-  })
-}
 
 # Ephemeral auth key for services that use the Tailscale operator
 resource "tailscale_tailnet_key" "operator" {

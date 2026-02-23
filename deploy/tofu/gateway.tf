@@ -8,6 +8,8 @@
 # =============================================================================
 
 resource "kubernetes_deployment" "gateway" {
+  wait_for_rollout = false
+
   metadata {
     name      = "rj-gateway"
     namespace = kubernetes_namespace.main.metadata[0].name

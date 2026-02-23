@@ -21,13 +21,13 @@ terraform {
   }
 
   backend "s3" {
-    bucket                      = "rj-tofu-state"
-    key                         = "remotejuggler/terraform.tfstate"
-    region                      = "LON1"
-    endpoint                    = "objectstore.lon1.civo.com"
+    bucket                      = "tinyland-bazel-cache"
+    key                         = "tofu/remotejuggler/terraform.tfstate"
+    region                      = "NYC1"
+    endpoint                    = "objectstore.nyc1.civo.com"
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true
-    force_path_style            = true
+    use_path_style              = true
   }
 }
