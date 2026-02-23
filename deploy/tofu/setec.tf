@@ -60,13 +60,19 @@ resource "kubernetes_deployment" "setec" {
 
           args = [
             "server",
-            "--addr=:8443",
             "--state-dir=/data",
+            "--hostname=setec",
+            "--dev",
           ]
 
-          port {
-            container_port = 8443
-            name           = "https"
+          env {
+            name = "TS_AUTHKEY"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.ts_auth.metadata[0].name
+                key  = "TS_AUTHKEY"
+              }
+            }
           }
 
           volume_mount {

@@ -27,6 +27,14 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-pull
+      initContainers:
+        # Copy the Chapel CLI binary into a shared volume for the gateway.
+        - name: copy-cli
+          image: ghcr.io/tinyland-inc/remote-juggler:latest  # renovate: image
+          command: ["cp", "/usr/local/bin/remote-juggler", "/shared/remote-juggler"]
+          volumeMounts:
+            - name: shared-bin
+              mountPath: /shared
       containers:
         - name: gateway
           image: ghcr.io/tinyland-inc/remote-juggler/gateway:latest  # renovate: image
@@ -42,6 +50,8 @@ spec:
               value: rj-gateway
             - name: TS_STATE_DIR
               value: /var/lib/tsnet
+            - name: RJ_GATEWAY_CHAPEL_BIN
+              value: /usr/local/bin/chapel/remote-juggler
           ports:
             - containerPort: 443
               name: https
@@ -51,6 +61,8 @@ spec:
               readOnly: true
             - name: ts-state
               mountPath: /var/lib/tsnet
+            - name: shared-bin
+              mountPath: /usr/local/bin/chapel
           resources:
             requests:
               cpu: 100m
@@ -64,4 +76,6 @@ spec:
           secret:
             secretName: rj-gateway-config
         - name: ts-state
+          emptyDir: {}
+        - name: shared-bin
           emptyDir: {}

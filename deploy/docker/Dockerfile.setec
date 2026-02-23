@@ -1,6 +1,10 @@
 # Setec secret server - built from source since Tailscale provides no official image.
 # https://github.com/tailscale/setec
 #
+# Setec serves exclusively over tsnet (Tailscale). There is no --listen flag;
+# the server registers as a Tailscale node with the given --hostname.
+# Required env: TS_AUTHKEY (first run) or persisted state in /data/tsnet/.
+#
 # Requires Go 1.25+ (setec's minimum version).
 FROM golang:1.25-alpine AS builder
 
@@ -19,7 +23,6 @@ RUN adduser -D -u 10000 setec
 USER setec
 
 VOLUME /data
-EXPOSE 8443
 
 ENTRYPOINT ["setec"]
-CMD ["server", "--addr=:8443", "--state-dir=/data"]
+CMD ["server", "--state-dir=/data", "--hostname=setec", "--dev"]

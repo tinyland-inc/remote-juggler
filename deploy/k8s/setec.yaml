@@ -31,11 +31,15 @@ spec:
           image: ghcr.io/tinyland-inc/remote-juggler/setec:latest  # renovate: image
           args:
             - server
-            - --addr=:8443
             - --state-dir=/data
-          ports:
-            - containerPort: 8443
-              name: https
+            - --hostname=setec
+            - --dev
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: ts-auth
+                  key: TS_AUTHKEY
           volumeMounts:
             - name: setec-data
               mountPath: /data
