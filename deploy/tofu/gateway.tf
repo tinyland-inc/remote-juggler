@@ -101,6 +101,16 @@ resource "kubernetes_deployment" "gateway" {
             mount_path = "/var/lib/tsnet"
           }
 
+          volume_mount {
+            name       = "shared-bin"
+            mount_path = "/usr/local/bin/chapel"
+          }
+
+          env {
+            name  = "RJ_GATEWAY_CHAPEL_BIN"
+            value = "/usr/local/bin/chapel/remote-juggler"
+          }
+
           resources {
             requests = {
               cpu    = "100m"
@@ -110,6 +120,19 @@ resource "kubernetes_deployment" "gateway" {
               cpu    = "500m"
               memory = "256Mi"
             }
+          }
+        }
+
+        # Init container: copy Chapel CLI binary to shared volume
+        init_container {
+          name  = "copy-cli"
+          image = var.chapel_binary_image
+
+          command = ["cp", "/usr/local/bin/remote-juggler", "/shared/remote-juggler"]
+
+          volume_mount {
+            name       = "shared-bin"
+            mount_path = "/shared"
           }
         }
 
@@ -125,6 +148,11 @@ resource "kubernetes_deployment" "gateway" {
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.gateway_tsnet.metadata[0].name
           }
+        }
+
+        volume {
+          name = "shared-bin"
+          empty_dir {}
         }
       }
     }

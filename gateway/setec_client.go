@@ -186,17 +186,33 @@ func (c *SetecClient) List(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("setec list: status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var result struct {
-		Secrets []struct {
-			Name string `json:"Name"`
-		} `json:"Secrets"`
+	// Setec returns either an array of {Name, ...} objects directly,
+	// or an object with a Secrets field containing the array.
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("setec read: %w", err)
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("setec decode: %w", err)
+
+	type secretEntry struct {
+		Name string `json:"Name"`
+	}
+
+	var entries []secretEntry
+
+	// Try array format first (Setec's actual format).
+	if err := json.Unmarshal(respBody, &entries); err != nil {
+		// Fall back to wrapped format.
+		var wrapped struct {
+			Secrets []secretEntry `json:"Secrets"`
+		}
+		if err2 := json.Unmarshal(respBody, &wrapped); err2 != nil {
+			return nil, fmt.Errorf("setec decode: %w (also tried wrapped: %w)", err, err2)
+		}
+		entries = wrapped.Secrets
 	}
 
 	var names []string
-	for _, s := range result.Secrets {
+	for _, s := range entries {
 		name := strings.TrimPrefix(s.Name, c.prefix)
 		names = append(names, name)
 	}
