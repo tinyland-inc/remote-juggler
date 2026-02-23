@@ -17,10 +17,12 @@ import (
 type MCPProxy struct {
 	binaryPath string
 
-	mu     sync.Mutex
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout *bufio.Reader
+	mu    sync.Mutex
+	cmd   *exec.Cmd
+	stdin io.WriteCloser
+
+	// responseCh receives JSON-RPC responses (messages with "id") from readLoop.
+	responseCh chan []byte
 
 	// SSE subscribers receive JSON-RPC notifications from the subprocess.
 	subs   map[chan []byte]struct{}
@@ -36,6 +38,7 @@ type MCPProxy struct {
 func NewMCPProxy(binaryPath string) *MCPProxy {
 	return &MCPProxy{
 		binaryPath: binaryPath,
+		responseCh: make(chan []byte, 1),
 		subs:       make(map[chan []byte]struct{}),
 	}
 }
@@ -61,10 +64,10 @@ func (p *MCPProxy) Start() error {
 
 	p.cmd = cmd
 	p.stdin = stdin
-	p.stdout = bufio.NewReader(stdoutPipe)
 
-	// Read subprocess output in background.
-	go p.readLoop()
+	// readLoop is the sole reader from stdout. It routes responses to
+	// responseCh and broadcasts notifications to SSE subscribers.
+	go p.readLoop(bufio.NewReader(stdoutPipe))
 
 	return nil
 }
@@ -83,24 +86,31 @@ func (p *MCPProxy) Stop() error {
 	return nil
 }
 
-// readLoop continuously reads JSON-RPC messages from the subprocess stdout
-// and dispatches notifications to SSE subscribers.
-func (p *MCPProxy) readLoop() {
+// readLoop is the sole reader from the subprocess stdout. It routes
+// JSON-RPC responses (messages with "id") to responseCh and broadcasts
+// notifications (messages without "id") to SSE subscribers.
+func (p *MCPProxy) readLoop(stdout *bufio.Reader) {
 	for {
-		line, err := p.stdout.ReadBytes('\n')
+		line, err := stdout.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("mcp subprocess read error: %v", err)
 			}
+			close(p.responseCh)
 			return
 		}
 
-		// Check if this is a notification (no "id" field) for SSE broadcast.
 		var msg map[string]json.RawMessage
-		if json.Unmarshal(line, &msg) == nil {
-			if _, hasID := msg["id"]; !hasID {
-				p.broadcast(line)
-			}
+		if json.Unmarshal(line, &msg) != nil {
+			continue // skip non-JSON lines
+		}
+
+		if _, hasID := msg["id"]; hasID {
+			// Response to a request — route to SendRequest waiter.
+			p.responseCh <- line
+		} else {
+			// Notification — broadcast to SSE subscribers.
+			p.broadcast(line)
 		}
 	}
 }
@@ -135,8 +145,8 @@ func (p *MCPProxy) unsubscribe(ch chan []byte) {
 	close(ch)
 }
 
-// SendRequest writes a JSON-RPC request to the subprocess and reads the response.
-// This is serialized: only one request at a time.
+// SendRequest writes a JSON-RPC request to the subprocess and waits for
+// the response from readLoop. Serialized: only one request at a time.
 func (p *MCPProxy) SendRequest(request []byte) ([]byte, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -146,10 +156,10 @@ func (p *MCPProxy) SendRequest(request []byte) ([]byte, error) {
 		return nil, fmt.Errorf("write to subprocess: %w", err)
 	}
 
-	// Read response line.
-	line, err := p.stdout.ReadBytes('\n')
-	if err != nil {
-		return nil, fmt.Errorf("read from subprocess: %w", err)
+	// Wait for response from readLoop.
+	line, ok := <-p.responseCh
+	if !ok {
+		return nil, fmt.Errorf("subprocess closed")
 	}
 
 	return line, nil
