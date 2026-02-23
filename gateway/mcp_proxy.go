@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -129,11 +130,16 @@ func (p *MCPProxy) readLoop(stdout *bufio.Reader) {
 			return
 		}
 
-		log.Printf("mcp: readLoop got line (%d bytes): %.200s", len(line), string(line))
+		// Trim whitespace/BOM that Chapel may emit before JSON.
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		log.Printf("mcp: readLoop got line (%d bytes, first5=%x): %.200s", len(line), line[:min(5, len(line))], string(line))
 
 		var msg map[string]json.RawMessage
-		if json.Unmarshal(line, &msg) != nil {
-			log.Printf("mcp: readLoop skipping non-JSON line")
+		if err := json.Unmarshal(line, &msg); err != nil {
+			log.Printf("mcp: readLoop skipping non-JSON line: %v", err)
 			continue // skip non-JSON lines
 		}
 
