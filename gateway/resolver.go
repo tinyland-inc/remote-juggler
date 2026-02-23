@@ -113,15 +113,25 @@ func (r *Resolver) resolveSOPS(ctx context.Context, query string) (string, error
 		return "", fmt.Errorf("sops error: %s", string(errField))
 	}
 
-	// Extract value from result.
+	// Extract value from result, checking for tool-level errors.
 	if resultField, ok := result["result"]; ok {
 		var toolResult struct {
 			Content []struct {
 				Text string `json:"text"`
 			} `json:"content"`
+			IsError bool `json:"isError"`
 		}
-		if err := json.Unmarshal(resultField, &toolResult); err == nil && len(toolResult.Content) > 0 {
-			return toolResult.Content[0].Text, nil
+		if err := json.Unmarshal(resultField, &toolResult); err == nil {
+			if toolResult.IsError {
+				msg := "unknown error"
+				if len(toolResult.Content) > 0 {
+					msg = toolResult.Content[0].Text
+				}
+				return "", fmt.Errorf("sops: %s", msg)
+			}
+			if len(toolResult.Content) > 0 {
+				return toolResult.Content[0].Text, nil
+			}
 		}
 	}
 
@@ -163,9 +173,19 @@ func (r *Resolver) resolveKDBX(ctx context.Context, query string) (string, error
 			Content []struct {
 				Text string `json:"text"`
 			} `json:"content"`
+			IsError bool `json:"isError"`
 		}
-		if err := json.Unmarshal(resultField, &toolResult); err == nil && len(toolResult.Content) > 0 {
-			return toolResult.Content[0].Text, nil
+		if err := json.Unmarshal(resultField, &toolResult); err == nil {
+			if toolResult.IsError {
+				msg := "unknown error"
+				if len(toolResult.Content) > 0 {
+					msg = toolResult.Content[0].Text
+				}
+				return "", fmt.Errorf("kdbx: %s", msg)
+			}
+			if len(toolResult.Content) > 0 {
+				return toolResult.Content[0].Text, nil
+			}
 		}
 	}
 

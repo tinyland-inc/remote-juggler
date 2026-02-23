@@ -89,12 +89,11 @@ func (p *MCPProxy) Start() error {
 			},
 		},
 	})
-	log.Printf("mcp: sending initialize handshake")
 	resp, err := p.SendRequest(initReq)
 	if err != nil {
 		log.Printf("warning: mcp initialize failed: %v", err)
 	} else {
-		log.Printf("mcp: initialize response: %s", string(resp))
+		log.Printf("mcp: subprocess initialized (%d bytes response)", len(resp))
 	}
 
 	return nil
@@ -118,14 +117,12 @@ func (p *MCPProxy) Stop() error {
 // JSON-RPC responses (messages with "id") to responseCh and broadcasts
 // notifications (messages without "id") to SSE subscribers.
 func (p *MCPProxy) readLoop(stdout *bufio.Reader) {
-	log.Printf("mcp: readLoop started")
 	for {
 		line, err := stdout.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("mcp subprocess read error: %v", err)
 			}
-			log.Printf("mcp: readLoop exiting (err=%v)", err)
 			close(p.responseCh)
 			return
 		}
@@ -137,22 +134,18 @@ func (p *MCPProxy) readLoop(stdout *bufio.Reader) {
 		if len(line) == 0 {
 			continue
 		}
-		log.Printf("mcp: readLoop got line (%d bytes): %.200s", len(line), string(line))
 
 		var msg map[string]json.RawMessage
 		if err := json.Unmarshal(line, &msg); err != nil {
-			log.Printf("mcp: readLoop skipping non-JSON line: %v", err)
-			continue // skip non-JSON lines
+			log.Printf("mcp: skipping non-JSON line (%d bytes): %v", len(line), err)
+			continue
 		}
 
 		if _, hasID := msg["id"]; hasID {
 			// Response to a request — route to SendRequest waiter.
-			log.Printf("mcp: readLoop routing response (has id) to responseCh")
 			p.responseCh <- line
-			log.Printf("mcp: readLoop sent to responseCh")
 		} else {
 			// Notification — broadcast to SSE subscribers.
-			log.Printf("mcp: readLoop broadcasting notification")
 			p.broadcast(line)
 		}
 	}
@@ -191,23 +184,19 @@ func (p *MCPProxy) unsubscribe(ch chan []byte) {
 // SendRequest writes a JSON-RPC request to the subprocess and waits for
 // the response from readLoop. Serialized: only one request at a time.
 func (p *MCPProxy) SendRequest(request []byte) ([]byte, error) {
-	log.Printf("mcp: SendRequest acquiring lock")
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	log.Printf("mcp: SendRequest lock acquired, writing %d bytes", len(request))
 
 	// Write request followed by newline.
 	if _, err := p.stdin.Write(append(request, '\n')); err != nil {
 		return nil, fmt.Errorf("write to subprocess: %w", err)
 	}
-	log.Printf("mcp: SendRequest wrote to stdin, waiting for response")
 
 	// Wait for response from readLoop.
 	line, ok := <-p.responseCh
 	if !ok {
 		return nil, fmt.Errorf("subprocess closed")
 	}
-	log.Printf("mcp: SendRequest got response (%d bytes)", len(line))
 
 	return line, nil
 }
