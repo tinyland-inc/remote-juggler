@@ -19,11 +19,11 @@ Build RemoteJuggler from source code.
 
 ### Chapel Compiler
 
-Install Chapel 2.6.0 or later:
+Install Chapel 2.7.0 or later:
 
-**macOS (Homebrew):**
+**Nix (recommended):**
 ```bash
-brew install chapel
+nix develop  # Provides Chapel 2.7.0 + all build tools
 ```
 
 **Linux (Spack):**
@@ -121,7 +121,7 @@ Not directly supported. Use CI/CD for Linux builds.
 ### Building in Docker
 
 ```dockerfile
-FROM chapel/chapel:2.6
+FROM chapel/chapel:2.7
 
 WORKDIR /app
 COPY . .

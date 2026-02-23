@@ -49,9 +49,9 @@ jobs:
         run: |
           mason build --release
           mv target/release/remote_juggler ${{ env.PROJECT_NAME }}-linux-${{ matrix.arch }}
+          chmod +x ${{ env.PROJECT_NAME }}-linux-${{ matrix.arch }}
         env:
           CHPL_TARGET_CPU: none
-          chmod +x ${{ env.PROJECT_NAME }}-linux-${{ matrix.arch }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -254,8 +254,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: arm64, runner: macos-14 }
-          - { arch: amd64, runner: macos-15 }
+          - { arch: arm64, runner: macos-15, nix_system: "" }
+          - { arch: amd64, runner: macos-15, nix_system: "packages.x86_64-darwin.", nix_extra_conf: "extra-platforms = x86_64-darwin" }
     name: macOS CLI (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     continue-on-error: true
@@ -263,23 +263,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Enable Rosetta 2
+        if: matrix.arch == 'amd64'
+        run: arch -x86_64 /usr/bin/true || softwareupdate --install-rosetta --agree-to-license
+
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
         with:
           extra-conf: |
             experimental-features = nix-command flakes
             accept-flake-config = true
+            ${{ matrix.nix_extra_conf }}
 
       - name: Build CLI
         run: |
-          nix build .#remote-juggler --print-build-logs
+          nix build .#${{ matrix.nix_system }}remote-juggler --print-build-logs
           cp -L result/bin/remote-juggler ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }}
           chmod +x ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }}
 
       - name: Test binary
         run: |
-          ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} --help
-          ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} list || true
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            arch -x86_64 ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} --help
+            arch -x86_64 ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} list || true
+          else
+            ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} --help
+            ./${{ env.PROJECT_NAME }}-darwin-${{ matrix.arch }} list || true
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

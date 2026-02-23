@@ -7,7 +7,7 @@
 # Build matrix:
 # - Linux x86_64: native build (~25 min cold, instant with cache)
 # - Linux aarch64: QEMU emulation (~60 min cold)
-# - macOS x86_64: Intel runner (macos-13)
+# - macOS x86_64: cross-build via Rosetta 2 on Apple Silicon (macos-15)
 # - macOS aarch64: Apple Silicon (macos-15)
 #
 # Required GitHub Secrets:
@@ -217,7 +217,7 @@ jobs:
 
   build-macos-x86_64:
     name: Build (macOS x86_64)
-    runs-on: macos-13  # Intel runner (last available x86_64-darwin)
+    runs-on: macos-15  # Apple Silicon + Rosetta 2 for x86_64-darwin cross-build
     needs: flake-check
     if: always() && !cancelled()
     steps:
@@ -230,6 +230,12 @@ jobs:
           extra-conf: |
             experimental-features = nix-command flakes
             accept-flake-config = true
+            extra-platforms = x86_64-darwin
+
+      - name: Enable Rosetta 2
+        run: |
+          # Rosetta 2 is pre-installed on GitHub macOS runners
+          arch -x86_64 /usr/bin/true || softwareupdate --install-rosetta --agree-to-license
 
       - name: Configure Attic
         run: |
@@ -250,7 +256,7 @@ jobs:
 
       - name: Build CLI
         run: |
-          nix build .#remote-juggler --print-build-logs
+          nix build .#packages.x86_64-darwin.remote-juggler --print-build-logs
 
           cp -L result/bin/remote-juggler ./remote-juggler-darwin-x86_64
           chmod +x ./remote-juggler-darwin-x86_64
@@ -263,8 +269,9 @@ jobs:
 
       - name: Test CLI binary
         run: |
-          ./remote-juggler-darwin-x86_64 --help
-          ./remote-juggler-darwin-x86_64 list || true
+          # Run via Rosetta 2
+          arch -x86_64 ./remote-juggler-darwin-x86_64 --help
+          arch -x86_64 ./remote-juggler-darwin-x86_64 list || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

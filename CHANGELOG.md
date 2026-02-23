@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+**Nix Build System**
+- Chapel 2.7.0 built from source with system LLVM 18 (eliminates FHS/bubblewrap)
+- Cross-platform Nix builds: Linux x86_64/aarch64, macOS x86_64/aarch64
+- Nix CI jobs no longer require `continue-on-error`
+
 **SOPS/KDBX Bidirectional Credential Sync**
 - 4 new MCP tools: juggler_keys_sops_status, sops_ingest, sops_sync, sops_export
 - 3 new CLI commands: keys sops-ingest, sops-sync, sops-export

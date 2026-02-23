@@ -107,11 +107,16 @@ nav:
     - SSH Configuration: operations/ssh-config.md
     - GPG Signing: operations/gpg-signing.md
     - Troubleshooting: operations/troubleshooting.md
+    - First-Time Setup: FIRST_TIME_SETUP.md
+    - Trusted Workstation: TRUSTED_WORKSTATION_SETUP.md
+    - Token Expiry Detection: token-expiry-detection.md
   - Development:
     - development/index.md
     - Building from Source: development/building.md
     - Running Tests: development/testing.md
     - Release Process: development/releasing.md
+    - Nix Chapel Setup: NIX_CHAPEL_SETUP.md
+    - CI Variables: CI_VARIABLES.md
   - Reference:
     - reference/index.md
     - MCP Tool Schemas: reference/tools-schema.md

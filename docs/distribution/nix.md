@@ -1,6 +1,6 @@
 # Nix Installation & Development
 
-RemoteJuggler supports Nix for reproducible builds and development environments.
+RemoteJuggler supports Nix for reproducible builds and development environments. Chapel 2.7.0 is built from source with system LLVM 18 — no FHS wrappers or Homebrew required on any platform.
 
 ## Quick Start
 
@@ -20,13 +20,19 @@ just release
 ### Building with Nix
 
 ```bash
-# Build the Chapel CLI (Linux)
+# Build the Chapel CLI
 nix build .#remote-juggler
+
+# Build the Go gateway
+nix build .#rj-gateway
 
 # Build the GTK GUI (Linux only)
 nix build .#remote-juggler-gui
 
-# Build Chapel compiler package (Linux)
+# Build the HSM pinentry helper
+nix build .#pinentry-remotejuggler
+
+# Build Chapel compiler package
 nix build .#chapel
 ```
 
@@ -41,10 +47,10 @@ The flake.nix includes cache configuration that works automatically:
 ```nix
 nixConfig = {
   extra-substituters = [
-    "https://attic.tinyland.dev/tinyland"
+    "https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
   ];
   extra-trusted-public-keys = [
-    "tinyland:O1ECUdLTRVhoyLTQ3hYy6xFhFyhlcVqbILJxBVOTwRY="
+    "tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric="
   ];
 };
 ```
@@ -54,38 +60,20 @@ nixConfig = {
 If you need to configure the cache manually, add to `~/.config/nix/nix.conf`:
 
 ```ini
-extra-substituters = https://attic.tinyland.dev/tinyland
-extra-trusted-public-keys = tinyland:O1ECUdLTRVhoyLTQ3hYy6xFhFyhlcVqbILJxBVOTwRY=
+extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
+extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric=
 ```
 
 ## Platform Support
 
-| Platform | Chapel CLI | GTK GUI | DevShell |
-|----------|-----------|---------|----------|
-| Linux x86_64 | Full Nix build | Full Nix build | Full |
-| Linux aarch64 | Full Nix build | Full Nix build | Full |
-| macOS x86_64 | Homebrew required | N/A | Partial |
-| macOS aarch64 | Homebrew required | N/A | Partial |
+| Platform | Chapel CLI | GTK GUI | Gateway | DevShell |
+|----------|-----------|---------|---------|----------|
+| Linux x86_64 | Full Nix build | Full Nix build | Full Nix build | Full |
+| Linux aarch64 | Full Nix build | Full Nix build | Full Nix build | Full |
+| macOS x86_64 | Full Nix build | N/A | Full Nix build | Full |
+| macOS aarch64 | Full Nix build | N/A | Full Nix build | Full |
 
-### macOS Notes
-
-Chapel does not provide pre-built macOS binaries. On macOS, the Nix flake provides:
-
-1. **DevShell**: Rust toolchain and common tools
-2. **Chapel shim**: Wraps system Chapel (install via Homebrew)
-
-To use on macOS:
-
-```bash
-# Install Chapel via Homebrew
-brew install chapel
-
-# Enter devShell (uses Homebrew Chapel)
-nix develop
-
-# Build with just (not nix build)
-just release
-```
+All platforms build Chapel from source with system LLVM 18. No Homebrew or external Chapel installation required.
 
 ## CI/CD Integration
 
@@ -106,8 +94,8 @@ build:nix:
   image: nixos/nix:2.28.3
   script:
     - echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
-    - echo 'extra-substituters = https://attic.tinyland.dev/tinyland' >> /etc/nix/nix.conf
-    - echo 'extra-trusted-public-keys = tinyland:O1ECUdLTRVhoyLTQ3hYy6xFhFyhlcVqbILJxBVOTwRY=' >> /etc/nix/nix.conf
+    - echo 'extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland' >> /etc/nix/nix.conf
+    - echo 'extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric=' >> /etc/nix/nix.conf
     - nix build .#remote-juggler
 ```
 
@@ -118,23 +106,26 @@ For CI cache push access:
 | Variable | Description |
 |----------|-------------|
 | `ATTIC_TOKEN` | Authentication token for Attic cache push |
-| `ATTIC_SERVER` | Attic server URL (default: `https://attic.tinyland.dev`) |
+| `ATTIC_SERVER` | Attic server URL (default: `https://nix-cache.fuzzy-dev.tinyland.dev`) |
 | `ATTIC_CACHE` | Cache name (default: `tinyland`) |
 
 ## Available Packages
 
-| Package | Description |
-|---------|-------------|
-| `remote-juggler` | Chapel CLI binary (default) |
-| `remote-juggler-gui` | GTK4/Libadwaita GUI (Linux only) |
-| `chapel` | Chapel compiler 2.7.0 (Linux only) |
+| Package | Description | Platforms |
+|---------|-------------|-----------|
+| `remote-juggler` | Chapel CLI binary (default) | All |
+| `remote-juggler-gui` | GTK4/Libadwaita GUI | Linux only |
+| `rj-gateway` | Go MCP gateway (tsnet + Setec) | All |
+| `pinentry-remotejuggler` | HSM pinentry helper | All |
+| `chapel` | Chapel compiler 2.7.0 (from source) | All |
 
 ## Available DevShells
 
 | Shell | Description |
 |-------|-------------|
-| `default` | Full development environment (Rust + Chapel + GTK) |
+| `default` | Full development environment (Rust + Chapel + Go + GTK) |
 | `chapel` | Minimal Chapel-only environment |
+| `tpm` | TPM/HSM development tools (Linux only) |
 
 ```bash
 # Full devShell
@@ -142,13 +133,16 @@ nix develop
 
 # Chapel-only shell
 nix develop .#chapel
+
+# TPM development (Linux)
+nix develop .#tpm
 ```
 
 ## Troubleshooting
 
 ### Chapel binary not found
 
-On Linux, verify Chapel is in the Nix store:
+Verify Chapel is in the Nix store:
 
 ```bash
 nix build .#chapel
@@ -169,7 +163,7 @@ nix build .#chapel
 
 3. Test cache connectivity:
    ```bash
-   curl -I https://attic.tinyland.dev/tinyland
+   curl -I https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
    ```
 
 ### GTK GUI build fails
@@ -181,25 +175,9 @@ Ensure GTK4 development libraries are available:
 nix develop --command pkg-config --modversion gtk4
 ```
 
-### macOS build issues
-
-Remember: Nix builds on macOS require Homebrew Chapel:
-
-```bash
-# Install Chapel
-brew install chapel
-
-# Verify installation
-which chpl
-chpl --version
-
-# Then use just (not nix build)
-just release
-```
-
 ## Development Workflow
 
-### Recommended Workflow (Linux)
+### Recommended Workflow
 
 ```bash
 # Enter devShell
@@ -214,30 +192,22 @@ just lint         # Run linter
 nix build         # Full reproducible build
 ```
 
-### Recommended Workflow (macOS)
-
-```bash
-# Ensure Homebrew Chapel is installed
-brew install chapel
-
-# Enter devShell for Rust tooling
-nix develop
-
-# Build with just
-just release
-```
-
 ## Updating Chapel Version
 
-To update Chapel in the flake:
+To update Chapel in the flake, override the `chapel-src` input:
 
-1. Update `chapelVersion` in `flake.nix`
-2. Update SHA256 hashes:
-   ```bash
-   nix-prefetch-url https://github.com/chapel-lang/chapel/releases/download/X.Y.Z/chapel-X.Y.Z-1.ubuntu24.amd64.deb
-   nix-prefetch-url https://github.com/chapel-lang/chapel/releases/download/X.Y.Z/chapel-X.Y.Z-1.ubuntu24.arm64.deb
-   ```
-3. Update flake.lock:
-   ```bash
-   nix flake update
-   ```
+```bash
+# Use a specific Chapel tag
+nix build --override-input chapel-src github:chapel-lang/chapel/refs/tags/X.Y.Z .#remote-juggler
+
+# Use a custom Chapel fork/branch
+nix build --override-input chapel-src github:youruser/chapel/your-branch .#remote-juggler
+```
+
+Then update `flake.lock` to pin the new version:
+
+```bash
+nix flake update chapel-src
+```
+
+For technical details on the from-source Chapel build, see [Nix Chapel Setup](../NIX_CHAPEL_SETUP.md).
