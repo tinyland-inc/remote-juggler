@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -80,9 +81,14 @@ func (a *APIServer) handleTrigger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Run asynchronously so the HTTP request returns immediately.
+	// Use a detached context with the campaign's max duration as timeout,
+	// since the request context will be canceled when the handler returns.
 	go func() {
-		log.Printf("api: manual trigger for campaign %s", campaignID)
-		if err := a.scheduler.RunCampaign(r.Context(), campaign); err != nil {
+		timeout := parseDuration(campaign.Guardrails.MaxDuration)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		log.Printf("api: manual trigger for campaign %s (timeout=%s)", campaignID, timeout)
+		if err := a.scheduler.RunCampaign(ctx, campaign); err != nil {
 			log.Printf("api: campaign %s failed: %v", campaignID, err)
 		}
 	}()
