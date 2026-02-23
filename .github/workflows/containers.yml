@@ -53,22 +53,16 @@ jobs:
         run: |
           FILTER="${{ github.event.inputs.images || 'all' }}"
 
-          # Full matrix of all images
-          ALL='[
-            {"name":"cli",       "context":".",        "file":"Dockerfile",                      "image":"remote-juggler"},
-            {"name":"gateway",   "context":"gateway",  "file":"gateway/Dockerfile",              "image":"remote-juggler/gateway"},
-            {"name":"setec",     "context":".",        "file":"deploy/docker/Dockerfile.setec",  "image":"remote-juggler/setec"},
-            {"name":"openclaw",  "context":".",        "file":"deploy/docker/Dockerfile.openclaw","image":"remote-juggler/openclaw"},
-            {"name":"hexstrike", "context":".",        "file":"deploy/docker/Dockerfile.hexstrike","image":"remote-juggler/hexstrike"}
-          ]'
+          # Full matrix of all images (compact JSON — GITHUB_OUTPUT requires single line)
+          ALL='[{"name":"cli","context":".","file":"Dockerfile","image":"remote-juggler"},{"name":"gateway","context":"gateway","file":"gateway/Dockerfile","image":"remote-juggler/gateway"},{"name":"setec","context":".","file":"deploy/docker/Dockerfile.setec","image":"remote-juggler/setec"},{"name":"openclaw","context":".","file":"deploy/docker/Dockerfile.openclaw","image":"remote-juggler/openclaw"},{"name":"hexstrike","context":".","file":"deploy/docker/Dockerfile.hexstrike","image":"remote-juggler/hexstrike"}]'
 
           if [ "$FILTER" = "all" ]; then
-            echo "matrix={\"include\":$ALL}" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":$ALL}" >> "$GITHUB_OUTPUT"
           else
             # Filter to requested images
-            echo "$ALL" | jq -c --arg filter "$FILTER" \
-              '{include: [.[] | select(.name as $n | $filter | split(",") | index($n))]}' \
-              >> $GITHUB_OUTPUT
+            FILTERED=$(echo "$ALL" | jq -c --arg filter "$FILTER" \
+              '{include: [.[] | select(.name as $n | $filter | split(",") | index($n))]}')
+            echo "matrix=$FILTERED" >> "$GITHUB_OUTPUT"
           fi
 
   # ---------------------------------------------------------------------------
