@@ -70,7 +70,6 @@
     }
   ],
   "tools": [
-    "juggler_resolve_composite",
     "juggler_audit_log",
     "juggler_campaign_status",
     "juggler_setec_get",
@@ -78,15 +77,12 @@
     "github_fetch"
   ],
   "process": [
-    "Resolve github-token via juggler_resolve_composite for GitHub API access",
-    "For each target repo: use github_fetch to retrieve dependency manifests (package.json, go.mod, Cargo.toml, pyproject.toml). Skip files that return 404.",
+    "For each target repo: call github_fetch(owner, repo, path) to retrieve dependency manifests. Try package.json, go.mod, Cargo.toml, and pyproject.toml for each repo. The GitHub token is resolved automatically. Skip files that return 404 or error.",
+    "Parse each manifest to extract dependency names and versions",
     "Build cross-repo dependency graph: map each dependency to all repos and versions that use it",
     "Flag version divergences: same package used at different versions across repos",
-    "Run vulnerability checks: npm audit (TypeScript), govulncheck (Go), cargo audit (Rust), pip-audit (Python)",
-    "Aggregate CVEs by severity: critical (CVSS >= 9), high (>= 7), medium (>= 4)",
-    "Cross-reference CVEs with dependency graph to identify blast radius",
-    "Store results in Setec and create/update pinned issue on remote-juggler",
-    "Compare with previous run to detect new divergences or resolved CVEs"
+    "Store results via juggler_setec_put with key from outputs.setecKey",
+    "Log completion via juggler_audit_log"
   ],
   "outputs": {
     "setecKey": "remotejuggler/campaigns/oc-dep-audit",
@@ -109,15 +105,12 @@
     "closeResolvedIssues": true
   },
   "metrics": {
-    "successCriteria": "All target repos scanned, dependency graph built, CVEs enumerated",
+    "successCriteria": "All target repos scanned, dependency graph built, version divergences identified",
     "kpis": [
       "repos_scanned",
+      "manifests_found",
       "total_dependencies",
-      "version_divergences",
-      "cve_critical",
-      "cve_high",
-      "cve_medium",
-      "cve_low"
+      "version_divergences"
     ]
   }
 }

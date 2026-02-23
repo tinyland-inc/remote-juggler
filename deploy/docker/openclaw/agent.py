@@ -208,7 +208,7 @@ class OpenClawAgent:
             return self._github_token
         result = self._call_mcp_tool(
             "juggler_resolve_composite",
-            {"name": "github-token"},
+            {"query": "github-token"},
         )
         # Result is a text string with JSON; parse to extract the value.
         if isinstance(result, str):
