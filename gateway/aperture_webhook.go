@@ -115,15 +115,21 @@ func (r *ApertureWebhookReceiver) record(event ApertureEvent) {
 
 	// Merge LLM-layer metrics into MeterStore if available.
 	if r.meter != nil && event.Type == "llm_call" {
+		inputTok := event.InputTokens
+		outputTok := event.OutputTokens
+		// Backward compat: if only "tokens" is set, attribute to output.
+		if inputTok == 0 && outputTok == 0 && event.Tokens > 0 {
+			outputTok = event.Tokens
+		}
 		r.meter.Record(MeterRecord{
-			Agent:         event.Agent,
-			CampaignID:    event.CampaignID,
-			ToolName:      fmt.Sprintf("llm:%s", event.Model),
-			RequestBytes:  0, // Not available from webhook.
-			ResponseBytes: 0,
-			DurationMs:    event.DurationMs,
-			Timestamp:     event.Timestamp,
-			IsError:       event.Error != "",
+			Agent:        event.Agent,
+			CampaignID:   event.CampaignID,
+			ToolName:     fmt.Sprintf("llm:%s", event.Model),
+			DurationMs:   event.DurationMs,
+			Timestamp:    event.Timestamp,
+			IsError:      event.Error != "",
+			InputTokens:  inputTok,
+			OutputTokens: outputTok,
 		})
 	}
 }

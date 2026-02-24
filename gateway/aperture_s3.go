@@ -175,12 +175,14 @@ func (s *ApertureS3Ingester) ingestKey(ctx context.Context, key string) error {
 
 	for _, rec := range records {
 		s.meter.Record(MeterRecord{
-			Agent:      rec.Agent,
-			CampaignID: rec.CampaignID,
-			ToolName:   fmt.Sprintf("llm:%s", rec.Model),
-			DurationMs: rec.DurationMs,
-			Timestamp:  rec.Timestamp,
-			IsError:    rec.Error != "",
+			Agent:        rec.Agent,
+			CampaignID:   rec.CampaignID,
+			ToolName:     fmt.Sprintf("llm:%s", rec.Model),
+			DurationMs:   rec.DurationMs,
+			Timestamp:    rec.Timestamp,
+			IsError:      rec.Error != "",
+			InputTokens:  rec.InputTokens,
+			OutputTokens: rec.OutputTokens,
 		})
 	}
 

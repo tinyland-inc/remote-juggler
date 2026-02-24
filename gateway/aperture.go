@@ -44,6 +44,9 @@ type ApertureUsage struct {
 	TotalTokens int    `json:"total_tokens"`
 	Period      string `json:"period,omitempty"`
 	Source      string `json:"source,omitempty"`
+	// LLM-layer token fields from webhook/S3 ingestion.
+	InputTokens  int64 `json:"input_tokens,omitempty"`
+	OutputTokens int64 `json:"output_tokens,omitempty"`
 	// MCP-layer fields from gateway metering.
 	MCPToolCalls     int   `json:"mcp_tool_calls,omitempty"`
 	MCPRequestBytes  int64 `json:"mcp_request_bytes,omitempty"`
@@ -66,13 +69,19 @@ func (a *ApertureClient) QueryUsage(ctx context.Context, campaignID, agent strin
 
 	if a.meterStore != nil {
 		buckets := a.meterStore.Query(agent, campaignID)
+		var totalInputTokens, totalOutputTokens int64
 		for _, b := range buckets {
 			usage.MCPToolCalls += b.ToolCalls
 			usage.MCPRequestBytes += b.RequestBytes
 			usage.MCPResponseBytes += b.ResponseBytes
 			usage.MCPErrorCount += b.ErrorCount
+			totalInputTokens += b.InputTokens
+			totalOutputTokens += b.OutputTokens
 		}
 		usage.TotalCalls = usage.MCPToolCalls
+		usage.TotalTokens = int(totalInputTokens + totalOutputTokens)
+		usage.InputTokens = totalInputTokens
+		usage.OutputTokens = totalOutputTokens
 		usage.Source = "mcp_metering"
 	}
 
@@ -115,6 +124,8 @@ func handleApertureUsageTool(aperture *ApertureClient, params json.RawMessage) (
 		"agent":              usage.Agent,
 		"total_calls":        usage.TotalCalls,
 		"total_tokens":       usage.TotalTokens,
+		"input_tokens":       usage.InputTokens,
+		"output_tokens":      usage.OutputTokens,
 		"period":             usage.Period,
 		"mcp_tool_calls":     usage.MCPToolCalls,
 		"mcp_request_bytes":  usage.MCPRequestBytes,

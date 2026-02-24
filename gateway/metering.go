@@ -19,6 +19,8 @@ type MeterRecord struct {
 	DurationMs    int64     `json:"duration_ms"`
 	Timestamp     time.Time `json:"timestamp"`
 	IsError       bool      `json:"is_error,omitempty"`
+	InputTokens   int       `json:"input_tokens,omitempty"`
+	OutputTokens  int       `json:"output_tokens,omitempty"`
 }
 
 // MeterBucket aggregates metering data per (agent, campaign_id) pair.
@@ -30,6 +32,8 @@ type MeterBucket struct {
 	ResponseBytes   int64     `json:"mcp_response_bytes"`
 	ErrorCount      int       `json:"error_count"`
 	TotalDurationMs int64     `json:"total_duration_ms"`
+	InputTokens     int64     `json:"input_tokens"`
+	OutputTokens    int64     `json:"output_tokens"`
 	FirstSeen       time.Time `json:"first_seen"`
 	LastSeen        time.Time `json:"last_seen"`
 }
@@ -85,6 +89,8 @@ func (m *MeterStore) Record(rec MeterRecord) {
 	bucket.RequestBytes += int64(rec.RequestBytes)
 	bucket.ResponseBytes += int64(rec.ResponseBytes)
 	bucket.TotalDurationMs += rec.DurationMs
+	bucket.InputTokens += int64(rec.InputTokens)
+	bucket.OutputTokens += int64(rec.OutputTokens)
 	bucket.LastSeen = rec.Timestamp
 	if rec.IsError {
 		bucket.ErrorCount++
@@ -148,6 +154,8 @@ func (m *MeterStore) Flush(ctx context.Context) (int, error) {
 					existing.ResponseBytes += b.ResponseBytes
 					existing.ErrorCount += b.ErrorCount
 					existing.TotalDurationMs += b.TotalDurationMs
+					existing.InputTokens += b.InputTokens
+					existing.OutputTokens += b.OutputTokens
 					if b.FirstSeen.Before(existing.FirstSeen) {
 						existing.FirstSeen = b.FirstSeen
 					}

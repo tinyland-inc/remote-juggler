@@ -180,6 +180,44 @@ func TestWebhookMergesIntoMeterStore(t *testing.T) {
 	}
 }
 
+func TestWebhookMergesTokensIntoMeterStore(t *testing.T) {
+	store := NewMeterStore()
+	receiver := NewApertureWebhookReceiver(100, store)
+
+	// Event with input/output tokens.
+	receiver.record(ApertureEvent{
+		Type:         "llm_call",
+		Agent:        "openclaw",
+		CampaignID:   "oc-smoketest",
+		Model:        "claude-sonnet-4-20250514",
+		InputTokens:  1200,
+		OutputTokens: 350,
+		Timestamp:    time.Now(),
+	})
+	// Event with legacy "tokens" field only.
+	receiver.record(ApertureEvent{
+		Type:       "llm_call",
+		Agent:      "openclaw",
+		CampaignID: "oc-smoketest",
+		Model:      "claude-sonnet-4-20250514",
+		Tokens:     500,
+		Timestamp:  time.Now(),
+	})
+
+	buckets := store.Query("openclaw", "oc-smoketest")
+	if len(buckets) != 1 {
+		t.Fatalf("expected 1 bucket, got %d", len(buckets))
+	}
+	b := buckets[0]
+	// First event: input=1200, output=350; second: legacy tokens=500 -> output=500
+	if b.InputTokens != 1200 {
+		t.Errorf("InputTokens = %d, want 1200", b.InputTokens)
+	}
+	if b.OutputTokens != 850 {
+		t.Errorf("OutputTokens = %d, want 850 (350 + 500 legacy)", b.OutputTokens)
+	}
+}
+
 func TestWebhookNonLLMEventNotMerged(t *testing.T) {
 	store := NewMeterStore()
 	receiver := NewApertureWebhookReceiver(100, store)

@@ -273,6 +273,44 @@ func TestExtractMeteringContextInvalid(t *testing.T) {
 	}
 }
 
+func TestMeterStoreTokenAggregation(t *testing.T) {
+	store := NewMeterStore()
+	now := time.Now()
+
+	// Simulate webhook/S3 ingested LLM calls with token counts.
+	store.Record(MeterRecord{
+		Agent:        "openclaw",
+		CampaignID:   "oc-smoketest",
+		ToolName:     "llm:claude-sonnet-4-20250514",
+		InputTokens:  1200,
+		OutputTokens: 350,
+		Timestamp:    now,
+	})
+	store.Record(MeterRecord{
+		Agent:        "openclaw",
+		CampaignID:   "oc-smoketest",
+		ToolName:     "llm:claude-sonnet-4-20250514",
+		InputTokens:  800,
+		OutputTokens: 200,
+		Timestamp:    now.Add(time.Second),
+	})
+
+	buckets := store.Query("openclaw", "oc-smoketest")
+	if len(buckets) != 1 {
+		t.Fatalf("expected 1 bucket, got %d", len(buckets))
+	}
+	b := buckets[0]
+	if b.InputTokens != 2000 {
+		t.Errorf("InputTokens = %d, want 2000", b.InputTokens)
+	}
+	if b.OutputTokens != 550 {
+		t.Errorf("OutputTokens = %d, want 550", b.OutputTokens)
+	}
+	if b.ToolCalls != 2 {
+		t.Errorf("ToolCalls = %d, want 2", b.ToolCalls)
+	}
+}
+
 func TestBucketKeyDefault(t *testing.T) {
 	key := bucketKey("", "campaign")
 	if key != "unknown:campaign" {

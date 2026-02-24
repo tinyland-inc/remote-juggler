@@ -174,6 +174,51 @@ func TestApertureClientQueryUsageWithWebhookData(t *testing.T) {
 	}
 }
 
+func TestApertureClientQueryUsageTokenTracking(t *testing.T) {
+	store := NewMeterStore()
+	now := time.Now()
+
+	// LLM calls with token data (from webhook/S3 ingestion).
+	store.Record(MeterRecord{
+		Agent:        "openclaw",
+		CampaignID:   "oc-smoketest",
+		ToolName:     "llm:claude-sonnet-4-20250514",
+		InputTokens:  1200,
+		OutputTokens: 350,
+		DurationMs:   500,
+		Timestamp:    now,
+	})
+	store.Record(MeterRecord{
+		Agent:        "openclaw",
+		CampaignID:   "oc-smoketest",
+		ToolName:     "llm:claude-sonnet-4-20250514",
+		InputTokens:  800,
+		OutputTokens: 200,
+		DurationMs:   400,
+		Timestamp:    now.Add(time.Second),
+	})
+
+	client := NewApertureClient("")
+	client.SetMeterStore(store)
+
+	usage, err := client.QueryUsage(context.Background(), "oc-smoketest", "openclaw")
+	if err != nil {
+		t.Fatalf("QueryUsage: %v", err)
+	}
+	if usage.InputTokens != 2000 {
+		t.Errorf("InputTokens = %d, want 2000", usage.InputTokens)
+	}
+	if usage.OutputTokens != 550 {
+		t.Errorf("OutputTokens = %d, want 550", usage.OutputTokens)
+	}
+	if usage.TotalTokens != 2550 {
+		t.Errorf("TotalTokens = %d, want 2550", usage.TotalTokens)
+	}
+	if usage.TotalCalls != 2 {
+		t.Errorf("TotalCalls = %d, want 2", usage.TotalCalls)
+	}
+}
+
 func TestHandleApertureUsageToolWithMeterStore(t *testing.T) {
 	store := NewMeterStore()
 	store.Record(MeterRecord{
