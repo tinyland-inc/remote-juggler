@@ -211,3 +211,23 @@ variable "aperture_s3_prefix" {
   type        = string
   default     = "aperture/exports/"
 }
+
+variable "aperture_s3_endpoint" {
+  description = "Custom S3 endpoint for non-AWS stores (e.g. objectstore.nyc1.civo.com)"
+  type        = string
+  default     = ""
+}
+
+variable "aperture_s3_access_key" {
+  description = "S3 access key for Aperture export bucket"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aperture_s3_secret_key" {
+  description = "S3 secret key for Aperture export bucket"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

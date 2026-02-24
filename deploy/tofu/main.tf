@@ -73,9 +73,12 @@ locals {
     aperture_url      = local.aperture_url
     aperture_webhook  = var.aperture_webhook_enabled
     aperture_s3 = {
-      bucket = var.aperture_s3_bucket
-      region = var.aperture_s3_region
-      prefix = var.aperture_s3_prefix
+      aperture_s3_bucket     = var.aperture_s3_bucket
+      aperture_s3_region     = var.aperture_s3_region
+      aperture_s3_prefix     = var.aperture_s3_prefix
+      aperture_s3_endpoint   = var.aperture_s3_endpoint
+      aperture_s3_access_key = var.aperture_s3_access_key
+      aperture_s3_secret_key = var.aperture_s3_secret_key
     }
     tailscale = {
       hostname  = "rj-gateway"

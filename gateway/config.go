@@ -92,6 +92,15 @@ func LoadConfig(path string) (Config, error) {
 	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_PREFIX"); v != "" {
 		cfg.ApertureS3.Prefix = v
 	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_ENDPOINT"); v != "" {
+		cfg.ApertureS3.Endpoint = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_ACCESS_KEY"); v != "" {
+		cfg.ApertureS3.AccessKey = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_SECRET_KEY"); v != "" {
+		cfg.ApertureS3.SecretKey = v
+	}
 
 	return cfg, nil
 }

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -155,6 +157,104 @@ func TestS3IngesterConfigured(t *testing.T) {
 	}
 }
 
+func TestS3IngesterConfiguredWithEndpoint(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:   "fuzzy-models",
+		Endpoint: "objectstore.nyc1.civo.com",
+	}, NewMeterStore(), nil)
+	if !ingester.Configured() {
+		t.Error("ingester with bucket+endpoint (no region) should be configured")
+	}
+}
+
+func TestS3URLPathStyle(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:   "fuzzy-models",
+		Endpoint: "objectstore.nyc1.civo.com",
+	}, NewMeterStore(), nil)
+
+	listURL := ingester.s3URL("")
+	if listURL != "https://objectstore.nyc1.civo.com/fuzzy-models" {
+		t.Errorf("list URL = %q, want path-style", listURL)
+	}
+
+	getURL := ingester.s3URL("aperture/exports/2026-02-24T00.ndjson")
+	want := "https://objectstore.nyc1.civo.com/fuzzy-models/aperture/exports/2026-02-24T00.ndjson"
+	if getURL != want {
+		t.Errorf("get URL = %q, want %q", getURL, want)
+	}
+}
+
+func TestS3URLVirtualHosted(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket: "my-bucket",
+		Region: "us-east-1",
+	}, NewMeterStore(), nil)
+
+	listURL := ingester.s3URL("")
+	if listURL != "https://my-bucket.s3.us-east-1.amazonaws.com/" {
+		t.Errorf("list URL = %q, want virtual-hosted", listURL)
+	}
+
+	getURL := ingester.s3URL("usage/file.ndjson")
+	want := "https://my-bucket.s3.us-east-1.amazonaws.com/usage/file.ndjson"
+	if getURL != want {
+		t.Errorf("get URL = %q, want %q", getURL, want)
+	}
+}
+
+func TestS3URLEndpointWithScheme(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:   "mybucket",
+		Endpoint: "https://s3.example.com/",
+	}, NewMeterStore(), nil)
+
+	url := ingester.s3URL("key")
+	if url != "https://s3.example.com/mybucket/key" {
+		t.Errorf("URL = %q, want no double scheme or trailing slash issues", url)
+	}
+}
+
+func TestSignS3RequestAddsAuthHeaders(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:    "mybucket",
+		Region:    "us-east-1",
+		Endpoint:  "s3.example.com",
+		AccessKey: "AKIAIOSFODNN7EXAMPLE",
+		SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+	}, NewMeterStore(), nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://s3.example.com/mybucket", nil)
+	ingester.signS3Request(req, sha256Hex([]byte{}))
+
+	if req.Header.Get("Authorization") == "" {
+		t.Error("Authorization header not set after signing")
+	}
+	if !strings.HasPrefix(req.Header.Get("Authorization"), "AWS4-HMAC-SHA256") {
+		t.Errorf("Authorization = %q, want AWS4-HMAC-SHA256 prefix", req.Header.Get("Authorization"))
+	}
+	if req.Header.Get("x-amz-date") == "" {
+		t.Error("x-amz-date header not set")
+	}
+	if req.Header.Get("x-amz-content-sha256") == "" {
+		t.Error("x-amz-content-sha256 header not set")
+	}
+}
+
+func TestSignS3RequestSkipsWithoutCredentials(t *testing.T) {
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:   "mybucket",
+		Endpoint: "s3.example.com",
+	}, NewMeterStore(), nil)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://s3.example.com/mybucket", nil)
+	ingester.signS3Request(req, sha256Hex([]byte{}))
+
+	if req.Header.Get("Authorization") != "" {
+		t.Error("Authorization should not be set without credentials")
+	}
+}
+
 func TestS3IngesterIngestKey(t *testing.T) {
 	ndjson := `{"timestamp":"2026-02-24T01:00:00Z","agent":"openclaw","campaign_id":"oc-dep-audit","model":"claude-sonnet-4","input_tokens":100,"output_tokens":50,"duration_ms":500}
 {"timestamp":"2026-02-24T01:01:00Z","agent":"openclaw","campaign_id":"oc-dep-audit","model":"claude-sonnet-4","input_tokens":200,"output_tokens":100,"duration_ms":300,"error":"rate_limit"}
@@ -249,6 +349,50 @@ func TestS3IngesterPollEndToEnd(t *testing.T) {
 	buckets := store.Query("openclaw", "")
 	if len(buckets) != 1 {
 		t.Fatalf("expected 1 bucket after ingestion, got %d", len(buckets))
+	}
+}
+
+func TestS3IngesterPollWithEndpoint(t *testing.T) {
+	ndjson := `{"timestamp":"2026-02-24T01:00:00Z","agent":"openclaw","campaign_id":"oc-dep-audit","model":"claude-sonnet-4","input_tokens":1200,"output_tokens":350,"duration_ms":500}
+`
+	listXML, _ := xml.Marshal(listBucketResult{
+		Contents: []s3Object{{Key: "aperture/exports/2026-02-24T00.ndjson", Size: 512}},
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify signed requests have auth headers.
+		if r.Header.Get("Authorization") == "" {
+			t.Error("request missing Authorization header")
+		}
+		if r.URL.Path == "/fuzzy-models" {
+			w.Header().Set("Content-Type", "application/xml")
+			w.Write(listXML)
+		} else {
+			w.Write([]byte(ndjson))
+		}
+	}))
+	defer server.Close()
+
+	store := NewMeterStore()
+	ingester := NewApertureS3Ingester(S3Config{
+		Bucket:    "fuzzy-models",
+		Prefix:    "aperture/exports/",
+		Endpoint:  server.URL,
+		AccessKey: "TESTKEY",
+		SecretKey: "TESTSECRET",
+	}, store, server.Client())
+
+	ingester.poll(context.Background())
+
+	buckets := store.Query("openclaw", "oc-dep-audit")
+	if len(buckets) != 1 {
+		t.Fatalf("expected 1 bucket after poll, got %d", len(buckets))
+	}
+	if buckets[0].InputTokens != 1200 {
+		t.Errorf("InputTokens = %d, want 1200", buckets[0].InputTokens)
+	}
+	if buckets[0].OutputTokens != 350 {
+		t.Errorf("OutputTokens = %d, want 350", buckets[0].OutputTokens)
 	}
 }
 
