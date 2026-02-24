@@ -106,7 +106,7 @@
             --set-default CHPL_LAUNCHER none \
             --set-default CHPL_COMM none \
             --set-default CHPL_TASKS qthreads \
-            --set-default CHPL_TARGET_MEM ${if pkgs.stdenv.isDarwin then "cstdlib" else "jemalloc"} \
+            --set-default CHPL_TARGET_MEM jemalloc \
             --set-default CHPL_HWLOC bundled \
             --prefix PATH : '${pkgs.lib.makeBinPath [
               pkgs.coreutils pkgs.gnumake pkgs.pkg-config pkgs.python3 pkgs.which
