@@ -1,6 +1,6 @@
 [brick]
 name = "remote_juggler"
-version = "2.2.0"
+version = "2.3.0"
 type = "application"
 chplVersion = "2.6.0..2.8.0"
 license = "Zlib"

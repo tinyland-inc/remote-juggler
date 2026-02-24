@@ -88,7 +88,7 @@ func (p *MCPProxy) Start() error {
 			"capabilities":    map[string]any{},
 			"clientInfo": map[string]any{
 				"name":    "rj-gateway",
-				"version": "2.2.0",
+				"version": "2.3.0",
 			},
 		},
 	})

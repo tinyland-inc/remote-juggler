@@ -24,10 +24,10 @@ elif command -v curl >/dev/null 2>&1; then
   VERSION=$(curl -fsSL https://api.github.com/repos/tinyland-inc/remote-juggler/releases/latest 2>/dev/null \
     | grep '"tag_name"' | head -1 | cut -d'"' -f4 | sed 's/^v//' || echo "")
   if [ -z "$VERSION" ]; then
-    VERSION="2.2.0"
+    VERSION="2.3.0"
   fi
 else
-  VERSION="2.2.0"
+  VERSION="2.3.0"
 fi
 
 # Colors for output (if terminal supports it)
