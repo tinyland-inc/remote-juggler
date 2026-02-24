@@ -42,6 +42,11 @@ output "hexstrike_replicas" {
   value       = var.hexstrike_replicas
 }
 
+output "aperture_url" {
+  description = "Aperture AI gateway URL (MagicDNS)"
+  value       = local.aperture_url
+}
+
 output "tailscale_operator_status" {
   description = "Tailscale Operator Helm release status"
   value       = helm_release.tailscale_operator.status

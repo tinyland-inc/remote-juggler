@@ -46,9 +46,13 @@ class HexStrikeAgent:
         gateway_url: str,
         anthropic_key: str,
         model: str = "claude-sonnet-4-20250514",
+        base_url: str | None = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
-        self.client = anthropic.Anthropic(api_key=anthropic_key)
+        client_kwargs: dict = {"api_key": anthropic_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = anthropic.Anthropic(**client_kwargs)
         self.model = model
         self.http = httpx.Client(timeout=60)
         self._github_token: str | None = None

@@ -20,6 +20,7 @@ resource "kubernetes_config_map" "campaign_definitions" {
     "cc-gateway-health.json"     = file("${path.module}/../../test/campaigns/claude-code/cc-gateway-health.json")
     "oc-gateway-smoketest.json"  = file("${path.module}/../../test/campaigns/openclaw/oc-gateway-smoketest.json")
     "oc-dep-audit.json"          = file("${path.module}/../../test/campaigns/openclaw/oc-dep-audit.json")
+    "hs-cred-exposure.json"      = file("${path.module}/../../test/campaigns/hexstrike/hs-cred-exposure.json")
     "xa-audit-completeness.json" = file("${path.module}/../../test/campaigns/cross-agent/xa-audit-completeness.json")
   }
 }

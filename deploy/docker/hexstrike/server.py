@@ -169,13 +169,14 @@ def main():
 
     gateway_url = os.environ.get("RJ_GATEWAY_URL", "https://rj-gateway:443")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
     model = os.environ.get("HEXSTRIKE_MODEL", "claude-sonnet-4-20250514")
     port = int(os.environ.get("HEXSTRIKE_PORT", "8080"))
 
     if not anthropic_key:
         log.warning("ANTHROPIC_API_KEY not set -- campaign execution will fail")
 
-    agent = HexStrikeAgent(gateway_url, anthropic_key, model)
+    agent = HexStrikeAgent(gateway_url, anthropic_key, model, base_url=base_url or None)
     state = AgentState(agent)
 
     server = HTTPServer(("0.0.0.0", port), AgentHandler)

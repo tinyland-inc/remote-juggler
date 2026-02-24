@@ -50,7 +50,7 @@ resource "kubernetes_deployment" "openclaw" {
           image = var.openclaw_image
 
           env {
-            name  = "ANTHROPIC_API_KEY"
+            name = "ANTHROPIC_API_KEY"
             value_from {
               secret_key_ref {
                 name     = kubernetes_secret.agent_api_keys.metadata[0].name
@@ -58,6 +58,15 @@ resource "kubernetes_deployment" "openclaw" {
                 optional = true
               }
             }
+          }
+
+          # Route LLM calls through Aperture for identity-linked attribution.
+          # Agents still use their own ANTHROPIC_API_KEY, but Aperture intercepts
+          # the request, logs usage against their Tailscale identity, and proxies
+          # to the upstream provider.
+          env {
+            name  = "ANTHROPIC_BASE_URL"
+            value = local.aperture_url
           }
 
           env {
@@ -185,7 +194,7 @@ resource "kubernetes_deployment" "hexstrike" {
   metadata {
     name      = "hexstrike-agent"
     namespace = kubernetes_namespace.main.metadata[0].name
-    labels    = merge(local.labels, {
+    labels = merge(local.labels, {
       app      = "hexstrike-agent"
       tier     = "agent"
       security = "pentest"
@@ -224,13 +233,31 @@ resource "kubernetes_deployment" "hexstrike" {
           image = var.hexstrike_image
 
           env {
+            name = "ANTHROPIC_API_KEY"
+            value_from {
+              secret_key_ref {
+                name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                key      = "ANTHROPIC_API_KEY"
+                optional = true
+              }
+            }
+          }
+
+          # Route LLM calls through Aperture (same as OpenClaw).
+          env {
             name  = "ANTHROPIC_BASE_URL"
-            value = "https://${var.aperture_hostname}/anthropic"
+            value = local.aperture_url
+          }
+
+          # In-cluster gateway URL (HTTP, no TLS needed inside the cluster).
+          env {
+            name  = "RJ_GATEWAY_URL"
+            value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080"
           }
 
           env {
             name  = "MCP_SERVER_URL"
-            value = "https://rj-gateway.${var.tailscale_tailnet}/mcp"
+            value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080/mcp"
           }
 
           volume_mount {

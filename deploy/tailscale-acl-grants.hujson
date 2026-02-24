@@ -1,9 +1,49 @@
 // Tailscale ACL grants for RemoteJuggler gateway.
-// Add these to your tailnet's ACL policy to enable identity-aware
-// secret access via Aperture + rj-gateway.
+// These are the RemoteJuggler-specific grants and ACLs that should be
+// merged into the tailnet policy. The full tailnet ACL is managed via
+// the Tailscale API (see deploy/tofu/tailscale-acl.json for the
+// CI/CD-managed source of truth).
 //
 // See: https://tailscale.com/docs/features/access-control/grants/grants-app-capabilities
 {
+  // Hosts (aliases for ACL rules)
+  "hosts": {
+    "ai": "100.108.97.127"
+  },
+
+  // ACL rules for RemoteJuggler services
+  "acls": [
+    {
+      // rj-gateway -> Setec (secret management)
+      "action": "accept",
+      "src": ["tag:rj-gateway"],
+      "dst": ["tag:setec:*"]
+    },
+    {
+      // Admins -> rj-gateway + Setec (management)
+      "action": "accept",
+      "src": ["group:dollhouse-admins"],
+      "dst": ["tag:rj-gateway:*", "tag:setec:*"]
+    },
+    {
+      // Aperture access: admins, users, agents, gateway, k8s
+      // Aperture is a managed Tailscale service (user-owned, no tag).
+      "action": "accept",
+      "src": [
+        "group:dollhouse-admins",
+        "group:dollhouse-users",
+        "tag:dev",
+        "tag:dollhouse",
+        "tag:rj-gateway",
+        "tag:ci-agent",
+        "tag:k8s-operator",
+        "tag:k8s"
+      ],
+      "dst": ["ai:*"]
+    }
+  ],
+
+  // Capability grants
   "grants": [
     {
       // Allow all tailnet users to read secrets via rj-gateway.
@@ -58,16 +98,6 @@
           "secret": ["*"]
         }]
       }
-    },
-    {
-      // Allow CI agents to route AI API calls through Aperture.
-      "src": ["tag:ci-agent"],
-      "dst": ["tag:aperture"],
-      "app": {
-        "tinyland.dev/cap/aperture": [{
-          "role": "agent"
-        }]
-      }
     }
   ],
 
@@ -75,7 +105,6 @@
   "tagOwners": {
     "tag:rj-gateway": ["autogroup:admin"],
     "tag:setec":      ["autogroup:admin"],
-    "tag:ci-agent":   ["autogroup:admin"],
-    "tag:aperture":   ["autogroup:admin"]
+    "tag:ci-agent":   ["autogroup:admin"]
   }
 }

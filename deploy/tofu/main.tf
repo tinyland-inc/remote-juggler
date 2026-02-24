@@ -56,15 +56,25 @@ locals {
   # Tailscale Operator may append a suffix (e.g. setec -> setec-1).
   effective_setec_url = var.gateway_setec_url != "" ? var.gateway_setec_url : "https://setec.${var.tailscale_tailnet}"
 
+  # Aperture AI gateway URL (MagicDNS hostname on the tailnet)
+  aperture_url = "http://${var.aperture_hostname}"
+
   # Gateway config JSON (mounted as secret)
   gateway_config = jsonencode({
-    listen             = ":443"
-    in_cluster_listen  = ":8080"
-    chapel_binary      = "remote-juggler"
-    setec_url          = local.effective_setec_url
-    setec_prefix       = var.gateway_setec_prefix
-    setec_secrets      = ["neon-database-url", "github-token", "gitlab-token", "attic-token", "anthropic-api-key"]
-    precedence         = var.gateway_precedence
+    listen            = ":443"
+    in_cluster_listen = ":8080"
+    chapel_binary     = "remote-juggler"
+    setec_url         = local.effective_setec_url
+    setec_prefix      = var.gateway_setec_prefix
+    setec_secrets     = ["neon-database-url", "github-token", "gitlab-token", "attic-token", "anthropic-api-key"]
+    precedence        = var.gateway_precedence
+    aperture_url      = local.aperture_url
+    aperture_webhook  = var.aperture_webhook_enabled
+    aperture_s3 = {
+      bucket = var.aperture_s3_bucket
+      region = var.aperture_s3_region
+      prefix = var.aperture_s3_prefix
+    }
     tailscale = {
       hostname  = "rj-gateway"
       state_dir = "/var/lib/rj-gateway/tsnet"

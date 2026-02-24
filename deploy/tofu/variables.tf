@@ -183,7 +183,31 @@ variable "tailscale_tailnet" {
 }
 
 variable "aperture_hostname" {
-  description = "Tailscale hostname for the Aperture proxy"
+  description = "Tailscale MagicDNS hostname for the Aperture AI gateway"
   type        = string
-  default     = "aperture.tail1234.ts.net"
+  default     = "ai"
+}
+
+variable "aperture_webhook_enabled" {
+  description = "Whether the gateway should accept Aperture webhook callbacks"
+  type        = bool
+  default     = true
+}
+
+variable "aperture_s3_bucket" {
+  description = "S3 bucket for Aperture usage export ingestion (empty = disabled)"
+  type        = string
+  default     = ""
+}
+
+variable "aperture_s3_region" {
+  description = "AWS region for the Aperture S3 export bucket"
+  type        = string
+  default     = ""
+}
+
+variable "aperture_s3_prefix" {
+  description = "S3 key prefix for Aperture export files"
+  type        = string
+  default     = "aperture/exports/"
 }

@@ -17,7 +17,13 @@ tailscale_tailnet = "example.com"
 # setec_storage_size           = "1Gi"
 # hexstrike_replicas           = 0
 # hexstrike_results_storage_size = "5Gi"
-# aperture_hostname            = "aperture.tail1234.ts.net"
+
+# Aperture AI gateway (MagicDNS hostname on your tailnet)
+# aperture_hostname            = "ai"
+# aperture_webhook_enabled     = true
+# aperture_s3_bucket           = ""          # empty = disabled
+# aperture_s3_region           = "us-east-1"
+# aperture_s3_prefix           = "aperture/exports/"
 
 # Optional: Override container images (all under tinyland-inc GHCR, private)
 # Renovate auto-bumps these via # renovate: image comments in variables.tf
