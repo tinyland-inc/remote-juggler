@@ -1,4 +1,4 @@
-"""OpenClaw agent HTTP server: health, campaign dispatch, and status."""
+"""HexStrike agent HTTP server: health, campaign dispatch, and status."""
 
 import json
 import logging
@@ -8,19 +8,19 @@ import time
 import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-from agent import OpenClawAgent
+from agent import HexStrikeAgent
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
-log = logging.getLogger("openclaw.server")
+log = logging.getLogger("hexstrike.server")
 
 
 class AgentState:
     """Shared state between HTTP handler and background campaign execution."""
 
-    def __init__(self, agent: OpenClawAgent):
+    def __init__(self, agent: HexStrikeAgent):
         self.agent = agent
         self.lock = threading.Lock()
         self.current_campaign_id: str | None = None
@@ -59,7 +59,7 @@ state: AgentState | None = None
 
 
 class AgentHandler(BaseHTTPRequestHandler):
-    """HTTP handler for OpenClaw agent endpoints."""
+    """HTTP handler for HexStrike agent endpoints."""
 
     def do_GET(self):
         if self.path == "/health":
@@ -67,9 +67,10 @@ class AgentHandler(BaseHTTPRequestHandler):
                 200,
                 {
                     "status": "ok",
-                    "agent": "openclaw",
+                    "agent": "hexstrike",
                     "scaffold": False,
                     "gateway": os.environ.get("RJ_GATEWAY_URL", ""),
+                    "tools": ["nmap", "netcat", "dig", "whois"],
                 },
             )
         elif self.path == "/status":
@@ -147,7 +148,7 @@ class AgentHandler(BaseHTTPRequestHandler):
                 "error": str(e),
                 "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "agent": "openclaw",
+                "agent": "hexstrike",
                 "tool_calls": 0,
                 "kpis": {},
             }
@@ -168,24 +169,18 @@ def main():
 
     gateway_url = os.environ.get("RJ_GATEWAY_URL", "https://rj-gateway:443")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
-    model = os.environ.get("OPENCLAW_MODEL", "claude-sonnet-4-20250514")
-    port = int(os.environ.get("OPENCLAW_PORT", "8080"))
+    model = os.environ.get("HEXSTRIKE_MODEL", "claude-sonnet-4-20250514")
+    port = int(os.environ.get("HEXSTRIKE_PORT", "8080"))
 
     if not anthropic_key:
         log.warning("ANTHROPIC_API_KEY not set -- campaign execution will fail")
 
-    agent = OpenClawAgent(
-        gateway_url,
-        anthropic_key,
-        model,
-        base_url=base_url or None,
-    )
+    agent = HexStrikeAgent(gateway_url, anthropic_key, model)
     state = AgentState(agent)
 
     server = HTTPServer(("0.0.0.0", port), AgentHandler)
     log.info(
-        "OpenClaw agent listening on :%d (gateway=%s, model=%s)",
+        "HexStrike agent listening on :%d (gateway=%s, model=%s)",
         port,
         gateway_url,
         model,

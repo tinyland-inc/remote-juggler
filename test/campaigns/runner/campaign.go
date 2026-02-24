@@ -25,6 +25,7 @@ type Campaign struct {
 type CampaignTrigger struct {
 	Schedule    string   `json:"schedule,omitempty"`
 	Event       string   `json:"event,omitempty"`
+	DependsOn   []string `json:"dependsOn,omitempty"`
 	PathFilters []string `json:"pathFilters,omitempty"`
 }
 

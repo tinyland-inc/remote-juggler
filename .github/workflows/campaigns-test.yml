@@ -1,0 +1,156 @@
+# Campaign System CI
+# Builds campaign runner, runs unit tests, E2E tests with mock gateway.
+
+name: Campaigns
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'test/campaigns/**'
+      - 'gateway/**'
+      - 'deploy/docker/openclaw/**'
+      - 'deploy/docker/hexstrike/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'test/campaigns/**'
+      - 'gateway/**'
+      - 'deploy/docker/openclaw/**'
+      - 'deploy/docker/hexstrike/**'
+  workflow_dispatch:
+
+jobs:
+  # =========================================================================
+  # Gateway Tests (Go)
+  # =========================================================================
+  gateway-test:
+    name: Gateway Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run gateway tests
+        working-directory: gateway
+        run: go test -v -race -count=1 ./...
+
+  # =========================================================================
+  # Campaign Runner Tests (Go)
+  # =========================================================================
+  runner-test:
+    name: Campaign Runner Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run campaign runner tests
+        working-directory: test/campaigns/runner
+        run: go test -v -race -count=1 ./...
+
+  # =========================================================================
+  # OpenClaw Agent Tests (Python)
+  # =========================================================================
+  openclaw-test:
+    name: OpenClaw Agent Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: deploy/docker/openclaw
+        run: |
+          pip install pytest anthropic httpx
+
+      - name: Run tests
+        working-directory: deploy/docker/openclaw
+        run: pytest -v test_agent.py test_server.py
+
+  # =========================================================================
+  # Campaign Runner Build
+  # =========================================================================
+  runner-build:
+    name: Build Campaign Runner
+    runs-on: ubuntu-latest
+    needs: [runner-test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build binary
+        working-directory: test/campaigns/runner
+        run: go build -o campaign-runner .
+
+      - name: Verify binary
+        working-directory: test/campaigns/runner
+        run: |
+          ./campaign-runner --help || true
+          echo "Binary built successfully"
+
+  # =========================================================================
+  # Campaign Definitions Validation
+  # =========================================================================
+  validate-campaigns:
+    name: Validate Campaign Definitions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install jsonschema
+        run: pip install jsonschema
+
+      - name: Validate campaign JSON files
+        run: |
+          python3 -c "
+          import json, sys, pathlib
+          from jsonschema import validate, ValidationError
+
+          schema = json.loads(pathlib.Path('test/campaigns/schema.json').read_text())
+          index = json.loads(pathlib.Path('test/campaigns/index.json').read_text())
+
+          errors = 0
+          for campaign_id, entry in index['campaigns'].items():
+              path = pathlib.Path('test/campaigns') / entry['file']
+              if not path.exists():
+                  print(f'WARN: {campaign_id}: file {path} not found')
+                  continue
+              try:
+                  campaign = json.loads(path.read_text())
+                  validate(instance=campaign, schema=schema)
+                  print(f'OK: {campaign_id}')
+              except (ValidationError, json.JSONDecodeError) as e:
+                  print(f'FAIL: {campaign_id}: {e.message if hasattr(e, \"message\") else e}')
+                  errors += 1
+
+          if errors:
+              sys.exit(1)
+          print(f'\nAll {len(index[\"campaigns\"])} campaigns validated.')
+          "

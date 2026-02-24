@@ -82,7 +82,7 @@
     },
     "hs-cred-exposure": {
       "file": "hexstrike/hs-cred-exposure.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },

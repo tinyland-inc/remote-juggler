@@ -42,13 +42,16 @@ spec:
         - name: openclaw
           image: ghcr.io/tinyland-inc/remote-juggler/openclaw:latest  # renovate: image
           env:
-            # AI API key from Setec (direct, Aperture integration deferred to issue #2)
+            # AI API key from Setec (used when Aperture is unavailable)
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: agent-api-keys
                   key: ANTHROPIC_API_KEY
                   optional: true
+            # Route LLM calls through Tailscale Aperture for identity-linked tracking
+            - name: ANTHROPIC_BASE_URL
+              value: "http://ai"
             # MCP tools via rj-gateway on tailnet
             - name: MCP_SERVERS
               value: '{"rj-gateway": {"url": "https://rj-gateway.tail1234.ts.net/mcp", "transport": "http"}}'

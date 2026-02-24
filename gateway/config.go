@@ -20,6 +20,7 @@ type Config struct {
 	SetecSecrets    []string        `json:"setec_secrets"`
 	Precedence      []string        `json:"precedence"`
 	ApertureURL     string          `json:"aperture_url"`
+	ApertureS3      S3Config        `json:"aperture_s3"`
 	Tailscale       TailscaleConfig `json:"tailscale"`
 }
 
@@ -81,6 +82,15 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("RJ_GATEWAY_IN_CLUSTER_LISTEN"); v != "" {
 		cfg.InClusterListen = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_BUCKET"); v != "" {
+		cfg.ApertureS3.Bucket = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_REGION"); v != "" {
+		cfg.ApertureS3.Region = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_PREFIX"); v != "" {
+		cfg.ApertureS3.Prefix = v
 	}
 
 	return cfg, nil

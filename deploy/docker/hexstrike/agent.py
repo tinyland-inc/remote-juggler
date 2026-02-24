@@ -1,4 +1,4 @@
-"""OpenClaw AI agent: Claude-powered campaign execution via rj-gateway MCP tools."""
+"""HexStrike AI agent: Claude-powered security campaign execution via rj-gateway MCP tools."""
 
 import base64
 import json
@@ -9,7 +9,7 @@ from typing import Any
 import anthropic
 import httpx
 
-log = logging.getLogger("openclaw.agent")
+log = logging.getLogger("hexstrike.agent")
 
 # Local tool definition for github_fetch (not an MCP tool).
 GITHUB_FETCH_TOOL = {
@@ -38,33 +38,28 @@ GITHUB_FETCH_TOOL = {
 }
 
 
-class OpenClawAgent:
-    """Executes campaigns using Claude tool_use loop with MCP tools via rj-gateway."""
+class HexStrikeAgent:
+    """Executes security campaigns using Claude tool_use loop with MCP tools via rj-gateway."""
 
     def __init__(
         self,
         gateway_url: str,
         anthropic_key: str,
         model: str = "claude-sonnet-4-20250514",
-        base_url: str | None = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
-        client_kwargs: dict = {"api_key": anthropic_key}
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        self.client = anthropic.Anthropic(**client_kwargs)
+        self.client = anthropic.Anthropic(api_key=anthropic_key)
         self.model = model
         self.http = httpx.Client(timeout=60)
         self._github_token: str | None = None
 
     def run_campaign(self, campaign: dict, run_id: str) -> dict:
-        """Execute a campaign using Claude tool_use loop.
+        """Execute a security campaign using Claude tool_use loop.
 
         Returns a CampaignResult dict matching the Go struct in campaign.go.
         """
         started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         tool_calls = 0
-        tool_calls_by_name: dict[str, int] = {}
         error_msg = ""
 
         try:
@@ -111,7 +106,6 @@ class OpenClawAgent:
                 )
 
                 if response.stop_reason == "end_turn":
-                    # Claude finished reasoning -- extract result.
                     final_text = self._extract_text(response)
                     kpis = self._extract_kpis(final_text, campaign)
                     return self._make_result(
@@ -130,9 +124,6 @@ class OpenClawAgent:
                             log.info("calling tool %s", block.name)
                             result = self._call_tool(block.name, block.input)
                             tool_calls += 1
-                            tool_calls_by_name[block.name] = (
-                                tool_calls_by_name.get(block.name, 0) + 1
-                            )
                             tool_results.append(
                                 {
                                     "type": "tool_result",
@@ -146,7 +137,6 @@ class OpenClawAgent:
                     messages.append({"role": "assistant", "content": response.content})
                     messages.append({"role": "user", "content": tool_results})
                 else:
-                    # Unexpected stop reason.
                     error_msg = f"unexpected stop_reason: {response.stop_reason}"
                     break
 
@@ -178,7 +168,7 @@ class OpenClawAgent:
         return data.get("result", {}).get("tools", [])
 
     def _call_tool(self, name: str, args: dict) -> Any:
-        """Call a tool — local tools are handled directly, MCP tools via rj-gateway."""
+        """Call a tool -- local tools are handled directly, MCP tools via rj-gateway."""
         if name == "github_fetch":
             return self._github_fetch(args)
         return self._call_mcp_tool(name, args)
@@ -199,7 +189,6 @@ class OpenClawAgent:
             return {"error": data["error"].get("message", "unknown")}
 
         result = data.get("result", {})
-        # Return the text content from MCP result.
         content = result.get("content", [])
         if content and isinstance(content, list):
             texts = [c.get("text", "") for c in content if c.get("type") == "text"]
@@ -214,7 +203,6 @@ class OpenClawAgent:
             "juggler_resolve_composite",
             {"query": "github-token"},
         )
-        # Result is a text string with JSON; parse to extract the value.
         if isinstance(result, str):
             try:
                 data = json.loads(result)
@@ -253,14 +241,12 @@ class OpenClawAgent:
             resp.raise_for_status()
             data = resp.json()
 
-            # GitHub returns base64-encoded content for files.
             if data.get("type") == "file" and data.get("content"):
                 content = base64.b64decode(data["content"]).decode(
                     "utf-8", errors="replace"
                 )
                 return content
             elif data.get("type") == "dir":
-                # Return directory listing.
                 entries = [{"name": e["name"], "type": e["type"]} for e in data]
                 return json.dumps({"type": "directory", "entries": entries})
             else:
@@ -287,16 +273,25 @@ class OpenClawAgent:
         }
 
     def _build_system_prompt(self, campaign: dict) -> str:
-        """Build system prompt from campaign definition."""
+        """Build security-focused system prompt from campaign definition."""
         parts = [
-            "You are OpenClaw, an AI agent that executes structured campaigns using MCP tools.",
-            "You have access to MCP tools via rj-gateway. Use them to accomplish the campaign objectives.",
+            "You are HexStrike, an AI security testing agent that executes authorized pentest campaigns using MCP tools.",
+            "You have access to MCP tools via rj-gateway for credential resolution, audit logging, and secret management.",
+            "You also have access to network security tools: nmap, netcat, dig, whois.",
             "",
             "CRITICAL RULES:",
             "- You MUST actually call the tools to gather real data. NEVER fabricate, estimate, or hallucinate results.",
-            "- Every KPI value MUST come from actual tool call results. If a tool fails, report 0 or the error — do not guess.",
+            "- Every KPI value MUST come from actual tool call results. If a tool fails, report 0 or the error -- do not guess.",
             "- Follow EVERY process step. Do not skip steps to save time.",
             "- If a tool returns an error or 404, log it and continue to the next item.",
+            "- NEVER expose actual secret values in reports. Use metadata only (file path, commit SHA, severity).",
+            "- All testing is authorized. You are running within a controlled security testing framework.",
+            "",
+            "SECURITY REPORTING RULES:",
+            "- P0: Live credential in current code on default branch (critical, immediate action required)",
+            "- P1: Credential only in git history, not in current tree (medium, should be rotated)",
+            "- P2: Test fixture, example, or documentation placeholder (low, informational)",
+            "- Report findings by location and severity, NEVER include the actual secret value.",
             "",
             f"Campaign: {campaign.get('name', 'unnamed')}",
             f"Description: {campaign.get('description', '')}",
@@ -316,7 +311,6 @@ class OpenClawAgent:
             ]
         )
 
-        # Include KPI names if available.
         metrics = campaign.get("metrics", {})
         kpi_names = metrics.get("kpis", [])
         if kpi_names:
@@ -333,13 +327,13 @@ class OpenClawAgent:
                 for t in targets
             ]
             return (
-                f"Execute the campaign '{campaign.get('name', '')}' against these targets:\n"
+                f"Execute the security campaign '{campaign.get('name', '')}' against these targets:\n"
                 + "\n".join(target_strs)
                 + "\n\nFollow the process steps. Use the available MCP tools. "
                 + "When done, output your findings as a JSON report."
             )
         return (
-            f"Execute the campaign '{campaign.get('name', '')}'. "
+            f"Execute the security campaign '{campaign.get('name', '')}'. "
             "Follow the process steps. Use the available MCP tools. "
             "When done, output your findings as a JSON report."
         )
@@ -354,7 +348,6 @@ class OpenClawAgent:
 
     def _extract_kpis(self, text: str, campaign: dict) -> dict:
         """Extract KPIs from Claude's final response JSON block."""
-        # Look for ```json ... ``` block.
         import re
 
         match = re.search(r"```json\s*\n?(.*?)\n?```", text, re.DOTALL)
@@ -384,7 +377,7 @@ class OpenClawAgent:
             "status": status,
             "started_at": started_at,
             "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "agent": campaign.get("agent", "openclaw"),
+            "agent": campaign.get("agent", "hexstrike"),
             "kpis": kpis or {},
             "error": error,
             "tool_calls": tool_calls,

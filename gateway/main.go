@@ -71,11 +71,20 @@ func main() {
 	audit := NewAuditLog()
 	resolver := NewResolver(proxy, setec, cfg.Precedence)
 
+	// Initialize MCP-layer metering.
+	meterStore := NewMeterStore()
+	if setec.Configured() {
+		meterStore.SetFlushCallback(flushToSetec(setec))
+	}
+
 	// Wire gateway tool handlers into the proxy for MCP tool interception.
+	aperture := NewApertureClient(cfg.ApertureURL, setecHTTPClient)
+	aperture.SetMeterStore(meterStore)
 	proxy.resolver = resolver
 	proxy.setec = setec
 	proxy.audit = audit
-	proxy.aperture = NewApertureClient(cfg.ApertureURL, setecHTTPClient)
+	proxy.aperture = aperture
+	proxy.meterStore = meterStore
 
 	// Start background polling for configured secrets.
 	if setec.Configured() && len(cfg.SetecSecrets) > 0 {
@@ -83,6 +92,20 @@ func main() {
 		defer cancel()
 		setec.StartPolling(ctx, cfg.SetecSecrets)
 		log.Printf("polling %d secrets from setec at %s", len(cfg.SetecSecrets), cfg.SetecURL)
+	}
+
+	// Start hourly metering flush to Setec.
+	stopFlush := meterStore.StartFlushLoop(context.Background(), 1*time.Hour)
+	defer stopFlush()
+
+	// Initialize Aperture webhook receiver for real-time LLM metrics.
+	webhookReceiver := NewApertureWebhookReceiver(1000, meterStore)
+
+	// Start Aperture S3 export ingestion if configured.
+	s3Ingester := NewApertureS3Ingester(cfg.ApertureS3, meterStore, setecHTTPClient)
+	if s3Ingester.Configured() {
+		stopS3 := s3Ingester.Start(context.Background())
+		defer stopS3()
 	}
 
 	// Build handler chain.
@@ -94,6 +117,7 @@ func main() {
 	mux.HandleFunc("/audit", handleAuditQuery(audit))
 	mux.HandleFunc("/setec/list", handleSetecList(setec))
 	mux.HandleFunc("/setec/get", handleSetecGet(setec, audit))
+	mux.HandleFunc("/aperture/webhook", webhookReceiver.HandleWebhook)
 
 	// Wrap with identity extraction middleware.
 	handler := IdentityMiddleware(mux)

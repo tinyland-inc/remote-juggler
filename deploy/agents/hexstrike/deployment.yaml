@@ -39,12 +39,19 @@ spec:
         - name: hexstrike
           image: ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest  # renovate: image
           env:
-            # Route AI calls through Aperture
+            # Route AI calls through Tailscale Aperture for identity-linked tracking
             - name: ANTHROPIC_BASE_URL
-              value: "https://aperture.tail1234.ts.net/anthropic"
+              value: "http://ai"
+            # AI API key (fallback when Aperture is unavailable)
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-keys
+                  key: ANTHROPIC_API_KEY
+                  optional: true
             # MCP tools via rj-gateway for credential-aware pentesting
-            - name: MCP_SERVER_URL
-              value: "https://rj-gateway.tail1234.ts.net/mcp"
+            - name: RJ_GATEWAY_URL
+              value: "http://rj-gateway.fuzzy-dev.svc.cluster.local:8080"
           volumeMounts:
             - name: workspace
               mountPath: /workspace

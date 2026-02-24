@@ -15,6 +15,10 @@ type Scheduler struct {
 	dispatcher *Dispatcher
 	collector  *Collector
 
+	// completedRuns tracks successfully completed campaign IDs within the
+	// current scheduler cycle. Used for dependsOn evaluation.
+	completedRuns map[string]bool
+
 	// OnResult is called after each campaign run with the result.
 	// Used by the API server to track latest results.
 	OnResult func(*CampaignResult)
@@ -23,16 +27,24 @@ type Scheduler struct {
 // NewScheduler creates a Scheduler with the given campaign registry.
 func NewScheduler(registry map[string]*Campaign, dispatcher *Dispatcher, collector *Collector) *Scheduler {
 	return &Scheduler{
-		registry:   registry,
-		dispatcher: dispatcher,
-		collector:  collector,
+		registry:      registry,
+		dispatcher:    dispatcher,
+		collector:     collector,
+		completedRuns: make(map[string]bool),
 	}
 }
 
 // RunDue evaluates all campaigns and runs those whose triggers are satisfied.
+// Uses two passes: first runs scheduled/manual campaigns, then runs dependent
+// campaigns whose dependencies were satisfied in this cycle.
 func (s *Scheduler) RunDue(ctx context.Context) {
 	now := time.Now().UTC()
+
+	// Pass 1: Run non-dependent campaigns.
 	for id, campaign := range s.registry {
+		if len(campaign.Trigger.DependsOn) > 0 {
+			continue // Handle in pass 2.
+		}
 		if !s.isDue(campaign, now) {
 			continue
 		}
@@ -41,6 +53,27 @@ func (s *Scheduler) RunDue(ctx context.Context) {
 		runCtx, cancel := context.WithTimeout(ctx, timeout)
 		if err := s.RunCampaign(runCtx, campaign); err != nil {
 			log.Printf("campaign %s: failed: %v", id, err)
+		} else {
+			s.completedRuns[id] = true
+		}
+		cancel()
+	}
+
+	// Pass 2: Run dependent campaigns whose dependencies are now met.
+	for id, campaign := range s.registry {
+		if len(campaign.Trigger.DependsOn) == 0 {
+			continue
+		}
+		if !s.dependenciesMet(campaign) {
+			continue
+		}
+		log.Printf("campaign %s: dependencies met, dispatching", id)
+		timeout := parseDuration(campaign.Guardrails.MaxDuration)
+		runCtx, cancel := context.WithTimeout(ctx, timeout)
+		if err := s.RunCampaign(runCtx, campaign); err != nil {
+			log.Printf("campaign %s: failed: %v", id, err)
+		} else {
+			s.completedRuns[id] = true
 		}
 		cancel()
 	}
@@ -134,12 +167,34 @@ func (s *Scheduler) isDue(campaign *Campaign, now time.Time) bool {
 		return false
 	}
 
+	// Dependent campaigns are handled separately in RunDue pass 2.
+	if len(trigger.DependsOn) > 0 {
+		return false
+	}
+
 	// Evaluate cron schedule.
 	if trigger.Schedule != "" {
 		return cronMatches(trigger.Schedule, now)
 	}
 
 	return false
+}
+
+// dependenciesMet checks whether all campaigns in the DependsOn list have
+// completed successfully in the current scheduler cycle.
+func (s *Scheduler) dependenciesMet(campaign *Campaign) bool {
+	for _, dep := range campaign.Trigger.DependsOn {
+		if !s.completedRuns[dep] {
+			return false
+		}
+	}
+	return true
+}
+
+// MarkCompleted records a campaign ID as having completed successfully.
+// Useful for external triggers (webhooks, manual) that bypass the scheduler.
+func (s *Scheduler) MarkCompleted(campaignID string) {
+	s.completedRuns[campaignID] = true
 }
 
 // cronMatches evaluates a simple 5-field cron expression against a time.

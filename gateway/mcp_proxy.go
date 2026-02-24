@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os/exec"
 	"sync"
+	"time"
 )
 
 // MCPProxy manages a Chapel MCP subprocess and bridges STDIO to HTTP/SSE.
@@ -30,10 +31,11 @@ type MCPProxy struct {
 	subsMu sync.Mutex
 
 	// Gateway tool handlers (set after construction).
-	resolver *Resolver
-	setec    *SetecClient
-	audit    *AuditLog
-	aperture *ApertureClient
+	resolver   *Resolver
+	setec      *SetecClient
+	audit      *AuditLog
+	aperture   *ApertureClient
+	meterStore *MeterStore
 }
 
 // NewMCPProxy creates a proxy for the given Chapel binary.
@@ -241,14 +243,52 @@ func (p *MCPProxy) HandleRPC(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &req); err == nil {
 		// Check if this is a tools/call for a gateway tool.
 		if req.Method == "tools/call" && gatewayToolNames[req.Params.Name] {
+			start := time.Now()
 			resp := p.handleGatewayTool(req.ID, req.Params.Name, req.Params.Arguments, r)
+			if p.meterStore != nil {
+				agent, campaignID := extractMeteringContext(req.Params.Arguments)
+				p.meterStore.Record(MeterRecord{
+					Agent:         agent,
+					CampaignID:    campaignID,
+					ToolName:      req.Params.Name,
+					RequestBytes:  len(body),
+					ResponseBytes: len(resp),
+					DurationMs:    time.Since(start).Milliseconds(),
+					Timestamp:     start,
+					IsError:       bytes.Contains(resp, []byte(`"error"`)),
+				})
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(resp)
+			return
+		}
+
+		// Record metering for Chapel-proxied tool calls.
+		if req.Method == "tools/call" && p.meterStore != nil {
+			start := time.Now()
+			resp, err := p.SendRequest(body)
+			if err != nil {
+				http.Error(w, "proxy error: "+err.Error(), http.StatusBadGateway)
+				return
+			}
+			agent, campaignID := extractMeteringContext(req.Params.Arguments)
+			p.meterStore.Record(MeterRecord{
+				Agent:         agent,
+				CampaignID:    campaignID,
+				ToolName:      req.Params.Name,
+				RequestBytes:  len(body),
+				ResponseBytes: len(resp),
+				DurationMs:    time.Since(start).Milliseconds(),
+				Timestamp:     start,
+				IsError:       bytes.Contains(resp, []byte(`"error"`)),
+			})
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(resp)
 			return
 		}
 	}
 
-	// Forward to Chapel subprocess.
+	// Forward to Chapel subprocess (non-tool calls: initialize, tools/list, etc.).
 	resp, err := p.SendRequest(body)
 	if err != nil {
 		http.Error(w, "proxy error: "+err.Error(), http.StatusBadGateway)

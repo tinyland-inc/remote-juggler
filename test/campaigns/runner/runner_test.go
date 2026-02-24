@@ -222,3 +222,70 @@ func TestNewCollector(t *testing.T) {
 		t.Error("dispatcher is nil")
 	}
 }
+
+func TestIsDueDependsOnSkippedInPass1(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+	campaign := &Campaign{
+		ID: "dep-campaign",
+		Trigger: CampaignTrigger{
+			Schedule:  "* * * * *",
+			DependsOn: []string{"prerequisite"},
+		},
+	}
+	// Even with a matching schedule, campaigns with dependsOn should not trigger in pass 1.
+	got := scheduler.isDue(campaign, time.Now().UTC())
+	if got {
+		t.Error("isDue should return false for campaigns with dependsOn")
+	}
+}
+
+func TestDependenciesMetAllSatisfied(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+	scheduler.completedRuns["campaign-a"] = true
+	scheduler.completedRuns["campaign-b"] = true
+
+	campaign := &Campaign{
+		ID: "dependent",
+		Trigger: CampaignTrigger{
+			DependsOn: []string{"campaign-a", "campaign-b"},
+		},
+	}
+	if !scheduler.dependenciesMet(campaign) {
+		t.Error("dependenciesMet should return true when all deps are met")
+	}
+}
+
+func TestDependenciesMetPartiallyUnsatisfied(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+	scheduler.completedRuns["campaign-a"] = true
+	// campaign-b NOT completed.
+
+	campaign := &Campaign{
+		ID: "dependent",
+		Trigger: CampaignTrigger{
+			DependsOn: []string{"campaign-a", "campaign-b"},
+		},
+	}
+	if scheduler.dependenciesMet(campaign) {
+		t.Error("dependenciesMet should return false when not all deps are met")
+	}
+}
+
+func TestDependenciesMetNoDeps(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+	campaign := &Campaign{
+		ID:      "no-deps",
+		Trigger: CampaignTrigger{},
+	}
+	if !scheduler.dependenciesMet(campaign) {
+		t.Error("dependenciesMet should return true when there are no deps")
+	}
+}
+
+func TestMarkCompleted(t *testing.T) {
+	scheduler := NewScheduler(nil, nil, nil)
+	scheduler.MarkCompleted("test-campaign")
+	if !scheduler.completedRuns["test-campaign"] {
+		t.Error("MarkCompleted should mark campaign as completed")
+	}
+}
