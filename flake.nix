@@ -161,9 +161,6 @@
           chapel
           pkgs.gnumake
           pkgs.git
-        ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-          pkgs.darwin.apple_sdk.frameworks.Security
-          pkgs.darwin.apple_sdk.frameworks.CoreFoundation
         ];
 
         # Build the Chapel CLI binary using Chapel built from source
@@ -199,7 +196,7 @@
               -M src/remote_juggler \
               --ccflags="-I$src/pinentry" \
               ${pkgs.lib.optionalString pkgs.stdenv.isDarwin
-                "--ldflags=\"-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security -F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation\""
+                ''--ldflags="-framework Security -framework CoreFoundation"''
               } \
               -sHSM_NATIVE_AVAILABLE=false \
               --fast \
@@ -244,9 +241,6 @@
 
           buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.tpm2-tss
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.CoreFoundation
           ];
 
           buildPhase = ''
@@ -377,9 +371,6 @@
 
             # Go toolchain for gateway development
             pkgs.go
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.CoreFoundation
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             # Xvfb for headless testing
             pkgs.xvfb-run
