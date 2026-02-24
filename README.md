@@ -63,24 +63,24 @@ For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, buil
 
 ### Latest Release
 
-**v2.2.0** | 2026-02-24 | [Release Notes](https://github.com/tinyland-inc/remote-juggler/releases/tag/v2.2.0) | [All Releases](https://github.com/tinyland-inc/remote-juggler/releases)
+**v2.3.0** | 2026-02-24 | [Release Notes](https://github.com/tinyland-inc/remote-juggler/releases/tag/v2.3.0) | [All Releases](https://github.com/tinyland-inc/remote-juggler/releases)
 
 ### Binary Downloads
 
 | Platform | CLI | GTK GUI | Tray |
 |----------|-----|---------|------|
-| Linux x86_64 | [remote-juggler-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-linux-amd64) (4.7MB) | [remote-juggler-gui-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-gui-linux-amd64) (874KB) | [remote-juggler-tray-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-tray-linux-amd64) (3.7MB) |
-| Linux ARM64 | [remote-juggler-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-linux-arm64) (4.3MB) | [remote-juggler-gui-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-gui-linux-arm64) (838KB) | [remote-juggler-tray-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-tray-linux-arm64) (3.7MB) |
-| macOS ARM64 | [remote-juggler-darwin-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-darwin-arm64) (3.5MB) | -- | [remote-juggler-tray-darwin-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-tray-darwin-arm64) (493KB) |
-| macOS x86_64 | [remote-juggler-darwin-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-darwin-amd64) (4.1MB) | -- | -- |
+| Linux x86_64 | [remote-juggler-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-linux-amd64) (4.7MB) | [remote-juggler-gui-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-gui-linux-amd64) (874KB) | [remote-juggler-tray-linux-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-tray-linux-amd64) (3.7MB) |
+| Linux ARM64 | [remote-juggler-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-linux-arm64) (4.3MB) | [remote-juggler-gui-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-gui-linux-arm64) (838KB) | [remote-juggler-tray-linux-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-tray-linux-arm64) (3.7MB) |
+| macOS ARM64 | [remote-juggler-darwin-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-darwin-arm64) (3.5MB) | -- | [remote-juggler-tray-darwin-arm64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-tray-darwin-arm64) (493KB) |
+| macOS x86_64 | [remote-juggler-darwin-amd64](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-darwin-amd64) (4.1MB) | -- | -- |
 
 ### Packages
 
 | Format | File | Size |
 |--------|------|------|
-| Debian/Ubuntu | [remote-juggler_2.2.0_amd64.deb](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler_2.2.0_amd64.deb) (1.8MB) |
-| RHEL/Fedora | [remote-juggler-2.2.0-1.x86_64.rpm](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-2.2.0-1.x86_64.rpm) (1.8MB) |
-| AppImage | [remote-juggler-gui-v2.2.0-x86_64.AppImage](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-gui-v2.2.0-x86_64.AppImage) (613KB) |
+| Debian/Ubuntu | [remote-juggler_2.3.0_amd64.deb](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler_2.3.0_amd64.deb) (1.8MB) |
+| RHEL/Fedora | [remote-juggler-2.3.0-1.x86_64.rpm](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-2.3.0-1.x86_64.rpm) (1.8MB) |
+| AppImage | [remote-juggler-gui-v2.3.0-x86_64.AppImage](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/remote-juggler-gui-v2.3.0-x86_64.AppImage) (613KB) |
 | Docker | `ghcr.io/tinyland-inc/remote-juggler:latest` |
 | npm | `npx @tummycrypt/remote-juggler@latest` |
 | Homebrew | `brew install remote-juggler` |
@@ -101,22 +101,22 @@ For other installation methods (AUR, Flatpak, .deb, .rpm, binary downloads, buil
 <summary>SHA256 Checksums</summary>
 
 ```
-372dd05741a6661214496d836c20e7a37a71df9fceb3a9b869835f12de4e37c5  remote-juggler-2.2.0-1.x86_64.rpm
-3d0c816bc3fb5473565124e94f0cf870b823be5bdb0374fa4c53103d22699a3d  remote-juggler-darwin-amd64
-7a3827440defacf47dda24ff5a38f176d81528f2bd10c6175d875df9bf130f49  remote-juggler-darwin-arm64
-249baeab229859517ad6717d5dc8942547a357634a5351c7604731c77b12c455  remote-juggler-gui-linux-amd64
-5ba8ce18a2515a92af7da65494dc429e991891ee2a7fff00db171964c5d6a2ca  remote-juggler-gui-linux-arm64
-a1cf8793780243af2dcaf260e3958789f90c1357d7651d0d853fb2af21515238  remote-juggler-gui-v2.2.0-x86_64.AppImage
+f7f5f3324f0e659b7b82888579475e123a904892c38099d8511038b52a6d97d7  remote-juggler-2.3.0-1.x86_64.rpm
+85475228d921ca576dcd3d25af232262d00bee19a2fc79296e21fb21cafa8a88  remote-juggler-darwin-amd64
+f912bf6daeabb976cc6f3aa8f65443e61cc1a827d1adca45d130e1bae7c22dd7  remote-juggler-darwin-arm64
+6f2ce1ccbd68a796e3bafafaee514c87a4cf2d6730b0065e3512dde402cf0e6e  remote-juggler-gui-linux-amd64
+4815ef25a12ba31464101bbfedd58d027eb50fd82e97931397062016804fcac0  remote-juggler-gui-linux-arm64
+d01f40f13393097a634966bffc4583b82f4ca346f9f8712bd41a533ef8e531a3  remote-juggler-gui-v2.3.0-x86_64.AppImage
 1aae4f636baeaad4da5f2aa761deead2570c21f143e20b1b1fdb549aa5d69a3d  remote-juggler-linux-amd64
 7a01f1e30c42d0d751f86750ba521691110d2e8be684007c6fc9a84cb00ecc03  remote-juggler-linux-arm64
-031c74db158cf9ab5f6b4765204de631a4b896ea7fa0f79b0cf2d85697ec3f8c  remote-juggler-tray-darwin-arm64
-a23a190bf4d5bcb946184b506f8041609e163f5990afc068b99b96440db54e69  remote-juggler-tray-darwin-arm64.app.zip
-ad587d8f7b7f121de3290d3dc1c2b0b6f8729c927a096fd8da637105025e6557  remote-juggler-tray-linux-amd64
-77dfbfcb3758c7138dc70eb7ad8c9ee90280eef4c2f4a210ff8a15c04b84dbb5  remote-juggler-tray-linux-arm64
-71badec82dcb9ef213a11b02d894901cb718522fd129960eecd57df52c289929  remote-juggler_2.2.0_amd64.deb
+3e1fa1c950d49f2bedc1f2930069c226b45340a427e30f9644791cedad84c996  remote-juggler-tray-darwin-arm64
+a1e071694b91474842b34607d5017b228638c57c8865e93b3b766bbaa0b53c2c  remote-juggler-tray-darwin-arm64.app.zip
+63a104d6e349d4b881ad3e6e563c39ccc8d8a9e860703104ef0f93a64f80f63b  remote-juggler-tray-linux-amd64
+fa3510158c40f18a4bffbe50ce53e23821bc5bab33ad1c6d979723f5d08e63af  remote-juggler-tray-linux-arm64
+6b3eeedb9d806faa9e8ea314a0efbb54f27fe0d34c1330d0d0a4a9830b8690c8  remote-juggler_2.3.0_amd64.deb
 ```
 
-Full checksums file: [SHA256SUMS.txt](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/SHA256SUMS.txt)
+Full checksums file: [SHA256SUMS.txt](https://github.com/tinyland-inc/remote-juggler/releases/download/v2.3.0/SHA256SUMS.txt)
 
 </details>
 
