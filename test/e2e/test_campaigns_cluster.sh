@@ -35,9 +35,9 @@ pass=0
 fail=0
 skip=0
 
-log_pass() { echo -e "${GREEN}PASS${NC}: $1"; ((pass++)); }
-log_fail() { echo -e "${RED}FAIL${NC}: $1"; ((fail++)); }
-log_skip() { echo -e "${YELLOW}SKIP${NC}: $1"; ((skip++)); }
+log_pass() { echo -e "${GREEN}PASS${NC}: $1"; pass=$((pass + 1)); }
+log_fail() { echo -e "${RED}FAIL${NC}: $1"; fail=$((fail + 1)); }
+log_skip() { echo -e "${YELLOW}SKIP${NC}: $1"; skip=$((skip + 1)); }
 log_info() { echo -e "INFO: $1"; }
 
 # --- Phase 1: Cluster Health ---
@@ -55,7 +55,7 @@ else
     fi
 
     # Check openclaw pod is running.
-    if kubectl get pods -n fuzzy-dev -l app=openclaw --field-selector=status.phase=Running -o name 2>/dev/null | grep -q pod; then
+    if kubectl get pods -n fuzzy-dev -l app=openclaw-agent --field-selector=status.phase=Running -o name 2>/dev/null | grep -q pod; then
         log_pass "openclaw pod is running"
     else
         log_fail "openclaw pod not found or not running"
@@ -170,7 +170,18 @@ setec_resp=$(curl -s -X POST "${GATEWAY_URL}/mcp" \
     -H "Content-Type: application/json" \
     -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"juggler_setec_get\",\"arguments\":{\"key\":\"remotejuggler/campaigns/${CAMPAIGN_ID}/latest\"}}}" 2>/dev/null || echo "{}")
 
-if echo "$setec_resp" | grep -q '"campaign_id"'; then
+setec_has_result=$(echo "$setec_resp" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+content=d.get('result',{}).get('content',[])
+if content:
+    inner=json.loads(content[0].get('text','{}'))
+    print('yes' if inner.get('campaign_id') else 'no')
+else:
+    print('no')
+" 2>/dev/null || echo "no")
+
+if [ "$setec_has_result" = "yes" ]; then
     log_pass "campaign result stored in Setec"
 
     # Extract tool_calls KPI.
