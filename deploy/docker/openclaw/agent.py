@@ -49,7 +49,10 @@ class OpenClawAgent:
         base_url: str | None = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
-        client_kwargs: dict = {"api_key": anthropic_key}
+        client_kwargs: dict = {
+            "api_key": anthropic_key,
+            "timeout": httpx.Timeout(120.0, connect=10.0),
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
         self.client = anthropic.Anthropic(**client_kwargs)
