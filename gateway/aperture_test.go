@@ -3,21 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
 
 func TestNewApertureClientDefaults(t *testing.T) {
-	client := NewApertureClient("https://aperture.example.com", nil)
+	client := NewApertureClient("http://ai")
 	if !client.Configured() {
 		t.Error("client with URL should be configured")
 	}
 }
 
 func TestApertureClientNotConfigured(t *testing.T) {
-	client := NewApertureClient("", nil)
+	client := NewApertureClient("")
 	if client.Configured() {
 		t.Error("client without URL and without MeterStore should not be configured")
 	}
@@ -29,7 +27,7 @@ func TestApertureClientNotConfigured(t *testing.T) {
 }
 
 func TestApertureClientConfiguredWithMeterStore(t *testing.T) {
-	client := NewApertureClient("", nil)
+	client := NewApertureClient("")
 	client.SetMeterStore(NewMeterStore())
 	if !client.Configured() {
 		t.Error("client with MeterStore should be configured")
@@ -69,58 +67,6 @@ func TestHandleApertureUsageToolInvalidParams(t *testing.T) {
 	}
 }
 
-func TestApertureClientQueryUsageFromRemote(t *testing.T) {
-	// Mock Aperture server.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/usage" {
-			http.Error(w, "not found", 404)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ApertureUsage{
-			CampaignID:  r.URL.Query().Get("campaign_id"),
-			Agent:       r.URL.Query().Get("agent"),
-			TotalCalls:  42,
-			TotalTokens: 12345,
-			Period:      "24h",
-		})
-	}))
-	defer server.Close()
-
-	client := NewApertureClient(server.URL, nil)
-	usage, err := client.QueryUsage(context.Background(), "oc-dep-audit", "openclaw")
-	if err != nil {
-		t.Fatalf("QueryUsage: %v", err)
-	}
-	if usage.TotalCalls != 42 {
-		t.Errorf("TotalCalls = %d, want 42", usage.TotalCalls)
-	}
-	if usage.TotalTokens != 12345 {
-		t.Errorf("TotalTokens = %d, want 12345", usage.TotalTokens)
-	}
-	if usage.Source != "aperture" {
-		t.Errorf("Source = %q, want 'aperture'", usage.Source)
-	}
-}
-
-func TestApertureClientQueryUsageServerError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "internal error", 500)
-	}))
-	defer server.Close()
-
-	// With only remote (no meter store), query falls through to return
-	// "none" source since remote fails but meterStore is nil.
-	client := NewApertureClient(server.URL, nil)
-	usage, err := client.QueryUsage(context.Background(), "", "")
-	if err != nil {
-		t.Fatalf("QueryUsage: %v", err)
-	}
-	if usage.Source != "none" {
-		t.Errorf("Source = %q, want 'none'", usage.Source)
-	}
-}
-
 func TestApertureClientQueryUsageFromMeterStore(t *testing.T) {
 	store := NewMeterStore()
 	now := time.Now()
@@ -144,7 +90,7 @@ func TestApertureClientQueryUsageFromMeterStore(t *testing.T) {
 		IsError:       true,
 	})
 
-	client := NewApertureClient("", nil)
+	client := NewApertureClient("")
 	client.SetMeterStore(store)
 
 	usage, err := client.QueryUsage(context.Background(), "oc-dep-audit", "openclaw")
@@ -171,45 +117,60 @@ func TestApertureClientQueryUsageFromMeterStore(t *testing.T) {
 	}
 }
 
-func TestApertureClientQueryUsageCombined(t *testing.T) {
-	// Mock Aperture server.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ApertureUsage{
-			TotalCalls:  10,
-			TotalTokens: 5000,
-			Period:      "1h",
-		})
-	}))
-	defer server.Close()
-
-	store := NewMeterStore()
-	store.Record(MeterRecord{
-		Agent:        "openclaw",
-		ToolName:     "juggler_setec_list",
-		RequestBytes: 100,
-		Timestamp:    time.Now(),
-	})
-
-	client := NewApertureClient(server.URL, nil)
-	client.SetMeterStore(store)
-
-	usage, err := client.QueryUsage(context.Background(), "", "openclaw")
+func TestApertureClientQueryUsageNoMeterStoreData(t *testing.T) {
+	// Configured with URL only, no MeterStore -- should return source "none".
+	client := NewApertureClient("http://ai")
+	usage, err := client.QueryUsage(context.Background(), "", "")
 	if err != nil {
 		t.Fatalf("QueryUsage: %v", err)
 	}
-	if usage.Source != "combined" {
-		t.Errorf("Source = %q, want 'combined'", usage.Source)
+	if usage.Source != "none" {
+		t.Errorf("Source = %q, want 'none'", usage.Source)
 	}
-	// MCP layer: 1 call; remote: 10 calls -> total 11.
-	if usage.TotalCalls != 11 {
-		t.Errorf("TotalCalls = %d, want 11", usage.TotalCalls)
+	if usage.TotalCalls != 0 {
+		t.Errorf("TotalCalls = %d, want 0", usage.TotalCalls)
 	}
-	if usage.TotalTokens != 5000 {
-		t.Errorf("TotalTokens = %d, want 5000", usage.TotalTokens)
+}
+
+func TestApertureClientQueryUsageWithWebhookData(t *testing.T) {
+	// Simulate webhook-merged LLM data in the same MeterStore.
+	store := NewMeterStore()
+	now := time.Now()
+
+	// MCP-layer tool call.
+	store.Record(MeterRecord{
+		Agent:        "openclaw",
+		CampaignID:   "oc-dep-audit",
+		ToolName:     "juggler_setec_list",
+		RequestBytes: 100,
+		Timestamp:    now,
+	})
+
+	// LLM-layer call from webhook receiver (merged into same store).
+	store.Record(MeterRecord{
+		Agent:      "openclaw",
+		CampaignID: "oc-dep-audit",
+		ToolName:   "llm:claude-sonnet-4",
+		DurationMs: 500,
+		Timestamp:  now,
+	})
+
+	client := NewApertureClient("http://ai")
+	client.SetMeterStore(store)
+
+	usage, err := client.QueryUsage(context.Background(), "oc-dep-audit", "openclaw")
+	if err != nil {
+		t.Fatalf("QueryUsage: %v", err)
 	}
-	if usage.MCPToolCalls != 1 {
-		t.Errorf("MCPToolCalls = %d, want 1", usage.MCPToolCalls)
+	// Both MCP and webhook-merged LLM calls should be counted.
+	if usage.MCPToolCalls != 2 {
+		t.Errorf("MCPToolCalls = %d, want 2", usage.MCPToolCalls)
+	}
+	if usage.TotalCalls != 2 {
+		t.Errorf("TotalCalls = %d, want 2", usage.TotalCalls)
+	}
+	if usage.Source != "mcp_metering" {
+		t.Errorf("Source = %q, want 'mcp_metering'", usage.Source)
 	}
 }
 
@@ -224,7 +185,7 @@ func TestHandleApertureUsageToolWithMeterStore(t *testing.T) {
 		Timestamp:     time.Now(),
 	})
 
-	client := NewApertureClient("", nil)
+	client := NewApertureClient("")
 	client.SetMeterStore(store)
 
 	params := json.RawMessage(`{"campaign_id": "oc-dep-audit", "agent": "openclaw"}`)

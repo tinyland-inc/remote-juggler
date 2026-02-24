@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// Wire gateway tool handlers into the proxy for MCP tool interception.
-	aperture := NewApertureClient(cfg.ApertureURL, setecHTTPClient)
+	aperture := NewApertureClient(cfg.ApertureURL)
 	aperture.SetMeterStore(meterStore)
 	proxy.resolver = resolver
 	proxy.setec = setec

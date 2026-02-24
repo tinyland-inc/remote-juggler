@@ -4,33 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 )
 
-// ApertureClient queries AI API usage metrics.
-// In Phase 1, metrics come from the gateway's MCP-layer MeterStore.
-// In Phase 2, LLM-layer metrics from Aperture webhooks will be merged.
+// ApertureClient queries AI API usage metrics from the gateway's MeterStore.
+// MeterStore aggregates both MCP-layer metrics (from proxy instrumentation)
+// and LLM-layer metrics (from Aperture webhook events).
+//
+// Tailscale Aperture has no REST API for usage queries -- all data flows
+// through the webhook receiver and S3 export ingester into MeterStore.
 type ApertureClient struct {
 	baseURL    string
-	httpClient *http.Client
 	meterStore *MeterStore
 }
 
 // NewApertureClient creates a client for AI API usage metrics.
-// If httpClient is nil, a default client with 10s timeout is used.
-func NewApertureClient(baseURL string, httpClient *http.Client) *ApertureClient {
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 10 * time.Second}
-	}
+// The baseURL is used only for the Configured() check (indicating Aperture
+// is deployed on the tailnet). All metrics come from MeterStore.
+func NewApertureClient(baseURL string) *ApertureClient {
 	return &ApertureClient{
-		baseURL:    baseURL,
-		httpClient: httpClient,
+		baseURL: baseURL,
 	}
 }
 
-// SetMeterStore wires the MCP-layer MeterStore into this client.
+// SetMeterStore wires the MeterStore into this client.
 func (a *ApertureClient) SetMeterStore(m *MeterStore) {
 	a.meterStore = m
 }
@@ -55,8 +51,9 @@ type ApertureUsage struct {
 	MCPErrorCount    int   `json:"mcp_error_count,omitempty"`
 }
 
-// QueryUsage returns combined usage metrics from MeterStore (MCP-layer)
-// and optionally the remote Aperture API (LLM-layer).
+// QueryUsage returns usage metrics from MeterStore.
+// MeterStore aggregates MCP tool call metrics recorded by the proxy and
+// LLM call metrics received via the Aperture webhook receiver.
 func (a *ApertureClient) QueryUsage(ctx context.Context, campaignID, agent string) (*ApertureUsage, error) {
 	if !a.Configured() {
 		return nil, fmt.Errorf("aperture not configured")
@@ -67,7 +64,6 @@ func (a *ApertureClient) QueryUsage(ctx context.Context, campaignID, agent strin
 		Agent:      agent,
 	}
 
-	// MCP-layer metrics from MeterStore.
 	if a.meterStore != nil {
 		buckets := a.meterStore.Query(agent, campaignID)
 		for _, b := range buckets {
@@ -80,22 +76,6 @@ func (a *ApertureClient) QueryUsage(ctx context.Context, campaignID, agent strin
 		usage.Source = "mcp_metering"
 	}
 
-	// LLM-layer metrics from remote Aperture API (Phase 2).
-	if a.baseURL != "" {
-		llmUsage, err := a.queryRemote(ctx, campaignID, agent)
-		if err == nil {
-			usage.TotalCalls += llmUsage.TotalCalls
-			usage.TotalTokens = llmUsage.TotalTokens
-			usage.Period = llmUsage.Period
-			if usage.Source == "" {
-				usage.Source = "aperture"
-			} else {
-				usage.Source = "combined"
-			}
-		}
-		// Non-fatal: if Aperture is unreachable, return MCP-layer data.
-	}
-
 	if usage.Source == "" {
 		usage.Source = "none"
 	}
@@ -103,44 +83,7 @@ func (a *ApertureClient) QueryUsage(ctx context.Context, campaignID, agent strin
 	return usage, nil
 }
 
-// queryRemote queries the remote Aperture API for LLM-layer metrics.
-func (a *ApertureClient) queryRemote(ctx context.Context, campaignID, agent string) (*ApertureUsage, error) {
-	url := a.baseURL + "/api/usage?"
-	if campaignID != "" {
-		url += "campaign_id=" + campaignID + "&"
-	}
-	if agent != "" {
-		url += "agent=" + agent + "&"
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("query aperture: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("aperture returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var usage ApertureUsage
-	if err := json.Unmarshal(body, &usage); err != nil {
-		return nil, fmt.Errorf("parse response: %w", err)
-	}
-	return &usage, nil
-}
-
-// handleApertureUsageTool returns AI API usage metrics from MeterStore + Aperture.
+// handleApertureUsageTool returns AI API usage metrics as an MCP tool response.
 func handleApertureUsageTool(aperture *ApertureClient, params json.RawMessage) (json.RawMessage, error) {
 	var args struct {
 		CampaignID string `json:"campaign_id"`
@@ -153,7 +96,7 @@ func handleApertureUsageTool(aperture *ApertureClient, params json.RawMessage) (
 	if aperture == nil || !aperture.Configured() {
 		return mcpTextResult(map[string]any{
 			"status": "not_configured",
-			"error":  "Aperture URL not configured and no MeterStore available. Set aperture_url in gateway config.",
+			"error":  "No MeterStore available. Ensure gateway metering is enabled.",
 		})
 	}
 

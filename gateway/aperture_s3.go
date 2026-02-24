@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
@@ -22,8 +25,8 @@ type ApertureS3Ingester struct {
 	interval time.Duration
 
 	// lastKey tracks the most recently processed S3 object key
-	// to avoid reprocessing. Stored as simple string (not persistent
-	// across restarts -- full history is in MeterStore/Setec).
+	// to avoid reprocessing. Not persistent across restarts --
+	// full history is in MeterStore/Setec.
 	lastKey string
 }
 
@@ -119,8 +122,6 @@ func (s *ApertureS3Ingester) poll(ctx context.Context) {
 		return
 	}
 
-	// Parse S3 list response (simplified -- real implementation would use XML parser).
-	// For now, this is a placeholder that processes newline-delimited JSON files.
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("aperture-s3: read list response: %v", err)
@@ -142,6 +143,7 @@ func (s *ApertureS3Ingester) poll(ctx context.Context) {
 }
 
 // ingestKey downloads and processes a single S3 export file.
+// Supports both NDJSON (newline-delimited JSON) and JSON arrays.
 func (s *ApertureS3Ingester) ingestKey(ctx context.Context, key string) error {
 	getURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",
 		s.bucket, s.region, key)
@@ -166,15 +168,9 @@ func (s *ApertureS3Ingester) ingestKey(ctx context.Context, key string) error {
 		return fmt.Errorf("read body: %w", err)
 	}
 
-	// Parse newline-delimited JSON records.
-	var records []ApertureS3Record
-	if err := json.Unmarshal(body, &records); err != nil {
-		// Try as single record.
-		var single ApertureS3Record
-		if err := json.Unmarshal(body, &single); err != nil {
-			return fmt.Errorf("parse records: %w", err)
-		}
-		records = []ApertureS3Record{single}
+	records, err := parseS3Records(body)
+	if err != nil {
+		return err
 	}
 
 	for _, rec := range records {
@@ -191,22 +187,68 @@ func (s *ApertureS3Ingester) ingestKey(ctx context.Context, key string) error {
 	return nil
 }
 
-// parseS3Keys is a placeholder that extracts object keys from an S3 list response.
-// In production, this would parse the XML ListBucketResult.
-func parseS3Keys(body []byte) []string {
-	// Simplified: look for Key elements in the response.
-	// Real implementation would use encoding/xml.
-	var result struct {
-		Contents []struct {
-			Key string `json:"Key"`
-		} `json:"Contents"`
+// parseS3Records parses export file contents as either NDJSON or a JSON array.
+func parseS3Records(body []byte) ([]ApertureS3Record, error) {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return nil, nil
 	}
-	if err := json.Unmarshal(body, &result); err != nil {
+
+	// If it starts with '[', try JSON array.
+	if trimmed[0] == '[' {
+		var records []ApertureS3Record
+		if err := json.Unmarshal(trimmed, &records); err != nil {
+			return nil, fmt.Errorf("parse JSON array: %w", err)
+		}
+		return records, nil
+	}
+
+	// Otherwise treat as NDJSON (newline-delimited JSON).
+	var records []ApertureS3Record
+	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var rec ApertureS3Record
+		if err := json.Unmarshal(line, &rec); err != nil {
+			return nil, fmt.Errorf("parse NDJSON line %d: %w", lineNum, err)
+		}
+		records = append(records, rec)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan NDJSON: %w", err)
+	}
+	return records, nil
+}
+
+// listBucketResult represents the AWS S3 ListBucketResult XML response.
+type listBucketResult struct {
+	XMLName  xml.Name   `xml:"ListBucketResult"`
+	Contents []s3Object `xml:"Contents"`
+}
+
+type s3Object struct {
+	Key          string `xml:"Key"`
+	LastModified string `xml:"LastModified"`
+	Size         int64  `xml:"Size"`
+}
+
+// parseS3Keys extracts object keys from an S3 ListBucketResult XML response.
+func parseS3Keys(body []byte) []string {
+	var result listBucketResult
+	if err := xml.Unmarshal(body, &result); err != nil {
+		log.Printf("aperture-s3: parse list XML: %v", err)
 		return nil
 	}
-	keys := make([]string, len(result.Contents))
-	for i, c := range result.Contents {
-		keys[i] = c.Key
+	keys := make([]string, 0, len(result.Contents))
+	for _, obj := range result.Contents {
+		if obj.Key != "" {
+			keys = append(keys, obj.Key)
+		}
 	}
 	return keys
 }
