@@ -779,7 +779,7 @@ Response:
     },
     "serverInfo": {
       "name": "remote-juggler",
-      "version": "2.1.0-beta.7"
+      "version": "2.2.0"
     }
   }
 }

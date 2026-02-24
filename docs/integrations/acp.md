@@ -65,7 +65,7 @@ ACP uses a similar message format to MCP but with some differences:
 ```json
 {
   "name": "RemoteJuggler",
-  "version": "2.1.0-beta.7",
+  "version": "2.2.0",
   "description": "Git identity management for multi-account workflows",
   "tools": [...]
 }

@@ -16,7 +16,7 @@ brew install remote-juggler
 
 | Formula | Description | Version |
 |---------|-------------|---------|
-| `remote-juggler` | Git identity management with MCP/ACP support | 2.1.0-beta.7 |
+| `remote-juggler` | Git identity management with MCP/ACP support | 2.2.0 |
 
 ## Updating
 
@@ -52,8 +52,8 @@ All releases are GPG signed. To verify:
 gpg --keyserver keys.openpgp.org --recv-keys B7D382A890EA8DA4
 
 # Download and verify checksums
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/SHA256SUMS.txt
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/SHA256SUMS.txt.asc
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/SHA256SUMS.txt
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/SHA256SUMS.txt.asc
 gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
 ```
 

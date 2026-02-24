@@ -57,7 +57,7 @@ jobs:
 
       - name: Test install.sh (local download)
         env:
-          REMOTE_JUGGLER_VERSION: "2.1.0-beta.7"
+          REMOTE_JUGGLER_VERSION: "2.2.0"
         run: |
           # Override download to use local server
           # Test the install script's platform detection and directory setup

@@ -172,7 +172,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "rj-gateway",
-		"version": "2.1.0",
+		"version": "2.2.0",
 	})
 }
 

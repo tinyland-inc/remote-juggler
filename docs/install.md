@@ -60,15 +60,15 @@ programs.remote-juggler = {
 
 ```bash
 # Download the specific release (no /latest — use the version tag)
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler_2.1.0.beta.7_amd64.deb
-sudo dpkg -i remote-juggler_2.1.0.beta.7_amd64.deb
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler_2.2.0_amd64.deb
+sudo dpkg -i remote-juggler_2.2.0_amd64.deb
 ```
 
 ## RHEL / Rocky / Fedora
 
 ```bash
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-2.1.0.beta.7-1.x86_64.rpm
-sudo rpm -i remote-juggler-2.1.0.beta.7-1.x86_64.rpm
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-2.2.0-1.x86_64.rpm
+sudo rpm -i remote-juggler-2.2.0-1.x86_64.rpm
 ```
 
 ## From Source

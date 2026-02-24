@@ -38,13 +38,13 @@ The script performs these operations:
 
 ```bash
 # Install specific version
-curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.1.0-beta.7
+curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.2.0
 
 # Install from stable channel (falls back to beta if stable has no assets)
 curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --channel stable
 
 # Environment variable override
-REMOTE_JUGGLER_VERSION=2.1.0-beta.7 curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
+REMOTE_JUGGLER_VERSION=2.2.0 curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 ```
 
 ### Uninstall via Script
@@ -89,10 +89,10 @@ autoload -Uz compinit && compinit
 
 ```bash
 # Download .deb package from releases
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler_2.1.0.beta.7_amd64.deb
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler_2.2.0_amd64.deb
 
 # Install
-sudo dpkg -i remote-juggler_2.1.0.beta.7_amd64.deb
+sudo dpkg -i remote-juggler_2.2.0_amd64.deb
 sudo apt-get install -f  # Fix dependencies if needed
 ```
 
@@ -100,10 +100,10 @@ sudo apt-get install -f  # Fix dependencies if needed
 
 ```bash
 # Download .rpm package from releases
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-2.1.0.beta.7-1.x86_64.rpm
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-2.2.0-1.x86_64.rpm
 
 # Install
-sudo dnf install remote-juggler-2.1.0.beta.7-1.x86_64.rpm
+sudo dnf install remote-juggler-2.2.0-1.x86_64.rpm
 ```
 
 ### Nix (Linux)
@@ -134,7 +134,7 @@ Download pre-built binaries from the [Releases page](https://github.com/tinyland
 
 ```bash
 # Example: Download and install
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-amd64
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-linux-amd64
 install -m 755 remote-juggler-linux-amd64 ~/.local/bin/remote-juggler
 ```
 
@@ -144,22 +144,22 @@ Always verify downloads with per-file or aggregate checksums:
 
 ```bash
 # Download checksum
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-linux-amd64.sha256
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-linux-amd64.sha256
 
 # Verify
 echo "$(cat remote-juggler-linux-amd64.sha256)  remote-juggler-linux-amd64" | sha256sum -c -
 
 # Or use the aggregate checksums file
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/SHA256SUMS.txt
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/SHA256SUMS.txt
 sha256sum -c SHA256SUMS.txt --ignore-missing
 ```
 
 ### Linux AppImage (GUI)
 
 ```bash
-curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.1.0-beta.7/remote-juggler-gui-v2.1.0-beta.7-x86_64.AppImage
-chmod +x remote-juggler-gui-v2.1.0-beta.7-x86_64.AppImage
-./remote-juggler-gui-v2.1.0-beta.7-x86_64.AppImage
+curl -LO https://github.com/tinyland-inc/remote-juggler/releases/download/v2.2.0/remote-juggler-gui-v2.2.0-x86_64.AppImage
+chmod +x remote-juggler-gui-v2.2.0-x86_64.AppImage
+./remote-juggler-gui-v2.2.0-x86_64.AppImage
 ```
 
 ## Build from Source

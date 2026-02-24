@@ -4,7 +4,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.1.0-beta.7
+#   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.2.0
 #
 # Options:
 #   --version VERSION    Install specific version (default: latest)
@@ -72,7 +72,7 @@ Examples:
   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash
 
   # Install specific version
-  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.1.0-beta.7
+  curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | bash -s -- --version 2.2.0
 
   # Install to /usr/local (requires sudo)
   curl -fsSL https://raw.githubusercontent.com/tinyland-inc/remote-juggler/main/install.sh | sudo bash -s -- --prefix /usr/local
