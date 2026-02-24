@@ -13,6 +13,10 @@ import (
 // ApertureWebhookReceiver handles real-time usage events from Aperture webhooks.
 // Events are parsed and stored in a ring buffer, and optionally merged into
 // the MeterStore for combined MCP + LLM metrics.
+//
+// Supports two payload formats:
+//  1. Aperture hook events (real): {metadata: {model, login_name, ...}, tool_calls: [...], response_body: {usage: ...}}
+//  2. Simple events (testing):     {type: "llm_call", agent: "...", model: "...", input_tokens: N, ...}
 type ApertureWebhookReceiver struct {
 	mu      sync.Mutex
 	events  []ApertureEvent
@@ -20,20 +24,51 @@ type ApertureWebhookReceiver struct {
 	meter   *MeterStore
 }
 
-// ApertureEvent represents a single event from an Aperture webhook.
-// Uses json.RawMessage for resilience to alpha API changes.
+// ApertureEvent is the normalized internal representation of a webhook event.
 type ApertureEvent struct {
 	Type         string          `json:"type"`
 	Timestamp    time.Time       `json:"timestamp"`
 	Agent        string          `json:"agent,omitempty"`
 	CampaignID   string          `json:"campaign_id,omitempty"`
 	Model        string          `json:"model,omitempty"`
+	Provider     string          `json:"provider,omitempty"`
 	Tokens       int             `json:"tokens,omitempty"`
 	InputTokens  int             `json:"input_tokens,omitempty"`
 	OutputTokens int             `json:"output_tokens,omitempty"`
 	DurationMs   int64           `json:"duration_ms,omitempty"`
 	Error        string          `json:"error,omitempty"`
+	ToolNames    []string        `json:"tool_names,omitempty"`
+	RequestID    string          `json:"request_id,omitempty"`
+	SessionID    string          `json:"session_id,omitempty"`
 	Raw          json.RawMessage `json:"raw,omitempty"`
+}
+
+// apertureHookPayload is the real Aperture webhook format.
+type apertureHookPayload struct {
+	Metadata struct {
+		LoginName    string `json:"login_name"`
+		UserAgent    string `json:"user_agent"`
+		URL          string `json:"url"`
+		Model        string `json:"model"`
+		Provider     string `json:"provider"`
+		TailnetName  string `json:"tailnet_name"`
+		StableNodeID string `json:"stable_node_id"`
+		RequestID    string `json:"request_id"`
+		SessionID    string `json:"session_id"`
+	} `json:"metadata"`
+	ToolCalls []struct {
+		Name   string          `json:"name"`
+		Params json.RawMessage `json:"params"`
+	} `json:"tool_calls"`
+	ResponseBody json.RawMessage `json:"response_body"`
+}
+
+// apertureResponseUsage extracts token counts from Anthropic-style response body.
+type apertureResponseUsage struct {
+	Usage struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
 }
 
 // NewApertureWebhookReceiver creates a webhook receiver with the given ring buffer size.
@@ -61,30 +96,15 @@ func (r *ApertureWebhookReceiver) HandleWebhook(w http.ResponseWriter, req *http
 		return
 	}
 
-	// Try to parse as a single event or an array of events.
-	var events []ApertureEvent
-
-	// First try array.
-	if err := json.Unmarshal(body, &events); err != nil {
-		// Try single event.
-		var single ApertureEvent
-		if err := json.Unmarshal(body, &single); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-		single.Raw = body
-		events = []ApertureEvent{single}
-	} else {
-		// Store raw for each event.
-		for i := range events {
-			events[i].Raw = body
-		}
+	events, err := r.parsePayload(body)
+	if err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	accepted := 0
 	for _, event := range events {
 		if event.Type == "" {
-			log.Printf("aperture webhook: skipped event with no type, raw=%s", truncate(string(body), 500))
 			continue
 		}
 		if event.Timestamp.IsZero() {
@@ -101,6 +121,75 @@ func (r *ApertureWebhookReceiver) HandleWebhook(w http.ResponseWriter, req *http
 		"accepted": accepted,
 		"total":    len(events),
 	})
+}
+
+// parsePayload handles both Aperture hook format and simple event format.
+func (r *ApertureWebhookReceiver) parsePayload(body []byte) ([]ApertureEvent, error) {
+	// Try Aperture hook format first (has "metadata" key).
+	if event, ok := r.tryApertureHook(body); ok {
+		return []ApertureEvent{event}, nil
+	}
+
+	// Try array of simple events.
+	var events []ApertureEvent
+	if err := json.Unmarshal(body, &events); err == nil && len(events) > 0 {
+		for i := range events {
+			events[i].Raw = body
+		}
+		return events, nil
+	}
+
+	// Try single simple event.
+	var single ApertureEvent
+	if err := json.Unmarshal(body, &single); err != nil {
+		return nil, fmt.Errorf("unrecognized payload: %w", err)
+	}
+	single.Raw = body
+	return []ApertureEvent{single}, nil
+}
+
+// tryApertureHook attempts to parse as a real Aperture hook payload.
+func (r *ApertureWebhookReceiver) tryApertureHook(body []byte) (ApertureEvent, bool) {
+	var payload apertureHookPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ApertureEvent{}, false
+	}
+
+	// Must have metadata with a model to be recognized as an Aperture hook.
+	if payload.Metadata.Model == "" {
+		return ApertureEvent{}, false
+	}
+
+	event := ApertureEvent{
+		Type:      "llm_call",
+		Model:     payload.Metadata.Model,
+		Provider:  payload.Metadata.Provider,
+		Agent:     payload.Metadata.LoginName,
+		RequestID: payload.Metadata.RequestID,
+		SessionID: payload.Metadata.SessionID,
+		Raw:       body,
+	}
+
+	// Extract tool names.
+	for _, tc := range payload.ToolCalls {
+		if tc.Name != "" {
+			event.ToolNames = append(event.ToolNames, tc.Name)
+		}
+	}
+
+	// Extract token counts from response body.
+	if len(payload.ResponseBody) > 0 {
+		var respUsage apertureResponseUsage
+		if err := json.Unmarshal(payload.ResponseBody, &respUsage); err == nil {
+			event.InputTokens = respUsage.Usage.InputTokens
+			event.OutputTokens = respUsage.Usage.OutputTokens
+		}
+	}
+
+	log.Printf("aperture webhook: parsed hook event model=%s agent=%s tools=%v input_tokens=%d output_tokens=%d",
+		event.Model, event.Agent, event.ToolNames, event.InputTokens, event.OutputTokens)
+
+	return event, true
 }
 
 // record adds an event to the ring buffer and optionally updates MeterStore.
@@ -156,12 +245,4 @@ func (r *ApertureWebhookReceiver) Count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.events)
-}
-
-// truncate returns up to n characters of s.
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
 }

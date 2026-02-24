@@ -235,6 +235,126 @@ func TestWebhookNonLLMEventNotMerged(t *testing.T) {
 	}
 }
 
+func TestWebhookApertureHookFormat(t *testing.T) {
+	store := NewMeterStore()
+	receiver := NewApertureWebhookReceiver(100, store)
+
+	// Real Aperture hook payload format (matches what ai.taila4c78d.ts.net sends).
+	payload := map[string]any{
+		"metadata": map[string]any{
+			"login_name":     "tagged-devices",
+			"user_agent":     "Anthropic/Python 0.83.0",
+			"url":            "http://aperture.fuzzy-dev.svc.cluster.local/v1/messages",
+			"model":          "claude-sonnet-4-20250514",
+			"provider":       "anthropic",
+			"tailnet_name":   "taila4c78d.ts.net",
+			"stable_node_id": "nvkZciDFvo11CNTRL",
+			"request_id":     "req-123",
+			"session_id":     "sess-456",
+		},
+		"tool_calls": []map[string]any{
+			{"name": "juggler_setec_list", "params": map[string]any{}},
+		},
+		"response_body": map[string]any{
+			"id":    "msg_abc",
+			"type":  "message",
+			"model": "claude-sonnet-4-20250514",
+			"usage": map[string]any{
+				"input_tokens":  2400,
+				"output_tokens": 680,
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["accepted"].(float64) != 1 {
+		t.Errorf("accepted = %v, want 1", resp["accepted"])
+	}
+
+	events := receiver.Recent(10)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+
+	e := events[0]
+	if e.Type != "llm_call" {
+		t.Errorf("Type = %q, want 'llm_call'", e.Type)
+	}
+	if e.Model != "claude-sonnet-4-20250514" {
+		t.Errorf("Model = %q, want 'claude-sonnet-4-20250514'", e.Model)
+	}
+	if e.Agent != "tagged-devices" {
+		t.Errorf("Agent = %q, want 'tagged-devices'", e.Agent)
+	}
+	if e.Provider != "anthropic" {
+		t.Errorf("Provider = %q, want 'anthropic'", e.Provider)
+	}
+	if e.InputTokens != 2400 {
+		t.Errorf("InputTokens = %d, want 2400", e.InputTokens)
+	}
+	if e.OutputTokens != 680 {
+		t.Errorf("OutputTokens = %d, want 680", e.OutputTokens)
+	}
+	if len(e.ToolNames) != 1 || e.ToolNames[0] != "juggler_setec_list" {
+		t.Errorf("ToolNames = %v, want [juggler_setec_list]", e.ToolNames)
+	}
+	if e.RequestID != "req-123" {
+		t.Errorf("RequestID = %q, want 'req-123'", e.RequestID)
+	}
+
+	// Verify tokens merged into MeterStore.
+	buckets := store.Query("tagged-devices", "")
+	if len(buckets) != 1 {
+		t.Fatalf("expected 1 bucket, got %d", len(buckets))
+	}
+	if buckets[0].InputTokens != 2400 {
+		t.Errorf("MeterStore InputTokens = %d, want 2400", buckets[0].InputTokens)
+	}
+	if buckets[0].OutputTokens != 680 {
+		t.Errorf("MeterStore OutputTokens = %d, want 680", buckets[0].OutputTokens)
+	}
+}
+
+func TestWebhookApertureHookNoResponseBody(t *testing.T) {
+	receiver := NewApertureWebhookReceiver(100, nil)
+
+	// Aperture hook with no response_body (e.g. streaming or error).
+	payload := map[string]any{
+		"metadata": map[string]any{
+			"model":    "claude-sonnet-4-20250514",
+			"provider": "anthropic",
+		},
+		"tool_calls": []map[string]any{},
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	events := receiver.Recent(10)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].InputTokens != 0 {
+		t.Errorf("InputTokens = %d, want 0 (no response_body)", events[0].InputTokens)
+	}
+}
+
 func TestWebhookRecentOrder(t *testing.T) {
 	receiver := NewApertureWebhookReceiver(100, nil)
 
