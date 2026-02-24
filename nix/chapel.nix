@@ -125,6 +125,16 @@ stdenv.mkDerivation {
     cp -r modules $out/modules
     cp -r make $out/make
 
+    # Create module search directories expected by chpl at compile time.
+    # These don't exist in the Chapel source tree (only tasktable/ and
+    # comm/{gasnet,ofi,ugni} exist). On macOS, LLVM's directory_iterator
+    # returns an error code that Chapel's frontend doesn't filter, causing
+    # a fatal "No such file or directory in directory traversal" error.
+    # Empty directories satisfy the traversal without affecting compilation.
+    mkdir -p $out/modules/internal/tasks/qthreads
+    mkdir -p $out/modules/internal/tasks/fifo
+    mkdir -p $out/modules/internal/comm/none
+
     # Third-party: only copy install dirs (not build dirs with /build/ refs)
     mkdir -p $out/third-party
     for tp in third-party/*/; do
