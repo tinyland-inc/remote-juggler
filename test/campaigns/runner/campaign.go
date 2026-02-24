@@ -82,6 +82,7 @@ type CampaignResult struct {
 	Error      string         `json:"error,omitempty"`
 	ToolCalls  int            `json:"tool_calls"`
 	Phases     []PhaseResult  `json:"phases,omitempty"`
+	Findings   []Finding      `json:"findings,omitempty"`
 }
 
 // PhaseResult captures the outcome of a single phase in a multi-phase campaign.

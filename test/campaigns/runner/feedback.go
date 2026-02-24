@@ -15,6 +15,9 @@ import (
 type FeedbackHandler struct {
 	httpClient *http.Client
 	token      string
+	// baseURL is the GitHub API base URL. Defaults to "https://api.github.com".
+	// Override in tests to point at a mock server.
+	baseURL string
 }
 
 // Finding represents a single finding from a campaign run that should be
@@ -43,6 +46,7 @@ func NewFeedbackHandler(token string) *FeedbackHandler {
 	return &FeedbackHandler{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		token:      token,
+		baseURL:    "https://api.github.com",
 	}
 }
 
@@ -98,8 +102,8 @@ func (f *FeedbackHandler) findExistingIssue(ctx context.Context, repo string, fi
 		searchTerm = finding.Title
 	}
 
-	url := fmt.Sprintf("https://api.github.com/search/issues?q=%s+repo:%s+state:open+in:body",
-		searchTerm, repo)
+	url := fmt.Sprintf("%s/search/issues?q=%s+repo:%s+state:open+in:body",
+		f.baseURL, searchTerm, repo)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -132,7 +136,7 @@ func (f *FeedbackHandler) findExistingIssue(ctx context.Context, repo string, fi
 
 // createIssue creates a GitHub issue.
 func (f *FeedbackHandler) createIssue(ctx context.Context, repo, title, body string, labels []string) (*GitHubIssue, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/issues", repo)
+	url := fmt.Sprintf("%s/repos/%s/issues", f.baseURL, repo)
 
 	payload := map[string]any{
 		"title":  title,
@@ -172,7 +176,7 @@ func (f *FeedbackHandler) createIssue(ctx context.Context, repo, title, body str
 // closeIssue closes a GitHub issue with a comment.
 func (f *FeedbackHandler) closeIssue(ctx context.Context, repo string, issueNumber int, comment string) error {
 	// Add comment.
-	commentURL := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments", repo, issueNumber)
+	commentURL := fmt.Sprintf("%s/repos/%s/issues/%d/comments", f.baseURL, repo, issueNumber)
 	commentPayload, _ := json.Marshal(map[string]string{"body": comment})
 	commentReq, err := http.NewRequestWithContext(ctx, http.MethodPost, commentURL, bytes.NewReader(commentPayload))
 	if err != nil {
@@ -187,7 +191,7 @@ func (f *FeedbackHandler) closeIssue(ctx context.Context, repo string, issueNumb
 	commentResp.Body.Close()
 
 	// Close issue.
-	closeURL := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d", repo, issueNumber)
+	closeURL := fmt.Sprintf("%s/repos/%s/issues/%d", f.baseURL, repo, issueNumber)
 	closePayload, _ := json.Marshal(map[string]string{"state": "closed"})
 	closeReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, closeURL, bytes.NewReader(closePayload))
 	if err != nil {

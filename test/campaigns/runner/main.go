@@ -79,6 +79,12 @@ func main() {
 	collector := NewCollector(*gatewayURL)
 	scheduler := NewScheduler(registry, dispatcher, collector)
 
+	// Wire feedback handler if a GitHub token is available.
+	if ghToken := os.Getenv("GITHUB_TOKEN"); ghToken != "" {
+		scheduler.SetFeedback(NewFeedbackHandler(ghToken))
+		log.Printf("feedback handler enabled (issue creation/closure)")
+	}
+
 	// Run a specific campaign and exit.
 	if *campaignID != "" {
 		campaign, ok := registry[*campaignID]
