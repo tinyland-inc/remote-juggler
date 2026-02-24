@@ -211,10 +211,23 @@ log_info "=== Phase 7: Verify Metering (Aperture Usage) ==="
 
 meter_resp=$(curl -s -X POST "${GATEWAY_URL}/mcp" \
     -H "Content-Type: application/json" \
-    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"juggler_aperture_usage\",\"arguments\":{\"campaign_id\":\"${CAMPAIGN_ID}\"}}}" 2>/dev/null || echo "{}")
+    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"juggler_aperture_usage\",\"arguments\":{}}}" 2>/dev/null || echo "{}")
 
-if echo "$meter_resp" | grep -q '"mcp_tool_calls"'; then
-    log_pass "aperture_usage returns metering data"
+meter_has_data=$(echo "$meter_resp" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+content=d.get('result',{}).get('content',[])
+if content:
+    inner=json.loads(content[0].get('text','{}'))
+    calls=inner.get('mcp_tool_calls',0)
+    tokens=inner.get('total_tokens',0)
+    print(f'yes calls={calls} tokens={tokens}')
+else:
+    print('no')
+" 2>/dev/null || echo "no")
+
+if echo "$meter_has_data" | grep -q "^yes"; then
+    log_pass "aperture_usage returns metering data ($meter_has_data)"
 else
     log_skip "aperture_usage metering data not available (may need active requests)"
 fi
