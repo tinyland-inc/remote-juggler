@@ -1,6 +1,6 @@
 # Nix Installation & Development
 
-RemoteJuggler supports Nix for reproducible builds and development environments. Chapel 2.7.0 is built from source with system LLVM 18 — no FHS wrappers or Homebrew required on any platform.
+RemoteJuggler supports Nix for reproducible builds and development environments. Chapel is consumed from the [Jesssullivan/chapel](https://github.com/Jesssullivan/chapel/tree/llvm-21-support) Nix fork with system LLVM 19 (`inputs.nixpkgs.follows` ensures ABI alignment). No FHS wrappers or Homebrew required on any platform.
 
 ## Quick Start
 
@@ -48,9 +48,11 @@ The flake.nix includes cache configuration that works automatically:
 nixConfig = {
   extra-substituters = [
     "https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
+    "https://nix-cache.fuzzy-dev.tinyland.dev/main"
   ];
   extra-trusted-public-keys = [
     "tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric="
+    "main:PBDvqG8OP3W2XF4QzuqWwZD/RhLRsE7ONxwM09kqTtw="
   ];
 };
 ```
@@ -60,8 +62,8 @@ nixConfig = {
 If you need to configure the cache manually, add to `~/.config/nix/nix.conf`:
 
 ```ini
-extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland
-extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric=
+extra-substituters = https://nix-cache.fuzzy-dev.tinyland.dev/tinyland https://nix-cache.fuzzy-dev.tinyland.dev/main
+extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric= main:PBDvqG8OP3W2XF4QzuqWwZD/RhLRsE7ONxwM09kqTtw=
 ```
 
 ## Platform Support
@@ -73,7 +75,7 @@ extra-trusted-public-keys = tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric
 | macOS x86_64 | Full Nix build | N/A | Full Nix build | Full |
 | macOS aarch64 | Full Nix build | N/A | Full Nix build | Full |
 
-All platforms build Chapel from source with system LLVM 18. No Homebrew or external Chapel installation required.
+All platforms use Chapel from the [Jesssullivan/chapel](https://github.com/Jesssullivan/chapel/tree/llvm-21-support) Nix fork (system LLVM 19, Attic-cached). No Homebrew or external Chapel installation required.
 
 ## CI/CD Integration
 
@@ -117,7 +119,7 @@ For CI cache push access:
 | `remote-juggler-gui` | GTK4/Libadwaita GUI | Linux only |
 | `rj-gateway` | Go MCP gateway (tsnet + Setec) | All |
 | `pinentry-remotejuggler` | HSM pinentry helper | All |
-| `chapel` | Chapel compiler 2.7.0 (from source) | All |
+| `chapel` | Chapel compiler (from fork, system LLVM 19) | All |
 
 ## Available DevShells
 
@@ -194,20 +196,20 @@ nix build         # Full reproducible build
 
 ## Updating Chapel Version
 
-To update Chapel in the flake, override the `chapel-src` input:
+To update Chapel in the flake, override the `chapel-nix` input:
 
 ```bash
-# Use a specific Chapel tag
-nix build --override-input chapel-src github:chapel-lang/chapel/refs/tags/X.Y.Z .#remote-juggler
+# Use a different branch of the Chapel Nix fork
+nix build --override-input chapel-nix github:Jesssullivan/chapel/other-branch .#remote-juggler
 
-# Use a custom Chapel fork/branch
-nix build --override-input chapel-src github:youruser/chapel/your-branch .#remote-juggler
+# Use a different Chapel fork entirely
+nix build --override-input chapel-nix github:youruser/chapel/your-branch .#remote-juggler
 ```
 
 Then update `flake.lock` to pin the new version:
 
 ```bash
-nix flake update chapel-src
+nix flake update chapel-nix
 ```
 
 For technical details on the from-source Chapel build, see [Nix Chapel Setup](../NIX_CHAPEL_SETUP.md).

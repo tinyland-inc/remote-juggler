@@ -1,12 +1,12 @@
 # RemoteJuggler Nix CI Workflow
 # Nix flake-based builds with Attic binary cache
 #
-# Chapel is built from source using system LLVM 18 (nix/chapel.nix).
+# Chapel is consumed from the Jesssullivan/chapel fork (Attic-cached, LLVM 19).
 # No FHS/bubblewrap sandbox needed — works natively on all platforms.
 #
 # Build matrix:
-# - Linux x86_64: native build (~25 min cold, instant with cache)
-# - Linux aarch64: QEMU emulation (~60 min cold)
+# - Linux x86_64: native build (instant with Attic cache)
+# - Linux aarch64: QEMU emulation
 # - macOS x86_64: cross-build via Rosetta 2 on Apple Silicon (macos-15)
 # - macOS aarch64: Apple Silicon (macos-15)
 #
@@ -398,5 +398,5 @@ jobs:
           echo "| Flake Check | ${{ needs.flake-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| DevShell | ${{ needs.devshell-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> Chapel is built from source with system LLVM 18 (no FHS/bubblewrap)." >> $GITHUB_STEP_SUMMARY
+          echo "> Chapel consumed from Jesssullivan/chapel fork (system LLVM 19, Attic-cached)." >> $GITHUB_STEP_SUMMARY
           echo "> Builds are cached via Attic at \`${{ env.ATTIC_SERVER }}\`" >> $GITHUB_STEP_SUMMARY

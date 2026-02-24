@@ -2,7 +2,7 @@
   description = "RemoteJuggler - Backend-agnostic git identity management with MCP/ACP support";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
     # Rust toolchain for GTK GUI
@@ -11,11 +11,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Optional: Custom Chapel fork for Nix support development
-    # Usage: nix build --override-input chapel-src github:jesssullivan/chapel/sid-nix-support .#remote-juggler
-    chapel-src = {
-      url = "github:chapel-lang/chapel/refs/tags/2.7.0";
-      flake = false;  # Raw source, not a flake
+    # Chapel compiler from Nix-enabled fork (pre-built via Attic binary cache)
+    # Provides chapel-system-llvm (LLVM 19), chapel-gnu, chapel-llvm18, etc.
+    # Override: nix build --override-input chapel-nix github:jesssullivan/chapel/<branch> .#remote-juggler
+    chapel-nix = {
+      url = "github:Jesssullivan/chapel/llvm-21-support";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -23,13 +24,15 @@
     # Attic binary cache configuration
     extra-substituters = [
       "https://nix-cache.fuzzy-dev.tinyland.dev/tinyland"
+      "https://nix-cache.fuzzy-dev.tinyland.dev/main"
     ];
     extra-trusted-public-keys = [
       "tinyland:/o3SR1lItco+g3RLb6vgAivYa6QjmokbnlNSX+s8ric="
+      "main:PBDvqG8OP3W2XF4QzuqWwZD/RhLRsE7ONxwM09kqTtw="
     ];
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, chapel-src }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, chapel-nix }:
     {
       # System-independent outputs for consumption by other flakes
       overlays.default = final: prev: {
@@ -58,17 +61,65 @@
         # Chapel version configuration
         chapelVersion = "2.7.0";
 
-        # Chapel built from source using system LLVM.
-        # Works on both Linux and macOS without FHS/bubblewrap.
-        chapel = import ./nix/chapel.nix {
-          inherit pkgs chapel-src;
-        };
+        # Chapel from Jesssullivan/chapel fork.
+        # The fork builds Chapel with system LLVM but its CHPL_HOME layout needs
+        # fixup: lib/ is at $out/lib/ but CHPL_HOME points to $out/share/chapel/.
+        # This wrapper creates the right symlink structure and bakes in the
+        # compiler environment so consumers don't need to set CHPL_* variables.
+        chapel-raw = chapel-nix.packages.${system}.chapel-system-llvm;
+        llvmPackages = pkgs.llvmPackages_19;
+        chapel = pkgs.runCommand "chapel-wrapped" {
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+        } ''
+          mkdir -p $out/bin $out/share/chapel
 
-        # Legacy: FHS-based Chapel environment for Linux (kept for backward compat)
-        chapelFhs = if pkgs.stdenv.isLinux then
-          import ./nix/chapel-fhs.nix { inherit pkgs chapelVersion; }
-        else
-          null;
+          # Symlink all CHPL_HOME contents from the fork's build
+          for item in ${chapel-raw}/share/chapel/*; do
+            ln -sf "$item" "$out/share/chapel/$(basename "$item")"
+          done
+
+          # Fix: add lib/ symlink into CHPL_HOME (fork puts it at $out/lib/)
+          ln -sf ${chapel-raw}/lib $out/share/chapel/lib
+
+          # Symlink non-chpl binaries directly
+          for bin in ${chapel-raw}/bin/*; do
+            binname=$(basename "$bin")
+            if [ "$binname" != "chpl" ] && [ "$binname" != ".chpl-wrapped" ]; then
+              ln -sf "$bin" "$out/bin/$binname"
+            fi
+          done
+
+          # Wrap chpl with CHPL_HOME, compiler environment, and LLVM paths
+          makeWrapper ${chapel-raw}/bin/.chpl-wrapped $out/bin/chpl \
+            --set CHPL_HOME "$out/share/chapel" \
+            --set-default CHPL_LLVM system \
+            --set-default CHPL_LLVM_CONFIG "${llvmPackages.llvm.dev}/bin/llvm-config" \
+            --set-default CHPL_HOST_COMPILER llvm \
+            --set-default CHPL_HOST_CC "${llvmPackages.clang}/bin/clang" \
+            --set-default CHPL_HOST_CXX "${llvmPackages.clang}/bin/clang++" \
+            --set-default CHPL_TARGET_CC "${llvmPackages.clang}/bin/clang" \
+            --set-default CHPL_TARGET_CXX "${llvmPackages.clang}/bin/clang++" \
+            --set-default CHPL_TARGET_CPU none \
+            --set-default CHPL_GMP none \
+            --set-default CHPL_RE2 bundled \
+            --set-default CHPL_UNWIND bundled \
+            --set-default CHPL_LAUNCHER none \
+            --set-default CHPL_COMM none \
+            --set-default CHPL_TASKS qthreads \
+            --set-default CHPL_TARGET_MEM jemalloc \
+            --set-default CHPL_HWLOC bundled \
+            --prefix PATH : '${pkgs.lib.makeBinPath [
+              pkgs.coreutils pkgs.gnumake pkgs.pkg-config pkgs.python3 pkgs.which
+              llvmPackages.clang llvmPackages.llvm
+            ]}' \
+            --add-flags '-L ${pkgs.xz.out}/lib' \
+            ${pkgs.lib.optionalString pkgs.stdenv.isLinux
+              "--add-flags '-I ${llvmPackages.clang}/resource-root/include' --add-flags '-I ${llvmPackages.bintools.libc.dev}/include'"
+            } \
+            ${pkgs.lib.optionalString pkgs.stdenv.isDarwin
+              "--add-flags '-I ${llvmPackages.clang}/resource-root/include'"
+            }
+        '';
 
         # Rust toolchain for GTK GUI
         # Using Rust 1.85+ for edition2024 support (required by cfg-expr crate)
@@ -133,7 +184,10 @@
                    baseName == ".git");
           };
 
-          nativeBuildInputs = chapelBuildInputs ++ [ pkgs.which ];
+          nativeBuildInputs = chapelBuildInputs ++ [
+            pkgs.which
+            pkgs.python3  # Required by chpl's printchplenv wrapper
+          ];
 
           buildPhase = ''
             export HOME=$(mktemp -d)
@@ -144,6 +198,9 @@
             ${chapel}/bin/chpl \
               -M src/remote_juggler \
               --ccflags="-I$src/pinentry" \
+              ${pkgs.lib.optionalString pkgs.stdenv.isDarwin
+                "--ldflags=\"-F${pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks -framework Security -F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation\""
+              } \
               -sHSM_NATIVE_AVAILABLE=false \
               --fast \
               -o target/release/remote_juggler \
@@ -286,8 +343,6 @@
           default = remote-juggler;
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           inherit remote-juggler-gui;
-          # Legacy FHS Chapel environment (kept for backward compat)
-          chapel-fhs = chapelFhs.chapel-fhs;
         };
 
         # Development shell with all tools
@@ -338,7 +393,7 @@
             echo "RemoteJuggler Development Environment"
             echo "======================================"
             echo ""
-            echo "Chapel version: ${chapelVersion} (built from source with LLVM 18)"
+            echo "Chapel version: ${chapelVersion} (from chapel-nix fork, LLVM 19)"
             echo "  Quick test: chpl --version"
             echo ""
             echo "Available commands:"
@@ -382,7 +437,7 @@
           shellHook = ''
             echo "Chapel Development Shell"
             echo "========================"
-            echo "Chapel ${chapelVersion} (from source, LLVM 18)"
+            echo "Chapel ${chapelVersion} (from chapel-nix fork, LLVM 19)"
             echo "  chpl --version"
           '';
         };

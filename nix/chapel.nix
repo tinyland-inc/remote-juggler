@@ -1,4 +1,9 @@
-# Chapel 2.7.0 from-source Nix derivation
+# DEPRECATED: Chapel is now consumed from the Jesssullivan/chapel fork flake
+# (github:Jesssullivan/chapel/llvm-21-support) which provides parameterized
+# Chapel builds with system LLVM. This file is kept as reference/fallback.
+#
+# ---
+# Chapel 2.7.0 from-source Nix derivation (LLVM 18)
 #
 # Builds Chapel from source using system LLVM, eliminating the need for
 # FHS/bubblewrap sandboxing. Works on both Linux and macOS.
