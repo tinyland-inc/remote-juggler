@@ -84,7 +84,8 @@ func (r *ApertureWebhookReceiver) HandleWebhook(w http.ResponseWriter, req *http
 	accepted := 0
 	for _, event := range events {
 		if event.Type == "" {
-			continue // Skip events without a type.
+			log.Printf("aperture webhook: skipped event with no type, raw=%s", truncate(string(body), 500))
+			continue
 		}
 		if event.Timestamp.IsZero() {
 			event.Timestamp = time.Now().UTC()
@@ -155,4 +156,12 @@ func (r *ApertureWebhookReceiver) Count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.events)
+}
+
+// truncate returns up to n characters of s.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
