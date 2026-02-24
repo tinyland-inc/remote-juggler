@@ -66,7 +66,7 @@ resource "kubernetes_deployment" "openclaw" {
           # to the upstream provider.
           env {
             name  = "ANTHROPIC_BASE_URL"
-            value = local.aperture_url
+            value = local.aperture_cluster_url
           }
 
           env {
@@ -246,7 +246,7 @@ resource "kubernetes_deployment" "hexstrike" {
           # Route LLM calls through Aperture (same as OpenClaw).
           env {
             name  = "ANTHROPIC_BASE_URL"
-            value = local.aperture_url
+            value = local.aperture_cluster_url
           }
 
           # In-cluster gateway URL (HTTP, no TLS needed inside the cluster).

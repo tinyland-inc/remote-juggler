@@ -56,8 +56,10 @@ locals {
   # Tailscale Operator may append a suffix (e.g. setec -> setec-1).
   effective_setec_url = var.gateway_setec_url != "" ? var.gateway_setec_url : "https://setec.${var.tailscale_tailnet}"
 
-  # Aperture AI gateway URL (MagicDNS hostname on the tailnet)
-  aperture_url = "http://${var.aperture_hostname}"
+  # Aperture AI gateway URL -- agents use in-cluster egress service,
+  # gateway (on tailnet) uses MagicDNS hostname directly.
+  aperture_url         = "http://${var.aperture_hostname}"
+  aperture_cluster_url = "http://aperture.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local"
 
   # Gateway config JSON (mounted as secret)
   gateway_config = jsonencode({
@@ -80,4 +82,32 @@ locals {
       state_dir = "/var/lib/rj-gateway/tsnet"
     }
   })
+}
+
+# =============================================================================
+# Aperture Egress Service
+# =============================================================================
+#
+# Tailscale Operator egress proxy: allows in-cluster pods (agents) to reach
+# the Aperture AI gateway (ai.<tailnet>) via a K8s Service without needing
+# direct tailnet access. The operator creates a proxy StatefulSet that
+# tunnels traffic through the tailnet.
+# =============================================================================
+
+resource "kubernetes_service" "aperture_egress" {
+  metadata {
+    name      = "aperture"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "aperture-egress" })
+    annotations = {
+      "tailscale.com/tailnet-fqdn" = "${var.aperture_hostname}.${var.tailscale_tailnet}"
+    }
+  }
+
+  spec {
+    type          = "ExternalName"
+    external_name = "placeholder.tailscale.svc.cluster.local"
+  }
+
+  depends_on = [helm_release.tailscale_operator]
 }
