@@ -66,6 +66,7 @@ let
     "--add-flags '-I ${llvmPackages.bintools.libc.dev}/include'"
   ]
   ++ lib.optionals stdenv.isDarwin [
+    "--add-flags '-I ${llvmPackages.clang}/resource-root/include'"
     "--add-flags '-I ${stdenv.libc}/include'"
   ]);
 
