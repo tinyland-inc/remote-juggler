@@ -2,7 +2,7 @@
   "id": "oc-dep-audit",
   "name": "Cross-Repo Dependency Audit",
   "description": "Audits dependency manifests across all Tinyland repos to find version divergence (same package, different versions) and known CVEs. Builds a cross-repo dependency graph and flags inconsistencies.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 2 * * 1",
     "event": "manual"

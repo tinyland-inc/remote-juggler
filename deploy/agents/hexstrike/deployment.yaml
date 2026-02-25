@@ -1,58 +1,73 @@
 ---
-# HexStrike AI Pentest Agent Deployment on Civo K8s (fuzzy-dev namespace)
-# Demonstrates credential-aware pentesting through rj-gateway.
+# HexStrike-AI Pentest Agent + Adapter Sidecar Deployment
+# This is a REFERENCE file — the authoritative deployment is managed by
+# deploy/tofu/hexstrike.tf via OpenTofu.
 #
-# HexStrike AI uses FastMCP for tool orchestration and supports 150+ security tools.
-# Routing through Aperture provides identity-aware audit of all credential access
-# during security testing engagements.
+# HexStrike-AI is a fork of hexstrike-ai (0x4m4/hexstrike-ai) at
+# tinyland-inc/hexstrike-ai. It uses FastMCP for native tool orchestration.
+# The adapter sidecar bridges the campaign runner protocol to HexStrike's
+# MCP JSON-RPC endpoint.
 #
-# Prerequisites:
-#   kubectl create secret generic ts-auth -n fuzzy-dev \
-#     --from-literal=TS_AUTHKEY="tskey-auth-..."
+# Architecture:
+#   campaign-runner → adapter (POST /campaign) → hexstrike-ai (MCP tools/call)
 #
 # IMPORTANT: Only deploy for authorized security testing.
 #
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hexstrike-agent
+  name: hexstrike-ai-agent
   namespace: fuzzy-dev
   labels:
-    app: hexstrike-agent
+    app: hexstrike-ai-agent
     tier: agent
     security: pentest
 spec:
   replicas: 0  # Scale to 1 only during active engagements
   selector:
     matchLabels:
-      app: hexstrike-agent
+      app: hexstrike-ai-agent
   template:
     metadata:
       labels:
-        app: hexstrike-agent
+        app: hexstrike-ai-agent
         tier: agent
         security: pentest
     spec:
       imagePullSecrets:
         - name: ghcr-pull
+      securityContext:
+        fsGroup: 10000
       containers:
-        - name: hexstrike
-          image: ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest  # renovate: image
+        - name: hexstrike-ai
+          image: ghcr.io/tinyland-inc/hexstrike-ai:latest  # renovate: image
+          ports:
+            - containerPort: 8888
+              name: fastmcp
           env:
-            # Route AI calls through Tailscale Aperture for identity-linked tracking
             - name: ANTHROPIC_BASE_URL
-              value: "http://ai"
-            # AI API key (fallback when Aperture is unavailable)
+              value: "http://aperture.fuzzy-dev.svc.cluster.local"
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: agent-api-keys
                   key: ANTHROPIC_API_KEY
-                  optional: true
-            # MCP tools via rj-gateway for credential-aware pentesting
             - name: RJ_GATEWAY_URL
               value: "http://rj-gateway.fuzzy-dev.svc.cluster.local:8080"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-keys
+                  key: GITHUB_TOKEN
+            - name: GIT_AUTHOR_NAME
+              value: "rj-agent-bot[bot]"
+            - name: GIT_COMMITTER_NAME
+              value: "rj-agent-bot[bot]"
           volumeMounts:
+            - name: ssh-key
+              mountPath: /home/agent/.ssh/id_ed25519
+              subPath: hexstrike-id-ed25519
+              readOnly: true
             - name: workspace
               mountPath: /workspace
             - name: results
@@ -65,51 +80,53 @@ spec:
               cpu: "2"
               memory: 2Gi
           securityContext:
-            # HexStrike needs network tools
             capabilities:
               add:
                 - NET_RAW
                 - NET_ADMIN
 
-        # Tailscale sidecar
-        - name: tailscale
-          image: ghcr.io/tailscale/tailscale:latest
-          env:
-            - name: TS_AUTHKEY
-              valueFrom:
-                secretKeyRef:
-                  name: ts-auth
-                  key: TS_AUTHKEY
-            - name: TS_HOSTNAME
-              value: hexstrike-agent
-            - name: TS_STATE_DIR
-              value: /var/lib/tailscale
-          volumeMounts:
-            - name: ts-state
-              mountPath: /var/lib/tailscale
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
+        # Adapter sidecar — bridges campaign protocol to HexStrike MCP
+        - name: adapter
+          image: ghcr.io/tinyland-inc/remote-juggler/adapter:latest  # renovate: image
+          args:
+            - --agent-type=hexstrike-ai
+            - --agent-url=http://localhost:8888
+            - --listen-port=8080
+          ports:
+            - containerPort: 8080
+              name: adapter
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
 
       volumes:
+        - name: ssh-key
+          secret:
+            secretName: agent-ssh-keys
+            defaultMode: 0600
         - name: workspace
           emptyDir: {}
         - name: results
           persistentVolumeClaim:
             claimName: hexstrike-results
-        - name: ts-state
-          emptyDir: {}
 
 ---
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: Service
 metadata:
-  name: hexstrike-results
+  name: hexstrike-ai-agent
   namespace: fuzzy-dev
+  labels:
+    app: hexstrike-ai-agent
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
+  type: ClusterIP
+  selector:
+    app: hexstrike-ai-agent
+  ports:
+    - port: 8080
+      targetPort: adapter
+      name: adapter

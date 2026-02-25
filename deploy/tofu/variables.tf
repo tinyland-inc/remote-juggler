@@ -55,15 +55,30 @@ variable "anthropic_api_key" {
 # Agent SSH identity (ed25519 keypairs stored in Setec)
 # =============================================================================
 
-variable "openclaw_ssh_private_key" {
-  description = "OpenClaw agent SSH private key (ed25519)"
+variable "ironclaw_ssh_private_key" {
+  description = "IronClaw agent SSH private key (ed25519)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "picoclaw_ssh_private_key" {
+  description = "PicoClaw agent SSH private key (ed25519)"
   type        = string
   sensitive   = true
   default     = ""
 }
 
 variable "hexstrike_ssh_private_key" {
-  description = "HexStrike agent SSH private key (ed25519)"
+  description = "HexStrike-AI agent SSH private key (ed25519)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# Backward compat aliases (deprecated)
+variable "openclaw_ssh_private_key" {
+  description = "Deprecated: use ironclaw_ssh_private_key"
   type        = string
   sensitive   = true
   default     = ""
@@ -73,14 +88,27 @@ variable "hexstrike_ssh_private_key" {
 # Agent model selection (routed through Aperture)
 # =============================================================================
 
-variable "openclaw_model" {
-  description = "Claude model for OpenClaw agent campaigns"
+variable "ironclaw_model" {
+  description = "Claude model for IronClaw agent campaigns"
   type        = string
   default     = "claude-sonnet-4-20250514"
 }
 
+variable "picoclaw_model" {
+  description = "Claude model for PicoClaw lightweight campaigns"
+  type        = string
+  default     = "claude-haiku-4-5-20251001"
+}
+
 variable "hexstrike_model" {
-  description = "Claude model for HexStrike security campaigns"
+  description = "Claude model for HexStrike-AI security campaigns"
+  type        = string
+  default     = "claude-sonnet-4-20250514"
+}
+
+# Backward compat alias (deprecated)
+variable "openclaw_model" {
+  description = "Deprecated: use ironclaw_model"
   type        = string
   default     = "claude-sonnet-4-20250514"
 }
@@ -133,16 +161,41 @@ variable "gateway_image" {
   default     = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest" # renovate: image
 }
 
-variable "openclaw_image" {
-  description = "OpenClaw agent container image"
+variable "ironclaw_image" {
+  description = "IronClaw agent container image (OpenClaw fork)"
   type        = string
-  default     = "ghcr.io/tinyland-inc/remote-juggler/openclaw:latest" # renovate: image
+  default     = "ghcr.io/tinyland-inc/ironclaw:latest" # renovate: image
+}
+
+variable "picoclaw_image" {
+  description = "PicoClaw agent container image"
+  type        = string
+  default     = "ghcr.io/tinyland-inc/picoclaw:latest" # renovate: image
+}
+
+variable "hexstrike_ai_image" {
+  description = "HexStrike-AI pentest agent container image"
+  type        = string
+  default     = "ghcr.io/tinyland-inc/hexstrike-ai:latest" # renovate: image
+}
+
+variable "adapter_image" {
+  description = "Campaign adapter sidecar image"
+  type        = string
+  default     = "ghcr.io/tinyland-inc/remote-juggler/adapter:latest" # renovate: image
+}
+
+# Backward compat aliases (deprecated — kept for existing tfvars)
+variable "openclaw_image" {
+  description = "Deprecated: use ironclaw_image"
+  type        = string
+  default     = "ghcr.io/tinyland-inc/ironclaw:latest"
 }
 
 variable "hexstrike_image" {
-  description = "HexStrike pentest agent container image"
+  description = "Deprecated: use hexstrike_ai_image"
   type        = string
-  default     = "ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest" # renovate: image
+  default     = "ghcr.io/tinyland-inc/hexstrike-ai:latest"
 }
 
 variable "chapel_binary_image" {

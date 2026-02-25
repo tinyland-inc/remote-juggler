@@ -2,7 +2,7 @@
   "id": "oc-issue-triage",
   "name": "Issue Triage",
   "description": "Fetches untriaged GitHub issues, classifies them (bug/feature/question), detects duplicates, and generates a triage report. Read-only -- does not modify issues directly.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 8 * * *",
     "event": "manual"

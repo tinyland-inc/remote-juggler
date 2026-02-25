@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "rj-gateway": {
+      "url": "http://rj-gateway.fuzzy-dev.svc.cluster.local:8080/mcp",
+      "transport": "http",
+      "description": "RemoteJuggler MCP gateway (in-cluster HTTP, proxied via adapter)"
+    }
+  }
+}

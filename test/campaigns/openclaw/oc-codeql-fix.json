@@ -2,7 +2,7 @@
   "id": "oc-codeql-fix",
   "name": "CodeQL Alert Auto-Fix",
   "description": "Autonomous agent campaign that examines open CodeQL alerts, creates fix branches with minimal-permissions YAML changes, and opens PRs. Demonstrates RemoteJuggler credential resolution, identity management, and GitHub write operations.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "model": "claude-sonnet-4-20250514",
   "mode": "autonomous",
   "trigger": {

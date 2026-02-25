@@ -29,8 +29,10 @@ tailscale_tailnet = "example.com"
 # Renovate auto-bumps these via # renovate: image comments in variables.tf
 # setec_image         = "ghcr.io/tinyland-inc/remote-juggler/setec:latest"
 # gateway_image       = "ghcr.io/tinyland-inc/remote-juggler/gateway:latest"
-# openclaw_image      = "ghcr.io/tinyland-inc/remote-juggler/openclaw:latest"
-# hexstrike_image     = "ghcr.io/tinyland-inc/remote-juggler/hexstrike:latest"
+# ironclaw_image      = "ghcr.io/tinyland-inc/ironclaw:latest"
+# picoclaw_image      = "ghcr.io/tinyland-inc/picoclaw:latest"
+# hexstrike_ai_image  = "ghcr.io/tinyland-inc/hexstrike-ai:latest"
+# adapter_image       = "ghcr.io/tinyland-inc/remote-juggler/adapter:latest"
 # chapel_binary_image = "ghcr.io/tinyland-inc/remote-juggler:latest"
 
 # Secrets — injected via TF_VAR_* env vars by apply.sh (do NOT hardcode here)

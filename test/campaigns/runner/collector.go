@@ -17,7 +17,7 @@ type Collector struct {
 func NewCollector(gatewayURL string) *Collector {
 	return &Collector{
 		gatewayURL: gatewayURL,
-		dispatcher: NewDispatcher(gatewayURL, ""),
+		dispatcher: NewDispatcher(gatewayURL, "", "", ""),
 	}
 }
 

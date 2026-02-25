@@ -2,7 +2,7 @@
   "id": "hs-cred-exposure",
   "name": "Credential Exposure Scan",
   "description": "Scans full git history of all repos for exposed credentials using pattern matching and entropy analysis. Cross-references found secrets against KDBX/Setec inventory to assess severity. Reports never contain actual secret values — only locations and hashes.",
-  "agent": "hexstrike",
+  "agent": "hexstrike-ai",
   "trigger": {
     "schedule": "0 1 * * 0",
     "event": "manual"

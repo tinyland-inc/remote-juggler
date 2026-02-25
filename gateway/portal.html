@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RemoteJuggler Agent Portal</title>
+<style>
+  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; }
+  h1 { color: var(--accent); margin-bottom: 0.5rem; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; }
+  .card h2 { font-size: 1rem; color: var(--accent); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .status.ok { background: var(--green); }
+  .status.degraded { background: var(--yellow); }
+  .status.down { background: var(--red); }
+  .status.unknown { background: #484f58; }
+  .agent-role { color: #8b949e; font-size: 0.85rem; margin-bottom: 0.5rem; }
+  .agent-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+  .agent-link:hover { text-decoration: underline; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; color: #8b949e; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+  .badge.adapter { background: #1f6feb33; color: var(--accent); }
+  .badge.real { background: #23883533; color: var(--green); }
+  #audit-log { max-height: 300px; overflow-y: auto; }
+  .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.8rem; }
+  .refresh { color: #8b949e; font-size: 0.8rem; cursor: pointer; }
+  .refresh:hover { color: var(--accent); }
+  footer { margin-top: 2rem; color: #484f58; font-size: 0.8rem; text-align: center; }
+</style>
+</head>
+<body>
+<h1>RemoteJuggler Agent Portal</h1>
+<p class="subtitle">Real FOSS agents with campaign adapter sidecars &mdash; <span class="refresh" onclick="loadData()">refresh</span></p>
+
+<div class="grid" id="agents"></div>
+
+<div class="card" style="margin-bottom:1rem">
+  <h2>Recent Audit Log</h2>
+  <div id="audit-log">
+    <table>
+      <thead><tr><th>Time</th><th>Caller</th><th>Action</th><th>Query</th><th>Source</th></tr></thead>
+      <tbody id="audit-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Metering</h2>
+  <p id="usage-info" class="mono">Loading...</p>
+</div>
+
+<footer>rj-gateway &middot; Tailscale &middot; Setec &middot; Aperture</footer>
+
+<script>
+async function loadData() {
+  try {
+    const resp = await fetch('/portal/api');
+    const data = await resp.json();
+    renderAgents(data.agents || []);
+    renderAudit(data.audit || []);
+    renderUsage(data.usage);
+  } catch (e) {
+    document.getElementById('agents').innerHTML = '<div class="card"><p>Failed to load portal data: ' + e.message + '</p></div>';
+  }
+}
+
+function renderAgents(agents) {
+  const container = document.getElementById('agents');
+  container.innerHTML = agents.map(a => `
+    <div class="card">
+      <h2><span class="status unknown" id="status-${a.type}"></span> ${a.name}
+        ${a.adapter ? '<span class="badge adapter">adapter sidecar</span>' : ''}
+        <span class="badge real">real FOSS</span>
+      </h2>
+      <p class="agent-role">${a.role}</p>
+      ${a.url ? `<a class="agent-link" href="${a.url}" target="_blank">${a.url}</a>` : '<span class="mono" style="color:#484f58">no tailnet UI</span>'}
+    </div>
+  `).join('');
+
+  // Check health for each agent
+  agents.forEach(a => checkHealth(a.type));
+}
+
+async function checkHealth(type) {
+  const el = document.getElementById('status-' + type);
+  if (!el) return;
+  // Health checks would need adapter URLs which aren't exposed to browser.
+  // For now, mark as unknown (cluster-internal only).
+  el.className = 'status unknown';
+}
+
+function renderAudit(entries) {
+  const tbody = document.getElementById('audit-body');
+  tbody.innerHTML = entries.map(e => `
+    <tr>
+      <td class="mono">${e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '-'}</td>
+      <td>${e.caller || '-'}</td>
+      <td>${e.action || '-'}</td>
+      <td class="mono">${e.query || '-'}</td>
+      <td>${e.source || '-'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderUsage(usage) {
+  const el = document.getElementById('usage-info');
+  if (!usage) {
+    el.textContent = 'No metering data available';
+    return;
+  }
+  el.textContent = `Total metered buckets: ${usage.total_buckets || 0}`;
+}
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>

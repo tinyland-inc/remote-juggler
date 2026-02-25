@@ -2,7 +2,7 @@
   "id": "oc-weekly-digest",
   "name": "Weekly Agent Ecosystem Digest",
   "description": "Aggregates campaign results, Aperture token usage, and audit highlights into a weekly summary Discussion. Provides ecosystem health overview for repo visitors.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 6 * * 1",
     "event": "manual"

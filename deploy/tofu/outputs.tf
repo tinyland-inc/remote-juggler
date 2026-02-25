@@ -27,19 +27,24 @@ output "gateway_health_url" {
   value       = "https://rj-gateway.${var.tailscale_tailnet}/health"
 }
 
-output "openclaw_tailnet_hostname" {
-  description = "OpenClaw agent tailnet hostname"
-  value       = "openclaw-agent.${var.tailscale_tailnet}"
+output "ironclaw_tailnet_hostname" {
+  description = "IronClaw agent tailnet hostname"
+  value       = "ironclaw.${var.tailscale_tailnet}"
 }
 
 output "hexstrike_tailnet_hostname" {
-  description = "HexStrike agent tailnet hostname"
-  value       = "hexstrike-agent.${var.tailscale_tailnet}"
+  description = "HexStrike-AI agent tailnet hostname"
+  value       = "hexstrike.${var.tailscale_tailnet}"
 }
 
 output "hexstrike_replicas" {
-  description = "Current HexStrike replica count"
+  description = "Current HexStrike-AI replica count"
   value       = var.hexstrike_replicas
+}
+
+output "portal_url" {
+  description = "Agent portal URL"
+  value       = "https://rj-gateway.${var.tailscale_tailnet}/portal"
 }
 
 output "aperture_url" {

@@ -2,7 +2,7 @@
   "id": "hs-container-vuln",
   "name": "Container Image Vulnerability Scan",
   "description": "Scans all GHCR container images for vulnerabilities using trivy-style analysis. Checks base image age, known CVEs in OS packages and application dependencies, and verifies images are built from expected Dockerfiles.",
-  "agent": "hexstrike",
+  "agent": "hexstrike-ai",
   "trigger": {
     "event": "push",
     "pathFilters": [

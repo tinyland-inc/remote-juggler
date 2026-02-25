@@ -2,7 +2,7 @@
   "id": "oc-coverage-gaps",
   "name": "Test Coverage Gap Analysis",
   "description": "Analyzes test coverage across key repos to find untested files and functions. Cross-references test directories with source code to identify gaps.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 3 * * 2",
     "event": "manual"

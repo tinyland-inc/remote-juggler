@@ -53,8 +53,11 @@ export TF_VAR_anthropic_api_key=$(resolve "anthropic-api-key" 2>/dev/null || ech
 export TF_VAR_ghcr_token=$(resolve "ghcr-token")
 
 # Agent SSH identity keys (optional — empty string if not yet provisioned)
-export TF_VAR_openclaw_ssh_private_key=$(resolve "agents/openclaw/ssh-private-key" 2>/dev/null || echo "")
+export TF_VAR_ironclaw_ssh_private_key=$(resolve "agents/ironclaw/ssh-private-key" 2>/dev/null || resolve "agents/openclaw/ssh-private-key" 2>/dev/null || echo "")
+export TF_VAR_picoclaw_ssh_private_key=$(resolve "agents/picoclaw/ssh-private-key" 2>/dev/null || echo "")
 export TF_VAR_hexstrike_ssh_private_key=$(resolve "agents/hexstrike/ssh-private-key" 2>/dev/null || echo "")
+# Backward compat (deprecated)
+export TF_VAR_openclaw_ssh_private_key="${TF_VAR_ironclaw_ssh_private_key}"
 
 echo "Secrets resolved. Running: tofu $*"
 

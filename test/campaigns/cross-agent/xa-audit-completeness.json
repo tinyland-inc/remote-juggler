@@ -2,7 +2,7 @@
   "id": "xa-audit-completeness",
   "name": "Audit Trail Completeness Verification",
   "description": "Cross-agent campaign that verifies every credential operation from every agent appears in the rj-gateway audit log. Each agent performs distinct operations, then OpenClaw queries the audit log to verify completeness.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 4 1 * *",
     "event": "manual"

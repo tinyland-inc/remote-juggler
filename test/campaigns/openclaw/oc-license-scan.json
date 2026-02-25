@@ -2,7 +2,7 @@
   "id": "oc-license-scan",
   "name": "License Compliance Scan",
   "description": "Scans all repos for license compliance. Checks for missing LICENSE files, flags GPL/AGPL dependencies in non-GPL projects, and verifies license headers in source files.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 1 1 * *",
     "event": "manual"

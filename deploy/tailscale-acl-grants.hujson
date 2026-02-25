@@ -20,7 +20,7 @@
       "dst": ["tag:setec:*"]
     },
     {
-      // Admins -> rj-gateway + Setec (management)
+      // Admins -> all agent services + Setec (management)
       "action": "accept",
       "src": ["group:dollhouse-admins"],
       "dst": ["tag:rj-gateway:*", "tag:setec:*"]
@@ -46,7 +46,7 @@
   // Capability grants
   "grants": [
     {
-      // Allow all tailnet users to read secrets via rj-gateway.
+      // All tailnet members can view the portal and read secrets via rj-gateway.
       "src": ["autogroup:member"],
       "dst": ["tag:rj-gateway"],
       "app": {
@@ -56,8 +56,8 @@
       }
     },
     {
-      // Allow admin users to write secrets and view audit logs.
-      "src": ["autogroup:admin"],
+      // Admin users can write secrets, trigger campaigns, interact with agent UIs.
+      "src": ["group:dollhouse-admins"],
       "dst": ["tag:rj-gateway"],
       "app": {
         "tinyland.dev/cap/rj-gateway": [{
@@ -66,7 +66,7 @@
       }
     },
     {
-      // Allow CI/CD agents to read specific secrets.
+      // CI/CD agents can read specific secrets and trigger campaigns via webhook.
       "src": ["tag:ci-agent"],
       "dst": ["tag:rj-gateway"],
       "app": {

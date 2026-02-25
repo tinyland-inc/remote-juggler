@@ -2,7 +2,7 @@
   "id": "xa-cred-lifecycle",
   "name": "Full Credential Lifecycle",
   "description": "Cross-agent campaign testing the complete credential lifecycle. OpenClaw discovers credentials across sources, HexStrike verifies none are exposed in git history, Claude Code verifies the composite resolver resolves each from the correct source with correct precedence.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 6 1 * *",
     "event": "manual"

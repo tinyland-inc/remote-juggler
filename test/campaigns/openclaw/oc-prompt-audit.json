@@ -2,7 +2,7 @@
   "id": "oc-prompt-audit",
   "name": "Prompt Quality Audit",
   "description": "Analyzes all campaign JSON definitions for process step clarity, tool coverage, guardrail completeness, and metric quality. Scores each campaign 1-5 and suggests improvements.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 6 1 * *",
     "event": "manual"

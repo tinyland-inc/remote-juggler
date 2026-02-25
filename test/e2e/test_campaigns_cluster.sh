@@ -54,11 +54,11 @@ else
         log_fail "rj-gateway pod not found or not running"
     fi
 
-    # Check openclaw pod is running.
-    if kubectl get pods -n fuzzy-dev -l app=openclaw-agent --field-selector=status.phase=Running -o name 2>/dev/null | grep -q pod; then
-        log_pass "openclaw pod is running"
+    # Check ironclaw pod is running (replaces openclaw).
+    if kubectl get pods -n fuzzy-dev -l app=ironclaw-agent --field-selector=status.phase=Running -o name 2>/dev/null | grep -q pod; then
+        log_pass "ironclaw pod is running"
     else
-        log_fail "openclaw pod not found or not running"
+        log_fail "ironclaw pod not found or not running"
     fi
 
     # Check campaign-definitions ConfigMap exists.

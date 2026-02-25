@@ -2,7 +2,7 @@
   "id": "hs-dep-vuln",
   "name": "Dependency Vulnerability Deep Scan",
   "description": "Extends the OpenClaw dependency audit with deeper vulnerability analysis. Checks exploitability of discovered CVEs, verifies if vulnerable code paths are actually reachable, and assesses blast radius.",
-  "agent": "hexstrike",
+  "agent": "hexstrike-ai",
   "trigger": {
     "schedule": "0 2 * * 0",
     "event": "dependent",

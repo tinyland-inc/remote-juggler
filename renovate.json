@@ -56,6 +56,19 @@
       "groupName": "github actions",
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Fork agent images - group together",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackagePatterns": [
+        "ghcr.io/tinyland-inc/ironclaw",
+        "ghcr.io/tinyland-inc/picoclaw",
+        "ghcr.io/tinyland-inc/hexstrike-ai"
+      ],
+      "groupName": "fork agent images",
+      "automerge": false
     }
   ],
   "customManagers": [

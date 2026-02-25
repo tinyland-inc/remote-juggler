@@ -132,6 +132,8 @@ func main() {
 	mux.HandleFunc("/setec/list", handleSetecList(setec))
 	mux.HandleFunc("/setec/get", handleSetecGet(setec, audit))
 	mux.HandleFunc("/aperture/webhook", webhookReceiver.HandleWebhook)
+	mux.HandleFunc("/portal", handlePortal)
+	mux.HandleFunc("/portal/api", handlePortalAPI(audit, meterStore))
 
 	// Wrap with identity extraction middleware.
 	handler := IdentityMiddleware(mux)

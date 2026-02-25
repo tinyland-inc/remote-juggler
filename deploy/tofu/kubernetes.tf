@@ -57,20 +57,7 @@ resource "kubernetes_secret" "agent_api_keys" {
   }
 }
 
-# Agent SSH identity keys (for git operations — clone, push, PR creation)
-resource "kubernetes_secret" "agent_ssh_keys" {
-  metadata {
-    name      = "agent-ssh-keys"
-    namespace = kubernetes_namespace.main.metadata[0].name
-    labels    = local.labels
-  }
-
-  data = {
-    # Bash $() strips trailing newlines; SSH keys require one.
-    "openclaw-id-ed25519"  = "${var.openclaw_ssh_private_key}\n"
-    "hexstrike-id-ed25519" = "${var.hexstrike_ssh_private_key}\n"
-  }
-}
+# Agent SSH identity keys are defined in agents.tf (shared across all agent pods).
 
 # Gateway configuration secret
 resource "kubernetes_secret" "gateway_config" {

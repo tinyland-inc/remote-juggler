@@ -1,9 +1,9 @@
 // Campaign runner: orchestration controller for RemoteJuggler agent test campaigns.
 //
-// Runs as a sidecar in the OpenClaw pod. Reads campaign definitions from
+// Runs as a sidecar in the IronClaw pod. Reads campaign definitions from
 // a mounted ConfigMap, evaluates triggers (cron, event, manual), and dispatches
-// work to agents via rj-gateway MCP tool calls. Results are collected and
-// stored in Setec.
+// work to agents (IronClaw, PicoClaw, HexStrike-AI) via adapter sidecars or
+// rj-gateway MCP tool calls. Results are collected and stored in Setec.
 //
 // Usage:
 //
@@ -31,7 +31,11 @@ import (
 func main() {
 	campaignsDir := flag.String("campaigns-dir", envOrDefault("CAMPAIGNS_DIR", "/etc/campaigns"), "path to campaign definitions")
 	gatewayURL := flag.String("gateway-url", envOrDefault("RJ_GATEWAY_URL", "https://rj-gateway:443"), "rj-gateway MCP endpoint")
-	hexstrikeURL := flag.String("hexstrike-url", envOrDefault("HEXSTRIKE_URL", ""), "hexstrike agent URL (separate pod)")
+	ironclawURL := flag.String("ironclaw-url", envOrDefault("IRONCLAW_URL", ""), "ironclaw adapter URL (same pod or K8s Service)")
+	picoclawURL := flag.String("picoclaw-url", envOrDefault("PICOCLAW_URL", ""), "picoclaw adapter URL (K8s Service)")
+	hexstrikeAIURL := flag.String("hexstrike-ai-url", envOrDefault("HEXSTRIKE_AI_URL", ""), "hexstrike-ai adapter URL (K8s Service)")
+	// Backward compat: --hexstrike-url is an alias for --hexstrike-ai-url.
+	hexstrikeURLAlias := flag.String("hexstrike-url", envOrDefault("HEXSTRIKE_URL", ""), "deprecated: use --hexstrike-ai-url")
 	once := flag.Bool("once", false, "run all due campaigns once and exit")
 	campaignID := flag.String("campaign", "", "run a specific campaign by ID and exit")
 	interval := flag.Duration("interval", 60*time.Second, "scheduler check interval")
@@ -76,7 +80,13 @@ func main() {
 		log.Printf("campaign %s: loaded (%s, agent=%s)", id, campaign.Name, campaign.Agent)
 	}
 
-	dispatcher := NewDispatcher(*gatewayURL, *hexstrikeURL)
+	// Resolve hexstrike-ai URL: prefer new flag, fall back to legacy alias.
+	hsURL := *hexstrikeAIURL
+	if hsURL == "" {
+		hsURL = *hexstrikeURLAlias
+	}
+
+	dispatcher := NewDispatcher(*gatewayURL, *ironclawURL, *picoclawURL, hsURL)
 	collector := NewCollector(*gatewayURL)
 	scheduler := NewScheduler(registry, dispatcher, collector)
 

@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # ConfigMap for campaign definitions, mounted into the campaign-runner sidecar
-# on the OpenClaw pod. Campaign runner reads these at startup and evaluates
+# on the IronClaw pod. Campaign runner reads these at startup and evaluates
 # triggers on an interval.
 # =============================================================================
 

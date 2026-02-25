@@ -204,9 +204,18 @@ func TestEnvOrDefault(t *testing.T) {
 }
 
 func TestNewDispatcher(t *testing.T) {
-	d := NewDispatcher("https://example.com", "")
+	d := NewDispatcher("https://example.com", "http://ironclaw:8080", "http://picoclaw:8080", "http://hexstrike:8080")
 	if d.gatewayURL != "https://example.com" {
 		t.Errorf("expected gateway URL 'https://example.com', got %q", d.gatewayURL)
+	}
+	if d.ironclawURL != "http://ironclaw:8080" {
+		t.Errorf("expected ironclaw URL 'http://ironclaw:8080', got %q", d.ironclawURL)
+	}
+	if d.picoclawURL != "http://picoclaw:8080" {
+		t.Errorf("expected picoclaw URL 'http://picoclaw:8080', got %q", d.picoclawURL)
+	}
+	if d.hexstrikeAIURL != "http://hexstrike:8080" {
+		t.Errorf("expected hexstrike-ai URL 'http://hexstrike:8080', got %q", d.hexstrikeAIURL)
 	}
 	if d.httpClient == nil {
 		t.Error("httpClient is nil")

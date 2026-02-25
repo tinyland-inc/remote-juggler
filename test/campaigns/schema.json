@@ -29,11 +29,14 @@
     },
     "agent": {
       "enum": [
+        "ironclaw",
+        "picoclaw",
+        "hexstrike-ai",
+        "claude-code",
         "openclaw",
-        "hexstrike",
-        "claude-code"
+        "hexstrike"
       ],
-      "description": "Which agent executes this campaign"
+      "description": "Which agent executes this campaign. 'openclaw' and 'hexstrike' are deprecated aliases for 'ironclaw' and 'hexstrike-ai'."
     },
     "model": {
       "type": "string",

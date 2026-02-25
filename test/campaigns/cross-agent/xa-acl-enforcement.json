@@ -2,7 +2,7 @@
   "id": "xa-acl-enforcement",
   "name": "ACL Grant Enforcement Verification",
   "description": "Cross-agent campaign where each agent attempts operations at and beyond their ACL grant scope. Verifies that allowed operations succeed, denied operations fail with proper error, and every denial has an audit entry.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 5 1 * *",
     "event": "manual"

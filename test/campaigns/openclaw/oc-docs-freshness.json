@@ -2,7 +2,7 @@
   "id": "oc-docs-freshness",
   "name": "Documentation Freshness Audit",
   "description": "Evaluates README accuracy across all GitHub repos by comparing claims against actual file structure, verifying install instructions match release artifacts, and checking for dead links.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 4 1,15 * *",
     "event": "manual"

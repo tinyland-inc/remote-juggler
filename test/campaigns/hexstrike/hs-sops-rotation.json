@@ -2,7 +2,7 @@
   "id": "hs-sops-rotation",
   "name": "SOPS Key Rotation Compliance",
   "description": "Checks SOPS-encrypted files across repos for key age, orphan keys (keys in .sops.yaml that no longer exist), and rotation compliance. Verifies age keys are not expired and SOPS configs reference valid recipients.",
-  "agent": "hexstrike",
+  "agent": "hexstrike-ai",
   "trigger": {
     "schedule": "0 4 1 * *",
     "event": "manual"

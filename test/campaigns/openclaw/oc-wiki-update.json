@@ -2,7 +2,7 @@
   "id": "oc-wiki-update",
   "name": "Wiki Architecture Update",
   "description": "Reads current source structure and campaign definitions, then updates the GitHub Wiki Architecture page to reflect the latest state. The only write-enabled campaign -- requires rj-agent-bot App identity.",
-  "agent": "openclaw",
+  "agent": "ironclaw",
   "trigger": {
     "schedule": "0 6 * * 1",
     "event": "manual"

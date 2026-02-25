@@ -2,7 +2,7 @@
   "id": "hs-network-posture",
   "name": "Network Posture Audit",
   "description": "Audits network security posture of the K8s cluster and tailnet services. Checks TLS certificate validity, open ports, service mesh policies, and network segmentation.",
-  "agent": "hexstrike",
+  "agent": "hexstrike-ai",
   "trigger": {
     "schedule": "0 3 1 * *",
     "event": "manual"
@@ -23,7 +23,7 @@
     "juggler_setec_put"
   ],
   "process": [
-    "Enumerate all tailnet services: rj-gateway, setec, openclaw-agent, hexstrike-agent",
+    "Enumerate all tailnet services: rj-gateway, setec, ironclaw, picoclaw-agent, hexstrike-ai-agent",
     "For each service: verify TLS certificate validity, expiration date, and certificate chain completeness",
     "Check for unexpected open ports via port scan within the tailnet (expected ports only: 443/HTTPS, 8080/health, SSE endpoints)",
     "Verify Tailscale ACL grants match expected configuration from deploy/tailscale-acl-grants.hujson",
