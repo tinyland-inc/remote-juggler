@@ -407,11 +407,11 @@ def swtpm_environment(
         """Find two consecutive free ports for swtpm server and control."""
         for _ in range(50):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s1:
-                s1.bind(("", 0))
+                s1.bind(("127.0.0.1", 0))
                 port = s1.getsockname()[1]
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
                     try:
-                        s2.bind(("", port + 1))
+                        s2.bind(("127.0.0.1", port + 1))
                         return port, port + 1
                     except OSError:
                         continue

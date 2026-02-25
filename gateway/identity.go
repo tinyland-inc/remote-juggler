@@ -138,6 +138,13 @@ func (a *AuditLog) Recent(n int) []AuditEntry {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	if n <= 0 {
+		return nil
+	}
+	const maxReturn = 10000
+	if n > maxReturn {
+		n = maxReturn
+	}
 	total := len(a.entries)
 	if n > total {
 		n = total

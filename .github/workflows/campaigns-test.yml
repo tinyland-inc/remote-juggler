@@ -9,15 +9,13 @@ on:
     paths:
       - 'test/campaigns/**'
       - 'gateway/**'
-      - 'deploy/docker/openclaw/**'
-      - 'deploy/docker/hexstrike/**'
+      - 'deploy/adapters/**'
   pull_request:
     branches: [main]
     paths:
       - 'test/campaigns/**'
       - 'gateway/**'
-      - 'deploy/docker/openclaw/**'
-      - 'deploy/docker/hexstrike/**'
+      - 'deploy/adapters/**'
   workflow_dispatch:
 
 jobs:
@@ -60,28 +58,23 @@ jobs:
         run: go test -v -race -count=1 ./...
 
   # =========================================================================
-  # OpenClaw Agent Tests (Python)
+  # Adapter Sidecar Tests (Go)
   # =========================================================================
-  openclaw-test:
-    name: OpenClaw Agent Tests
+  adapter-test:
+    name: Adapter Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          python-version: '3.12'
+          go-version: '1.24'
 
-      - name: Install dependencies
-        working-directory: deploy/docker/openclaw
-        run: |
-          pip install pytest anthropic httpx
-
-      - name: Run tests
-        working-directory: deploy/docker/openclaw
-        run: pytest -v test_agent.py test_server.py
+      - name: Run adapter tests
+        working-directory: deploy/adapters
+        run: go test -v -race -count=1 ./...
 
   # =========================================================================
   # Campaign Runner Build

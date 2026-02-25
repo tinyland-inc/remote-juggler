@@ -274,16 +274,40 @@ static char* get_storage_path(void) {
 }
 
 /*
+ * Recursively create directory (equivalent to mkdir -p).
+ */
+static int mkdir_p(const char* path, mode_t mode) {
+    char tmp[512];
+    char* p = NULL;
+    size_t len;
+
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    len = strlen(tmp);
+    if (len > 0 && tmp[len - 1] == '/')
+        tmp[len - 1] = '\0';
+
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, mode) != 0 && errno != EEXIST)
+                return -1;
+            *p = '/';
+        }
+    }
+    if (mkdir(tmp, mode) != 0 && errno != EEXIST)
+        return -1;
+    /* Ensure final directory has correct permissions. */
+    return chmod(tmp, mode);
+}
+
+/*
  * Ensure storage directory exists.
  */
 static int ensure_storage_dir(void) {
     char* path = get_storage_path();
     if (!path) return -1;
 
-    /* Create directory with parents */
-    char cmd[600];
-    snprintf(cmd, sizeof(cmd), "mkdir -p '%s' && chmod 700 '%s'", path, path);
-    int rc = system(cmd);
+    int rc = mkdir_p(path, 0700);
 
     free(path);
     return rc;
