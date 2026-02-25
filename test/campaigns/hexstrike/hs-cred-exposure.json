@@ -75,7 +75,8 @@
     "juggler_setec_list",
     "juggler_audit_log",
     "juggler_campaign_status",
-    "juggler_setec_put"
+    "juggler_setec_put",
+    "github_fetch"
   ],
   "process": [
     "Resolve github-token via juggler_resolve_composite for cloning access",
