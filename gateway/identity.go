@@ -50,7 +50,16 @@ func IdentityMiddleware(next http.Handler) http.Handler {
 			id.Capabilities = parseCapabilities(caps)
 		}
 
-		// Fallback: extract from remote addr if no identity headers.
+		// Fallback: use X-Agent-Identity header from in-cluster agents.
+		if id.User == "" {
+			if agentID := r.Header.Get("X-Agent-Identity"); agentID != "" {
+				id.Node = agentID
+				id.Login = agentID
+				id.User = agentID + "@agent.tinyland.dev"
+			}
+		}
+
+		// Final fallback: extract from remote addr.
 		if id.User == "" && r.RemoteAddr != "" {
 			id.TailnetIP = strings.Split(r.RemoteAddr, ":")[0]
 			id.Node = id.TailnetIP // best effort

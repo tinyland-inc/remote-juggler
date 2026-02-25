@@ -31,7 +31,7 @@ func (c *Collector) StoreResult(ctx context.Context, campaign *Campaign, result 
 	// Store at the campaign's configured Setec key with /latest suffix.
 	key := campaign.Outputs.SetecKey + "/latest"
 	_, err = c.dispatcher.callTool(ctx, "juggler_setec_put", map[string]any{
-		"key":   key,
+		"name":  key,
 		"value": string(resultJSON),
 	})
 	if err != nil {
@@ -43,7 +43,7 @@ func (c *Collector) StoreResult(ctx context.Context, campaign *Campaign, result 
 	// Also store a timestamped copy for history.
 	historyKey := fmt.Sprintf("%s/runs/%s", campaign.Outputs.SetecKey, result.RunID)
 	_, err = c.dispatcher.callTool(ctx, "juggler_setec_put", map[string]any{
-		"key":   historyKey,
+		"name":  historyKey,
 		"value": string(resultJSON),
 	})
 	if err != nil {
@@ -57,7 +57,7 @@ func (c *Collector) StoreResult(ctx context.Context, campaign *Campaign, result 
 // Returns true if campaigns should be halted.
 func (c *Collector) CheckKillSwitch(ctx context.Context) (bool, error) {
 	resp, err := c.dispatcher.callTool(ctx, "juggler_setec_get", map[string]any{
-		"key": "remotejuggler/campaigns/global-kill",
+		"name": "remotejuggler/campaigns/global-kill",
 	})
 	if err != nil {
 		// Key not found = kill switch not set = safe to proceed.

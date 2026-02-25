@@ -69,8 +69,8 @@ func (m *mockGateway) handleMCP(w http.ResponseWriter, r *http.Request) {
 			"result": map[string]any{
 				"tools": []map[string]any{
 					{"name": "juggler_setec_list", "description": "List secrets", "inputSchema": map[string]any{"type": "object"}},
-					{"name": "juggler_setec_get", "description": "Get secret", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"key": map[string]any{"type": "string"}}}},
-					{"name": "juggler_setec_put", "description": "Put secret", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"key": map[string]any{"type": "string"}, "value": map[string]any{"type": "string"}}}},
+					{"name": "juggler_setec_get", "description": "Get secret", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}}},
+					{"name": "juggler_setec_put", "description": "Put secret", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}, "value": map[string]any{"type": "string"}}}},
 					{"name": "juggler_audit_log", "description": "Query audit", "inputSchema": map[string]any{"type": "object"}},
 					{"name": "juggler_campaign_status", "description": "Campaign status", "inputSchema": map[string]any{"type": "object"}},
 					{"name": "juggler_resolve_composite", "description": "Resolve secret", "inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string"}}}},
@@ -95,28 +95,28 @@ func (m *mockGateway) handleMCP(w http.ResponseWriter, r *http.Request) {
 		switch req.Params.Name {
 		case "juggler_setec_put":
 			var args struct {
-				Key   string `json:"key"`
+				Name  string `json:"name"`
 				Value string `json:"value"`
 			}
 			json.Unmarshal(req.Params.Arguments, &args)
 			m.mu.Lock()
-			m.secrets[args.Key] = args.Value
+			m.secrets[args.Name] = args.Value
 			m.mu.Unlock()
 			json.NewEncoder(w).Encode(map[string]any{
 				"jsonrpc": "2.0",
 				"id":      req.ID,
 				"result": map[string]any{
-					"content": []map[string]any{{"type": "text", "text": fmt.Sprintf("stored %s", args.Key)}},
+					"content": []map[string]any{{"type": "text", "text": fmt.Sprintf("stored %s", args.Name)}},
 				},
 			})
 
 		case "juggler_setec_get":
 			var args struct {
-				Key string `json:"key"`
+				Name string `json:"name"`
 			}
 			json.Unmarshal(req.Params.Arguments, &args)
 			m.mu.Lock()
-			val, ok := m.secrets[args.Key]
+			val, ok := m.secrets[args.Name]
 			m.mu.Unlock()
 			if !ok {
 				json.NewEncoder(w).Encode(map[string]any{

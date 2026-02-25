@@ -54,7 +54,10 @@ class HexStrikeAgent:
             client_kwargs["base_url"] = base_url
         self.client = anthropic.Anthropic(**client_kwargs)
         self.model = model
-        self.http = httpx.Client(timeout=60)
+        self.http = httpx.Client(
+            timeout=60,
+            headers={"X-Agent-Identity": "hexstrike"},
+        )
         self._github_token: str | None = None
 
     def run_campaign(self, campaign: dict, run_id: str) -> dict:
@@ -97,7 +100,7 @@ class HexStrikeAgent:
             # Scale iteration limit based on campaign's token budget.
             ai_budget = campaign.get("guardrails", {}).get("aiApiBudget", {})
             budget_tokens = ai_budget.get("maxTokens", 50000)
-            max_iterations = max(20, budget_tokens // 4000)
+            max_iterations = max(20, budget_tokens // 2000)
             max_response_tokens = 8192
 
             for _ in range(max_iterations):
