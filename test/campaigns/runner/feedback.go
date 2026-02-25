@@ -243,6 +243,11 @@ func (f *FeedbackHandler) closeResolvedIssues(ctx context.Context, campaign *Cam
 	}
 }
 
+// UpdateToken replaces the stored token (used for App token refresh).
+func (f *FeedbackHandler) UpdateToken(token string) {
+	f.token = token
+}
+
 // setAuth adds GitHub authentication headers to the request.
 func (f *FeedbackHandler) setAuth(req *http.Request) {
 	if f.token != "" {

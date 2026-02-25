@@ -220,6 +220,24 @@ resource "kubernetes_deployment" "ironclaw" {
               }
             }
 
+            # GitHub App credentials for bot-attributed Discussions (issue #9).
+            # When both are set, campaign runner generates JWT → installation token.
+            env {
+              name  = "GITHUB_APP_ID"
+              value = var.github_app_id
+            }
+
+            env {
+              name = "GITHUB_APP_PRIVATE_KEY"
+              value_from {
+                secret_key_ref {
+                  name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                  key      = "GITHUB_APP_PRIVATE_KEY"
+                  optional = true
+                }
+              }
+            }
+
             env {
               name  = "GITHUB_REPO_OWNER"
               value = "tinyland-inc"

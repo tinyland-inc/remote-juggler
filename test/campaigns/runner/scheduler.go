@@ -11,11 +11,12 @@ import (
 
 // Scheduler evaluates campaign triggers and orchestrates execution.
 type Scheduler struct {
-	registry   map[string]*Campaign
-	dispatcher *Dispatcher
-	collector  *Collector
-	feedback   *FeedbackHandler
-	publisher  *Publisher
+	registry      map[string]*Campaign
+	dispatcher    *Dispatcher
+	collector     *Collector
+	feedback      *FeedbackHandler
+	publisher     *Publisher
+	tokenProvider *AppTokenProvider
 
 	// completedRuns tracks successfully completed campaign IDs within the
 	// current scheduler cycle. Used for dependsOn evaluation.
@@ -44,6 +45,32 @@ func (s *Scheduler) SetFeedback(handler *FeedbackHandler) {
 // SetPublisher configures the publisher for Discussion creation.
 func (s *Scheduler) SetPublisher(pub *Publisher) {
 	s.publisher = pub
+}
+
+// SetTokenProvider configures an AppTokenProvider for automatic token refresh.
+// When set, the scheduler refreshes tokens on publisher and feedback handler
+// before each campaign dispatch.
+func (s *Scheduler) SetTokenProvider(provider *AppTokenProvider) {
+	s.tokenProvider = provider
+}
+
+// refreshTokens gets a fresh token from the AppTokenProvider and updates
+// the publisher and feedback handler. Called before campaign dispatch.
+func (s *Scheduler) refreshTokens() {
+	if s.tokenProvider == nil {
+		return
+	}
+	token, err := s.tokenProvider.Token()
+	if err != nil {
+		log.Printf("token refresh failed: %v", err)
+		return
+	}
+	if s.publisher != nil {
+		s.publisher.UpdateToken(token)
+	}
+	if s.feedback != nil {
+		s.feedback.UpdateToken(token)
+	}
 }
 
 // RunDue evaluates all campaigns and runs those whose triggers are satisfied.
@@ -93,6 +120,9 @@ func (s *Scheduler) RunDue(ctx context.Context) {
 
 // RunCampaign executes a single campaign end-to-end.
 func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
+	// Refresh App token if provider is configured (handles expiry).
+	s.refreshTokens()
+
 	runID := fmt.Sprintf("%s-%d", campaign.ID, time.Now().Unix())
 	log.Printf("campaign %s: starting run %s (agent=%s, timeout=%s)",
 		campaign.ID, runID, campaign.Agent, campaign.Guardrails.MaxDuration)

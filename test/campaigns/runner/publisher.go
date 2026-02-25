@@ -332,6 +332,11 @@ type graphqlError struct {
 	Message string `json:"message"`
 }
 
+// UpdateToken replaces the stored token (used for App token refresh).
+func (p *Publisher) UpdateToken(token string) {
+	p.token = token
+}
+
 // setAuth adds GitHub authentication headers.
 func (p *Publisher) setAuth(req *http.Request) {
 	if p.token != "" {

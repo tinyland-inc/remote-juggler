@@ -112,6 +112,12 @@ func main() {
 		}
 	}
 
+	// Wire App token provider for automatic refresh (1h TTL tokens).
+	if appTokenProvider != nil {
+		scheduler.SetTokenProvider(appTokenProvider)
+		log.Printf("app token auto-refresh enabled")
+	}
+
 	// Run a specific campaign and exit.
 	if *campaignID != "" {
 		campaign, ok := registry[*campaignID]
@@ -210,17 +216,40 @@ type CampaignEntry struct {
 	LastResult *string `json:"lastResult"`
 }
 
-// resolveGitHubToken returns a GitHub token, preferring App installation tokens.
-// Checks GITHUB_APP_TOKEN first (pre-resolved by init container or entrypoint),
-// then falls back to GITHUB_TOKEN (PAT).
+// appTokenProvider is the singleton App token provider, initialized on first use.
+var appTokenProvider *AppTokenProvider
+
+// resolveGitHubToken returns a GitHub token using this priority:
+//  1. GITHUB_APP_TOKEN (pre-resolved by init container or entrypoint)
+//  2. GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY (generate JWT, exchange for installation token)
+//  3. GITHUB_TOKEN (PAT — attributed to the PAT owner, not the App bot)
 func resolveGitHubToken() string {
 	// Pre-resolved App installation token (highest priority).
 	if t := os.Getenv("GITHUB_APP_TOKEN"); t != "" {
 		log.Printf("using pre-resolved GitHub App installation token")
 		return t
 	}
-	// Standard PAT.
+
+	// Generate installation token from App credentials (Discussions attributed to bot).
+	if os.Getenv("GITHUB_APP_ID") != "" && os.Getenv("GITHUB_APP_PRIVATE_KEY") != "" {
+		provider, err := NewAppTokenProvider()
+		if err != nil {
+			log.Printf("github-app: init failed: %v (falling back to PAT)", err)
+		} else {
+			token, err := provider.Token()
+			if err != nil {
+				log.Printf("github-app: token generation failed: %v (falling back to PAT)", err)
+			} else {
+				appTokenProvider = provider
+				log.Printf("using GitHub App installation token (bot attribution)")
+				return token
+			}
+		}
+	}
+
+	// Standard PAT (fallback — attributed to PAT owner).
 	if t := os.Getenv("GITHUB_TOKEN"); t != "" {
+		log.Printf("using GitHub PAT (Discussions attributed to PAT owner, not bot)")
 		return t
 	}
 	return ""

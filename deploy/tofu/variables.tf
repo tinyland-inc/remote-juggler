@@ -331,3 +331,10 @@ variable "github_app_id" {
   type        = string
   default     = ""
 }
+
+variable "github_app_private_key" {
+  description = "GitHub App private key (PEM) for rj-agent-bot (JWT auth for installation tokens)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

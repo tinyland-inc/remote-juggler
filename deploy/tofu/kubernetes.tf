@@ -52,9 +52,10 @@ resource "kubernetes_secret" "agent_api_keys" {
   }
 
   data = {
-    ANTHROPIC_API_KEY      = var.anthropic_api_key
-    GITHUB_TOKEN           = var.github_token
-    OPENCLAW_GATEWAY_TOKEN = var.openclaw_gateway_token
+    ANTHROPIC_API_KEY          = var.anthropic_api_key
+    GITHUB_TOKEN               = var.github_token
+    OPENCLAW_GATEWAY_TOKEN     = var.openclaw_gateway_token
+    GITHUB_APP_PRIVATE_KEY     = var.github_app_private_key
   }
 }
 
