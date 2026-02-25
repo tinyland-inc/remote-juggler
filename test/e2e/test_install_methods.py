@@ -97,7 +97,7 @@ class TestInstallScript:
         """Install script fetches versions from GitHub, not GitLab."""
         with open("scripts/install.sh") as f:
             content = f.read()
-        assert "api.github.com" in content
+        assert "https://api.github.com/" in content
         assert "gitlab.com" not in content
 
 
