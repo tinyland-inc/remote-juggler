@@ -187,7 +187,7 @@ func TestE2EFullSchedulerDispatchCollect(t *testing.T) {
 		},
 	}
 
-	dispatcher := NewDispatcher(server.URL)
+	dispatcher := NewDispatcher(server.URL, "")
 	collector := NewCollector(server.URL)
 	registry := map[string]*Campaign{"e2e-test": campaign}
 	scheduler := NewScheduler(registry, dispatcher, collector)
@@ -248,7 +248,7 @@ func TestE2EDirectDispatch(t *testing.T) {
 		Tools: []string{"juggler_setec_list", "juggler_audit_log", "juggler_resolve_composite"},
 	}
 
-	dispatcher := NewDispatcher(server.URL)
+	dispatcher := NewDispatcher(server.URL, "")
 	ctx := context.Background()
 
 	result, err := dispatcher.Dispatch(ctx, campaign, "run-1")
@@ -337,7 +337,7 @@ func TestE2ETimeoutHandling(t *testing.T) {
 		Outputs: CampaignOutputs{SetecKey: "test"},
 	}
 
-	dispatcher := NewDispatcher(slowServer.URL)
+	dispatcher := NewDispatcher(slowServer.URL, "")
 	scheduler := NewScheduler(map[string]*Campaign{"timeout-test": campaign}, dispatcher, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -369,7 +369,7 @@ func TestE2EToolFailure(t *testing.T) {
 		Tools: []string{"juggler_setec_list", "juggler_audit_log", "juggler_campaign_status"},
 	}
 
-	dispatcher := NewDispatcher(server.URL)
+	dispatcher := NewDispatcher(server.URL, "")
 	ctx := context.Background()
 
 	result, err := dispatcher.Dispatch(ctx, campaign, "run-1")
@@ -396,7 +396,7 @@ func TestE2EGatewayUnavailable(t *testing.T) {
 		Tools: []string{"juggler_setec_list"},
 	}
 
-	dispatcher := NewDispatcher("http://" + port)
+	dispatcher := NewDispatcher("http://"+port, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -428,7 +428,7 @@ func TestE2EKillSwitch(t *testing.T) {
 		},
 	}
 
-	dispatcher := NewDispatcher(server.URL)
+	dispatcher := NewDispatcher(server.URL, "")
 	collector := NewCollector(server.URL)
 	scheduler := NewScheduler(map[string]*Campaign{"kill-test": campaign}, dispatcher, collector)
 

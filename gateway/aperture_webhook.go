@@ -18,10 +18,11 @@ import (
 //  1. Aperture hook events (real): {metadata: {model, login_name, ...}, tool_calls: [...], response_body: {usage: ...}}
 //  2. Simple events (testing):     {type: "llm_call", agent: "...", model: "...", input_tokens: N, ...}
 type ApertureWebhookReceiver struct {
-	mu      sync.Mutex
-	events  []ApertureEvent
-	maxSize int
-	meter   *MeterStore
+	mu            sync.Mutex
+	events        []ApertureEvent
+	maxSize       int
+	meter         *MeterStore
+	webhookSecret string // If set, validates X-Webhook-Secret header.
 }
 
 // ApertureEvent is the normalized internal representation of a webhook event.
@@ -72,14 +73,16 @@ type apertureResponseUsage struct {
 }
 
 // NewApertureWebhookReceiver creates a webhook receiver with the given ring buffer size.
-func NewApertureWebhookReceiver(maxSize int, meter *MeterStore) *ApertureWebhookReceiver {
+// If webhookSecret is non-empty, incoming requests must include a matching X-Webhook-Secret header.
+func NewApertureWebhookReceiver(maxSize int, meter *MeterStore, webhookSecret string) *ApertureWebhookReceiver {
 	if maxSize <= 0 {
 		maxSize = 1000
 	}
 	return &ApertureWebhookReceiver{
-		events:  make([]ApertureEvent, 0, maxSize),
-		maxSize: maxSize,
-		meter:   meter,
+		events:        make([]ApertureEvent, 0, maxSize),
+		maxSize:       maxSize,
+		meter:         meter,
+		webhookSecret: webhookSecret,
 	}
 }
 
@@ -88,6 +91,14 @@ func (r *ApertureWebhookReceiver) HandleWebhook(w http.ResponseWriter, req *http
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
+	}
+
+	// Validate webhook secret if configured.
+	if r.webhookSecret != "" {
+		if req.Header.Get("X-Webhook-Secret") != r.webhookSecret {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	body, err := io.ReadAll(req.Body)

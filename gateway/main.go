@@ -99,7 +99,7 @@ func main() {
 	defer stopFlush()
 
 	// Initialize Aperture webhook receiver for real-time LLM metrics.
-	webhookReceiver := NewApertureWebhookReceiver(1000, meterStore)
+	webhookReceiver := NewApertureWebhookReceiver(1000, meterStore, cfg.WebhookSecret)
 
 	// Start Aperture S3 export ingestion if configured.
 	s3Ingester := NewApertureS3Ingester(cfg.ApertureS3, meterStore, setecHTTPClient)

@@ -14,8 +14,9 @@ import (
 
 // Dispatcher sends MCP tool calls to agents via rj-gateway.
 type Dispatcher struct {
-	gatewayURL string
-	httpClient *http.Client
+	gatewayURL   string
+	hexstrikeURL string
+	httpClient   *http.Client
 }
 
 // DispatchResult captures the outcome of dispatching a campaign to an agent.
@@ -26,9 +27,11 @@ type DispatchResult struct {
 }
 
 // NewDispatcher creates a Dispatcher targeting the given rj-gateway URL.
-func NewDispatcher(gatewayURL string) *Dispatcher {
+// hexstrikeURL is the URL for the HexStrike agent (separate pod, not localhost).
+func NewDispatcher(gatewayURL, hexstrikeURL string) *Dispatcher {
 	return &Dispatcher{
-		gatewayURL: gatewayURL,
+		gatewayURL:   gatewayURL,
+		hexstrikeURL: hexstrikeURL,
 		httpClient: &http.Client{
 			Timeout: 2 * time.Minute,
 		},
@@ -36,18 +39,42 @@ func NewDispatcher(gatewayURL string) *Dispatcher {
 }
 
 // Dispatch executes a campaign by routing to the appropriate agent.
-// For "openclaw" and "hexstrike" agents, it dispatches to the agent container
-// running in the same pod (localhost:8080). For other agents (e.g. "claude-code"),
-// it fires tools sequentially via rj-gateway MCP (direct dispatch).
+// For "openclaw", dispatches to the agent container in the same pod (localhost:8080).
+// For "hexstrike", dispatches to the hexstrike K8s Service (separate pod).
+// For other agents (e.g. "claude-code"), fires tools sequentially via rj-gateway MCP.
 func (d *Dispatcher) Dispatch(ctx context.Context, campaign *Campaign, runID string) (*DispatchResult, error) {
 	switch campaign.Agent {
 	case "openclaw":
 		return d.dispatchToAgent(ctx, campaign, runID, "http://localhost:8080")
 	case "hexstrike":
-		return d.dispatchToAgent(ctx, campaign, runID, "http://localhost:8080")
+		if d.hexstrikeURL == "" {
+			return &DispatchResult{Error: "hexstrike agent URL not configured"}, nil
+		}
+		// Check if hexstrike is available before dispatching.
+		if err := d.checkAgentHealth(ctx, d.hexstrikeURL); err != nil {
+			return &DispatchResult{Error: fmt.Sprintf("hexstrike agent unavailable: %v", err)}, nil
+		}
+		return d.dispatchToAgent(ctx, campaign, runID, d.hexstrikeURL)
 	default:
 		return d.dispatchDirect(ctx, campaign, runID)
 	}
+}
+
+// checkAgentHealth verifies an agent is reachable and healthy before dispatching.
+func (d *Dispatcher) checkAgentHealth(ctx context.Context, agentURL string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, agentURL+"/health", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // dispatchToAgent sends a campaign to an agent container for AI-powered execution.

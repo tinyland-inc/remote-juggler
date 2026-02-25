@@ -10,7 +10,7 @@ import (
 )
 
 func TestWebhookSingleEvent(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	body, _ := json.Marshal(ApertureEvent{
 		Type:      "llm_call",
@@ -44,7 +44,7 @@ func TestWebhookSingleEvent(t *testing.T) {
 }
 
 func TestWebhookBatchEvents(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	events := []ApertureEvent{
 		{Type: "llm_call", Agent: "openclaw", Tokens: 100, Timestamp: time.Now()},
@@ -73,7 +73,7 @@ func TestWebhookBatchEvents(t *testing.T) {
 }
 
 func TestWebhookMalformedJSON(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	req := httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader([]byte("{invalid")))
 	w := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestWebhookMalformedJSON(t *testing.T) {
 }
 
 func TestWebhookMethodNotAllowed(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/aperture/webhook", nil)
 	w := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func TestWebhookMethodNotAllowed(t *testing.T) {
 }
 
 func TestWebhookSkipsEventsWithoutType(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	events := []ApertureEvent{
 		{Type: "llm_call", Agent: "openclaw", Timestamp: time.Now()},
@@ -117,7 +117,7 @@ func TestWebhookSkipsEventsWithoutType(t *testing.T) {
 }
 
 func TestWebhookRingBufferEviction(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(3, nil)
+	receiver := NewApertureWebhookReceiver(3, nil, "")
 
 	for i := 0; i < 5; i++ {
 		receiver.record(ApertureEvent{
@@ -144,7 +144,7 @@ func TestWebhookRingBufferEviction(t *testing.T) {
 
 func TestWebhookMergesIntoMeterStore(t *testing.T) {
 	store := NewMeterStore()
-	receiver := NewApertureWebhookReceiver(100, store)
+	receiver := NewApertureWebhookReceiver(100, store, "")
 
 	receiver.record(ApertureEvent{
 		Type:       "llm_call",
@@ -182,7 +182,7 @@ func TestWebhookMergesIntoMeterStore(t *testing.T) {
 
 func TestWebhookMergesTokensIntoMeterStore(t *testing.T) {
 	store := NewMeterStore()
-	receiver := NewApertureWebhookReceiver(100, store)
+	receiver := NewApertureWebhookReceiver(100, store, "")
 
 	// Event with input/output tokens.
 	receiver.record(ApertureEvent{
@@ -220,7 +220,7 @@ func TestWebhookMergesTokensIntoMeterStore(t *testing.T) {
 
 func TestWebhookNonLLMEventNotMerged(t *testing.T) {
 	store := NewMeterStore()
-	receiver := NewApertureWebhookReceiver(100, store)
+	receiver := NewApertureWebhookReceiver(100, store, "")
 
 	receiver.record(ApertureEvent{
 		Type:      "rate_limit",
@@ -237,7 +237,7 @@ func TestWebhookNonLLMEventNotMerged(t *testing.T) {
 
 func TestWebhookApertureHookFormat(t *testing.T) {
 	store := NewMeterStore()
-	receiver := NewApertureWebhookReceiver(100, store)
+	receiver := NewApertureWebhookReceiver(100, store, "")
 
 	// Real Aperture hook payload format (matches what ai.taila4c78d.ts.net sends).
 	payload := map[string]any{
@@ -326,7 +326,7 @@ func TestWebhookApertureHookFormat(t *testing.T) {
 }
 
 func TestWebhookApertureHookNoResponseBody(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	// Aperture hook with no response_body (e.g. streaming or error).
 	payload := map[string]any{
@@ -356,7 +356,7 @@ func TestWebhookApertureHookNoResponseBody(t *testing.T) {
 }
 
 func TestWebhookRecentOrder(t *testing.T) {
-	receiver := NewApertureWebhookReceiver(100, nil)
+	receiver := NewApertureWebhookReceiver(100, nil, "")
 
 	for i := 0; i < 5; i++ {
 		receiver.record(ApertureEvent{
@@ -379,5 +379,60 @@ func TestWebhookRecentOrder(t *testing.T) {
 	}
 	if events[2].Tokens != 3 {
 		t.Errorf("events[2].Tokens = %d, want 3", events[2].Tokens)
+	}
+}
+
+func TestWebhookSecretRejectsUnauthorized(t *testing.T) {
+	receiver := NewApertureWebhookReceiver(100, nil, "my-secret-token")
+
+	body, _ := json.Marshal(ApertureEvent{
+		Type:  "llm_call",
+		Agent: "openclaw",
+	})
+
+	// No secret header.
+	req := httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 (no secret header)", w.Code)
+	}
+
+	// Wrong secret.
+	req = httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	req.Header.Set("X-Webhook-Secret", "wrong-secret")
+	w = httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401 (wrong secret)", w.Code)
+	}
+
+	// Correct secret.
+	req = httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	req.Header.Set("X-Webhook-Secret", "my-secret-token")
+	w = httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200 (correct secret)", w.Code)
+	}
+}
+
+func TestWebhookNoSecretAllowsAll(t *testing.T) {
+	receiver := NewApertureWebhookReceiver(100, nil, "")
+
+	body, _ := json.Marshal(ApertureEvent{
+		Type:  "llm_call",
+		Agent: "openclaw",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/aperture/webhook", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	receiver.HandleWebhook(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200 (no secret configured)", w.Code)
 	}
 }

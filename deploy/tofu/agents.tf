@@ -113,6 +113,7 @@ resource "kubernetes_deployment" "openclaw" {
             args = [
               "--campaigns-dir=/etc/campaigns",
               "--gateway-url=http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
+              "--hexstrike-url=http://hexstrike-agent.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
               "--interval=60s",
               "--api-port=8081",
             ]
@@ -304,4 +305,35 @@ resource "kubernetes_deployment" "hexstrike" {
   }
 
   depends_on = [helm_release.tailscale_operator]
+}
+
+# =============================================================================
+# HexStrike K8s Service
+# =============================================================================
+#
+# ClusterIP service for HexStrike agent HTTP API. Required because the campaign
+# runner (sidecar in OpenClaw pod) dispatches to hexstrike via K8s service URL,
+# not localhost.
+# =============================================================================
+
+resource "kubernetes_service" "hexstrike" {
+  metadata {
+    name      = "hexstrike-agent"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "hexstrike-agent" })
+  }
+
+  spec {
+    selector = {
+      app = "hexstrike-agent"
+    }
+
+    port {
+      port        = 8080
+      target_port = 8080
+      name        = "agent"
+    }
+
+    type = "ClusterIP"
+  }
 }

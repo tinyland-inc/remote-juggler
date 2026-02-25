@@ -31,6 +31,7 @@ import (
 func main() {
 	campaignsDir := flag.String("campaigns-dir", envOrDefault("CAMPAIGNS_DIR", "/etc/campaigns"), "path to campaign definitions")
 	gatewayURL := flag.String("gateway-url", envOrDefault("RJ_GATEWAY_URL", "https://rj-gateway:443"), "rj-gateway MCP endpoint")
+	hexstrikeURL := flag.String("hexstrike-url", envOrDefault("HEXSTRIKE_URL", ""), "hexstrike agent URL (separate pod)")
 	once := flag.Bool("once", false, "run all due campaigns once and exit")
 	campaignID := flag.String("campaign", "", "run a specific campaign by ID and exit")
 	interval := flag.Duration("interval", 60*time.Second, "scheduler check interval")
@@ -75,7 +76,7 @@ func main() {
 		log.Printf("campaign %s: loaded (%s, agent=%s)", id, campaign.Name, campaign.Agent)
 	}
 
-	dispatcher := NewDispatcher(*gatewayURL)
+	dispatcher := NewDispatcher(*gatewayURL, *hexstrikeURL)
 	collector := NewCollector(*gatewayURL)
 	scheduler := NewScheduler(registry, dispatcher, collector)
 

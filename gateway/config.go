@@ -21,6 +21,7 @@ type Config struct {
 	Precedence      []string        `json:"precedence"`
 	ApertureURL     string          `json:"aperture_url"`
 	ApertureS3      S3Config        `json:"aperture_s3"`
+	WebhookSecret   string          `json:"webhook_secret"`
 	Tailscale       TailscaleConfig `json:"tailscale"`
 }
 
@@ -100,6 +101,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("RJ_GATEWAY_APERTURE_S3_SECRET_KEY"); v != "" {
 		cfg.ApertureS3.SecretKey = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_WEBHOOK_SECRET"); v != "" {
+		cfg.WebhookSecret = v
 	}
 
 	return cfg, nil

@@ -204,7 +204,7 @@ func TestEnvOrDefault(t *testing.T) {
 }
 
 func TestNewDispatcher(t *testing.T) {
-	d := NewDispatcher("https://example.com")
+	d := NewDispatcher("https://example.com", "")
 	if d.gatewayURL != "https://example.com" {
 		t.Errorf("expected gateway URL 'https://example.com', got %q", d.gatewayURL)
 	}
