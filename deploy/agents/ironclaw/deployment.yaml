@@ -8,7 +8,9 @@
 # dispatch protocol to IronClaw's native conversation API.
 #
 # Architecture:
-#   campaign-runner -> adapter (POST /campaign) -> ironclaw (POST /api/chat)
+#   campaign-runner -> adapter (POST /campaign) -> ironclaw (POST /v1/responses)
+#   Health: adapter probes /v1/chat/completions (no dedicated health endpoint)
+#   Auth: Bearer token via OPENCLAW_GATEWAY_TOKEN env var
 #   rj-gateway MCP tools available via IronClaw's mcporter bridge
 #
 apiVersion: apps/v1
@@ -65,6 +67,11 @@ spec:
                 secretKeyRef:
                   name: agent-api-keys
                   key: GITHUB_TOKEN
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-keys
+                  key: OPENCLAW_GATEWAY_TOKEN
           volumeMounts:
             - name: ssh-key
               mountPath: /home/agent/.ssh/id_ed25519
@@ -87,6 +94,12 @@ spec:
             - --agent-type=ironclaw
             - --agent-url=http://localhost:18789
             - --listen-port=8080
+          env:
+            - name: ADAPTER_AGENT_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: agent-api-keys
+                  key: OPENCLAW_GATEWAY_TOKEN
           ports:
             - containerPort: 8080
               name: adapter

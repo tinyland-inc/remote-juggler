@@ -4,10 +4,10 @@
 #
 # 2-container pod:
 #   1. hexstrike-ai — real HexStrike-AI fork (ghcr.io/tinyland-inc/hexstrike-ai)
-#   2. adapter      — campaign protocol bridge (MCP passthrough to FastMCP)
+#   2. adapter      — campaign protocol bridge (Flask REST /api/command)
 #
-# HexStrike-AI has native FastMCP support, so the adapter simply proxies
-# MCP tool calls to port 8888.
+# HexStrike-AI exposes tools via a Flask REST API. The adapter dispatches
+# campaign tool calls to POST /api/command on port 8888.
 #
 # Security: NET_RAW and NET_ADMIN for network security tools (nmap, etc.)
 # Default: replicas=0 (dormant), scale up for engagements.
@@ -135,7 +135,7 @@ resource "kubernetes_deployment" "hexstrike" {
 
           port {
             container_port = 8888
-            name           = "mcp"
+            name           = "flask"
           }
 
           volume_mount {
@@ -173,7 +173,7 @@ resource "kubernetes_deployment" "hexstrike" {
           }
         }
 
-        # Adapter sidecar — bridges campaign protocol to HexStrike's FastMCP
+        # Adapter sidecar — bridges campaign protocol to HexStrike's Flask REST API
         container {
           name  = "adapter"
           image = var.adapter_image

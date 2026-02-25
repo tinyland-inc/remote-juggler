@@ -51,6 +51,13 @@ variable "anthropic_api_key" {
   default     = ""
 }
 
+variable "openclaw_gateway_token" {
+  description = "Bearer token for IronClaw (OpenClaw) gateway HTTP endpoints auth"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # =============================================================================
 # Agent SSH identity (ed25519 keypairs stored in Setec)
 # =============================================================================

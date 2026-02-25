@@ -107,6 +107,17 @@ resource "kubernetes_deployment" "ironclaw" {
             value = "ssh -i /home/agent/.ssh/id_ed25519 -o StrictHostKeyChecking=no"
           }
 
+          env {
+            name = "OPENCLAW_GATEWAY_TOKEN"
+            value_from {
+              secret_key_ref {
+                name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                key      = "OPENCLAW_GATEWAY_TOKEN"
+                optional = true
+              }
+            }
+          }
+
           port {
             container_port = 18789
             name           = "chat"
@@ -141,7 +152,7 @@ resource "kubernetes_deployment" "ironclaw" {
           }
         }
 
-        # Adapter sidecar — bridges campaign protocol to IronClaw's native API
+        # Adapter sidecar — bridges campaign protocol to IronClaw's OpenResponses API
         container {
           name  = "adapter"
           image = var.adapter_image
@@ -152,6 +163,17 @@ resource "kubernetes_deployment" "ironclaw" {
             "--listen-port=8080",
             "--gateway-url=http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
           ]
+
+          env {
+            name = "ADAPTER_AGENT_AUTH_TOKEN"
+            value_from {
+              secret_key_ref {
+                name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                key      = "OPENCLAW_GATEWAY_TOKEN"
+                optional = true
+              }
+            }
+          }
 
           port {
             container_port = 8080

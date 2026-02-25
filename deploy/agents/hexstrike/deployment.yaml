@@ -4,12 +4,13 @@
 # deploy/tofu/hexstrike.tf via OpenTofu.
 #
 # HexStrike-AI is a fork of hexstrike-ai (0x4m4/hexstrike-ai) at
-# tinyland-inc/hexstrike-ai. It uses FastMCP for native tool orchestration.
+# tinyland-inc/hexstrike-ai. It exposes security tools via a Flask REST API.
 # The adapter sidecar bridges the campaign runner protocol to HexStrike's
-# MCP JSON-RPC endpoint.
+# Flask /api/command endpoint.
 #
 # Architecture:
-#   campaign-runner → adapter (POST /campaign) → hexstrike-ai (MCP tools/call)
+#   campaign-runner → adapter (POST /campaign) → hexstrike-ai (POST /api/command)
+#   Health: GET /health (Flask comprehensive tool check)
 #
 # IMPORTANT: Only deploy for authorized security testing.
 #
@@ -43,7 +44,7 @@ spec:
           image: ghcr.io/tinyland-inc/hexstrike-ai:latest  # renovate: image
           ports:
             - containerPort: 8888
-              name: fastmcp
+              name: flask
           env:
             - name: ANTHROPIC_BASE_URL
               value: "http://aperture.fuzzy-dev.svc.cluster.local"
@@ -85,7 +86,7 @@ spec:
                 - NET_RAW
                 - NET_ADMIN
 
-        # Adapter sidecar — bridges campaign protocol to HexStrike MCP
+        # Adapter sidecar — bridges campaign protocol to HexStrike Flask REST
         - name: adapter
           image: ghcr.io/tinyland-inc/remote-juggler/adapter:latest  # renovate: image
           args:
