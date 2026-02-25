@@ -4,7 +4,7 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY *.go ./
+COPY *.go *.html ./
 RUN CGO_ENABLED=0 go build -o rj-gateway .
 
 # Use Ubuntu 24.04 to match the Chapel CLI binary's glibc (2.38+).

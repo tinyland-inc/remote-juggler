@@ -1,5 +1,6 @@
 {
   "gateway": {
+    "mode": "local",
     "http": {
       "endpoints": {
         "responses": {
