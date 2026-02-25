@@ -25,8 +25,6 @@ resource "kubernetes_secret" "agent_ssh_keys" {
     "ironclaw-id-ed25519"  = "${var.ironclaw_ssh_private_key}\n"
     "picoclaw-id-ed25519"  = "${var.picoclaw_ssh_private_key}\n"
     "hexstrike-id-ed25519" = "${var.hexstrike_ssh_private_key}\n"
-    # Backward compat alias
-    "openclaw-id-ed25519"  = "${var.ironclaw_ssh_private_key}\n"
   }
 
   type = "Opaque"

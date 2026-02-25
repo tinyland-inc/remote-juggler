@@ -32,11 +32,9 @@
         "ironclaw",
         "picoclaw",
         "hexstrike-ai",
-        "claude-code",
-        "openclaw",
-        "hexstrike"
+        "claude-code"
       ],
-      "description": "Which agent executes this campaign. 'openclaw' and 'hexstrike' are deprecated aliases for 'ironclaw' and 'hexstrike-ai'."
+      "description": "Which agent executes this campaign"
     },
     "model": {
       "type": "string",

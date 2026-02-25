@@ -83,14 +83,6 @@ variable "hexstrike_ssh_private_key" {
   default     = ""
 }
 
-# Backward compat aliases (deprecated)
-variable "openclaw_ssh_private_key" {
-  description = "Deprecated: use ironclaw_ssh_private_key"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
 # =============================================================================
 # Agent model selection (routed through Aperture)
 # =============================================================================
@@ -109,13 +101,6 @@ variable "picoclaw_model" {
 
 variable "hexstrike_model" {
   description = "Claude model for HexStrike-AI security campaigns"
-  type        = string
-  default     = "claude-sonnet-4-20250514"
-}
-
-# Backward compat alias (deprecated)
-variable "openclaw_model" {
-  description = "Deprecated: use ironclaw_model"
   type        = string
   default     = "claude-sonnet-4-20250514"
 }
@@ -190,19 +175,6 @@ variable "adapter_image" {
   description = "Campaign adapter sidecar image"
   type        = string
   default     = "ghcr.io/tinyland-inc/remote-juggler/adapter:latest" # renovate: image
-}
-
-# Backward compat aliases (deprecated — kept for existing tfvars)
-variable "openclaw_image" {
-  description = "Deprecated: use ironclaw_image"
-  type        = string
-  default     = "ghcr.io/tinyland-inc/ironclaw:latest"
-}
-
-variable "hexstrike_image" {
-  description = "Deprecated: use hexstrike_ai_image"
-  type        = string
-  default     = "ghcr.io/tinyland-inc/hexstrike-ai:latest"
 }
 
 variable "chapel_binary_image" {
