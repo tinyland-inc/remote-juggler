@@ -139,13 +139,16 @@ class OpenClawAgent:
                             tool_calls_by_name[block.name] = (
                                 tool_calls_by_name.get(block.name, 0) + 1
                             )
+                            content = (
+                                json.dumps(result)
+                                if isinstance(result, (dict, list))
+                                else str(result)
+                            )
                             tool_results.append(
                                 {
                                     "type": "tool_result",
                                     "tool_use_id": block.id,
-                                    "content": json.dumps(result)
-                                    if isinstance(result, (dict, list))
-                                    else str(result),
+                                    "content": content or "(empty response)",
                                 }
                             )
 

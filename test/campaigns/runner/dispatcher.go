@@ -249,6 +249,7 @@ func (d *Dispatcher) callTool(ctx context.Context, toolName string, args map[str
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("X-Agent-Identity", "campaign-runner")
 
 	resp, err := d.httpClient.Do(httpReq)
 	if err != nil {
