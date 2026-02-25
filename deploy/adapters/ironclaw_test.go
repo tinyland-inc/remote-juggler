@@ -16,8 +16,12 @@ func TestIronclawBackend_Type(t *testing.T) {
 
 func TestIronclawBackend_Health(t *testing.T) {
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/health" {
-			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		if r.URL.Path == "/v1/chat/completions" && r.Method == http.MethodPost {
+			json.NewEncoder(w).Encode(map[string]any{
+				"choices": []map[string]any{
+					{"message": map[string]string{"role": "assistant", "content": "pong"}},
+				},
+			})
 		}
 	}))
 	defer agent.Close()
@@ -35,14 +39,50 @@ func TestIronclawBackend_HealthUnreachable(t *testing.T) {
 	}
 }
 
+func TestIronclawBackend_HealthAcceptsUnauthorized(t *testing.T) {
+	// 401 means the server is up but auth is wrong — still healthy.
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer agent.Close()
+
+	b := NewIronclawBackend(agent.URL)
+	if err := b.Health(); err != nil {
+		t.Fatalf("expected healthy on 401, got: %v", err)
+	}
+}
+
 func TestIronclawBackend_Dispatch(t *testing.T) {
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/chat" {
+		if r.URL.Path == "/v1/responses" {
 			json.NewEncoder(w).Encode(map[string]any{
-				"message": map[string]string{"content": "analysis complete"},
-				"tool_calls": []map[string]string{
-					{"name": "juggler_status"},
-					{"name": "juggler_keys_list"},
+				"id":     "resp_123",
+				"status": "completed",
+				"output": []map[string]any{
+					{
+						"type":      "function_call",
+						"id":        "call_1",
+						"name":      "juggler_status",
+						"arguments": `{"query":"health"}`,
+					},
+					{
+						"type":      "function_call",
+						"id":        "call_2",
+						"name":      "juggler_keys_list",
+						"arguments": `{}`,
+					},
+					{
+						"type": "message",
+						"role": "assistant",
+						"content": []map[string]any{
+							{"type": "output_text", "text": "analysis complete"},
+						},
+					},
+				},
+				"usage": map[string]int{
+					"input_tokens":  100,
+					"output_tokens": 50,
+					"total_tokens":  150,
 				},
 			})
 		}
@@ -80,5 +120,28 @@ func TestIronclawBackend_DispatchError(t *testing.T) {
 	}
 	if result.Status != "failure" {
 		t.Errorf("expected failure, got %s", result.Status)
+	}
+}
+
+func TestIronclawBackend_DispatchAuth(t *testing.T) {
+	var gotAuth string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id": "resp_1", "status": "completed", "output": []any{},
+		})
+	}))
+	defer agent.Close()
+
+	b := NewIronclawBackend(agent.URL)
+	b.SetAuthToken("test-token-123")
+	campaign := json.RawMessage(`{"id":"test","name":"test","process":["ping"],"tools":[]}`)
+
+	_, err := b.Dispatch(campaign, "run-1")
+	if err != nil {
+		t.Fatalf("dispatch error: %v", err)
+	}
+	if gotAuth != "Bearer test-token-123" {
+		t.Errorf("expected Bearer auth header, got %q", gotAuth)
 	}
 }

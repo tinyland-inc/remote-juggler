@@ -73,11 +73,15 @@ type Adapter struct {
 }
 
 // NewAdapter creates an Adapter for the specified agent type.
-func NewAdapter(agentType, agentURL, gatewayURL string) (*Adapter, error) {
+func NewAdapter(agentType, agentURL, gatewayURL, authToken string) (*Adapter, error) {
 	var backend AgentBackend
 	switch agentType {
 	case "ironclaw", "openclaw":
-		backend = NewIronclawBackend(agentURL)
+		b := NewIronclawBackend(agentURL)
+		if authToken != "" {
+			b.SetAuthToken(authToken)
+		}
+		backend = b
 	case "picoclaw":
 		backend = NewPicoclawBackend(agentURL, gatewayURL)
 	case "hexstrike-ai", "hexstrike":
@@ -165,6 +169,13 @@ func (a *Adapter) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func (a *Adapter) handleHealth(w http.ResponseWriter, r *http.Request) {

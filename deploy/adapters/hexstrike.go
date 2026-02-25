@@ -6,12 +6,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
-// HexstrikeBackend translates campaign requests to HexStrike-AI's Flask API.
-// HexStrike exposes security tools via a FastMCP-based server on port 8888.
-// It also provides a Flask dashboard and REST API for tool execution.
+// HexstrikeBackend translates campaign requests to HexStrike-AI's Flask REST API.
+// HexStrike exposes security tools via Flask on port 8888 with endpoints:
+//   - GET  /health                                   — comprehensive tool availability check
+//   - POST /api/command                              — execute arbitrary security commands
+//   - POST /api/intelligence/smart-scan              — AI-driven scan with tool selection
+//   - POST /api/error-handling/execute-with-recovery — command execution with retry/recovery
+//   - POST /api/intelligence/analyze-target          — target profiling
+//   - POST /api/files/*                              — file operations
+//
+// Note: HexStrike also has a FastMCP server (hexstrike_mcp.py) that exposes
+// tools via stdio transport, but the adapter uses the Flask REST API directly
+// since it's HTTP-native and doesn't require a stdio bridge.
 type HexstrikeBackend struct {
 	agentURL   string
 	httpClient *http.Client
@@ -40,9 +50,10 @@ func (b *HexstrikeBackend) Health() error {
 	return nil
 }
 
-// Dispatch sends a campaign to HexStrike via its tool execution API.
-// HexStrike's MCP server exposes 150+ security tools. The adapter invokes
-// tools sequentially based on the campaign's process steps.
+// Dispatch sends a campaign to HexStrike via its Flask REST API.
+// For campaigns with targets, it uses /api/intelligence/smart-scan for
+// AI-driven tool selection and parallel execution. For campaigns that
+// specify individual MCP tools, it maps them to /api/command calls.
 func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*LastResult, error) {
 	var c struct {
 		ID      string   `json:"id"`
@@ -61,25 +72,12 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 	var trace []ToolTrace
 	var lastErr string
 
-	// Execute each tool in the campaign via HexStrike's MCP endpoint.
+	// For each tool in the campaign, dispatch via the appropriate REST endpoint.
 	for _, toolName := range c.Tools {
-		args := map[string]any{
-			"campaign_id": c.ID,
-			"run_id":      runID,
-		}
-
-		// Pass target repos if available.
-		if len(c.Targets) > 0 {
-			var repos []string
-			for _, t := range c.Targets {
-				repos = append(repos, fmt.Sprintf("%s/%s", t.Org, t.Repo))
-			}
-			args["targets"] = repos
-		}
-
-		result, err := b.callMCPTool(toolName, args)
 		ts := time.Now().UTC().Format(time.RFC3339)
 
+		// Map MCP-style tool names to HexStrike REST API calls.
+		result, err := b.dispatchTool(toolName, c.ID, runID, c.Targets)
 		if err != nil {
 			trace = append(trace, ToolTrace{
 				Timestamp: ts,
@@ -91,10 +89,17 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 			continue
 		}
 
+		summary := "ok"
+		if s, ok := result["stdout"].(string); ok && s != "" {
+			summary = truncate(s, 200)
+		} else if s, ok := result["status"].(string); ok {
+			summary = s
+		}
+
 		trace = append(trace, ToolTrace{
 			Timestamp: ts,
 			Tool:      toolName,
-			Summary:   truncate(string(result), 200),
+			Summary:   summary,
 		})
 	}
 
@@ -111,16 +116,46 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 	}, nil
 }
 
-// callMCPTool calls a single tool on HexStrike's MCP server endpoint.
-func (b *HexstrikeBackend) callMCPTool(toolName string, args map[string]any) (json.RawMessage, error) {
+// dispatchTool routes a tool name to the appropriate HexStrike REST endpoint.
+func (b *HexstrikeBackend) dispatchTool(toolName, campaignID, runID string, targets []struct {
+	Org  string `json:"org"`
+	Repo string `json:"repo"`
+}) (map[string]any, error) {
+	// Build target list for context.
+	var targetRepos []string
+	for _, t := range targets {
+		targetRepos = append(targetRepos, fmt.Sprintf("%s/%s", t.Org, t.Repo))
+	}
+	targetStr := strings.Join(targetRepos, ", ")
+
+	// Route tool to appropriate endpoint.
+	switch {
+	case toolName == "juggler_resolve_composite" || toolName == "juggler_setec_get" ||
+		toolName == "juggler_setec_list" || toolName == "juggler_setec_put" ||
+		toolName == "juggler_audit_log" || toolName == "juggler_campaign_status" ||
+		toolName == "juggler_aperture_usage":
+		// These are rj-gateway tools, not HexStrike tools.
+		// The campaign runner dispatches these directly via rj-gateway MCP.
+		// Return a no-op success so the trace records the intent.
+		return map[string]any{
+			"status": "skipped (gateway tool)",
+		}, nil
+
+	default:
+		// Execute as a command via /api/command.
+		command := toolName
+		if targetStr != "" {
+			command = fmt.Sprintf("%s --target %s", toolName, targetStr)
+		}
+		return b.execCommand(command)
+	}
+}
+
+// execCommand calls POST /api/command on HexStrike's Flask API.
+func (b *HexstrikeBackend) execCommand(command string) (map[string]any, error) {
 	payload := map[string]any{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "tools/call",
-		"params": map[string]any{
-			"name":      toolName,
-			"arguments": args,
-		},
+		"command":   command,
+		"use_cache": true,
 	}
 
 	body, err := json.Marshal(payload)
@@ -128,7 +163,7 @@ func (b *HexstrikeBackend) callMCPTool(toolName string, args map[string]any) (js
 		return nil, fmt.Errorf("marshal: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, b.agentURL+"/mcp", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, b.agentURL+"/api/command", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
 	}
@@ -136,7 +171,7 @@ func (b *HexstrikeBackend) callMCPTool(toolName string, args map[string]any) (js
 
 	resp, err := b.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("hexstrike mcp: %w", err)
+		return nil, fmt.Errorf("hexstrike command: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -146,28 +181,17 @@ func (b *HexstrikeBackend) callMCPTool(toolName string, args map[string]any) (js
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("hexstrike returned %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("hexstrike returned %d: %s", resp.StatusCode, truncate(string(respBody), 500))
 	}
 
-	var mcpResp struct {
-		Result json.RawMessage `json:"result"`
-		Error  *struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(respBody, &mcpResp); err != nil {
-		return respBody, nil
-	}
-	if mcpResp.Error != nil {
-		return nil, fmt.Errorf("mcp error: %s", mcpResp.Error.Message)
+	var result map[string]any
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return map[string]any{"stdout": string(respBody)}, nil
 	}
 
-	return mcpResp.Result, nil
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
+	if errMsg, ok := result["error"].(string); ok && errMsg != "" {
+		return nil, fmt.Errorf("hexstrike error: %s", errMsg)
 	}
-	return s[:maxLen-3] + "..."
+
+	return result, nil
 }

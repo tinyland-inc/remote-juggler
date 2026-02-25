@@ -30,13 +30,12 @@ func TestHexstrikeBackend_Health(t *testing.T) {
 
 func TestHexstrikeBackend_Dispatch(t *testing.T) {
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/mcp" {
+		if r.URL.Path == "/api/command" && r.Method == http.MethodPost {
 			json.NewEncoder(w).Encode(map[string]any{
-				"result": map[string]any{
-					"content": []map[string]string{
-						{"type": "text", "text": "no credentials found"},
-					},
-				},
+				"success":        true,
+				"stdout":         "no credentials found in 15 files",
+				"stderr":         "",
+				"execution_time": 2.5,
 			})
 		}
 	}))
@@ -61,16 +60,18 @@ func TestHexstrikeBackend_Dispatch(t *testing.T) {
 	if result.ToolCalls != 1 {
 		t.Errorf("expected 1 tool call, got %d", result.ToolCalls)
 	}
+	if result.ToolTrace[0].Summary != "no credentials found in 15 files" {
+		t.Errorf("unexpected summary: %s", result.ToolTrace[0].Summary)
+	}
 }
 
-func TestHexstrikeBackend_DispatchMCPError(t *testing.T) {
+func TestHexstrikeBackend_DispatchCommandError(t *testing.T) {
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": map[string]any{
-				"code":    -32600,
-				"message": "tool not found",
-			},
-		})
+		if r.URL.Path == "/api/command" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": "command not found: nonexistent_tool",
+			})
+		}
 	}))
 	defer agent.Close()
 
@@ -88,6 +89,28 @@ func TestHexstrikeBackend_DispatchMCPError(t *testing.T) {
 	}
 	if result.Status != "failure" {
 		t.Errorf("expected failure, got %s", result.Status)
+	}
+}
+
+func TestHexstrikeBackend_DispatchGatewayToolSkipped(t *testing.T) {
+	// Gateway tools (juggler_*) should be skipped, not sent to HexStrike.
+	b := NewHexstrikeBackend("http://localhost:1") // unreachable — should not be called
+	campaign := json.RawMessage(`{
+		"id": "test",
+		"name": "test",
+		"process": ["check audit"],
+		"tools": ["juggler_audit_log"]
+	}`)
+
+	result, err := b.Dispatch(campaign, "run-1")
+	if err != nil {
+		t.Fatalf("dispatch error: %v", err)
+	}
+	if result.Status != "success" {
+		t.Errorf("expected success for skipped gateway tool, got %s", result.Status)
+	}
+	if result.ToolTrace[0].Summary != "skipped (gateway tool)" {
+		t.Errorf("unexpected summary: %s", result.ToolTrace[0].Summary)
 	}
 }
 

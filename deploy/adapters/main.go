@@ -25,6 +25,7 @@ func main() {
 	agentURL := flag.String("agent-url", envOrDefault("ADAPTER_AGENT_URL", ""), "base URL of the agent container")
 	listenPort := flag.Int("listen-port", intEnvOrDefault("ADAPTER_LISTEN_PORT", 8080), "HTTP port to listen on")
 	gatewayURL := flag.String("gateway-url", envOrDefault("ADAPTER_GATEWAY_URL", ""), "rj-gateway URL (for tool proxy)")
+	agentAuthToken := flag.String("agent-auth-token", envOrDefault("ADAPTER_AGENT_AUTH_TOKEN", ""), "bearer token for agent API auth (OpenClaw gateway)")
 	flag.Parse()
 
 	if *agentType == "" || *agentURL == "" {
@@ -36,7 +37,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix(fmt.Sprintf("adapter[%s]: ", *agentType))
 
-	adapter, err := NewAdapter(*agentType, *agentURL, *gatewayURL)
+	adapter, err := NewAdapter(*agentType, *agentURL, *gatewayURL, *agentAuthToken)
 	if err != nil {
 		log.Fatalf("init adapter: %v", err)
 	}

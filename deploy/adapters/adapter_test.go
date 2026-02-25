@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewAdapter_UnknownType(t *testing.T) {
-	_, err := NewAdapter("unknown", "http://localhost:1234", "")
+	_, err := NewAdapter("unknown", "http://localhost:1234", "", "")
 	if err == nil {
 		t.Fatal("expected error for unknown agent type")
 	}
@@ -18,7 +18,7 @@ func TestNewAdapter_UnknownType(t *testing.T) {
 func TestNewAdapter_ValidTypes(t *testing.T) {
 	types := []string{"ironclaw", "openclaw", "picoclaw", "hexstrike-ai", "hexstrike"}
 	for _, typ := range types {
-		a, err := NewAdapter(typ, "http://localhost:1234", "http://gw:8080")
+		a, err := NewAdapter(typ, "http://localhost:1234", "http://gw:8080", "")
 		if err != nil {
 			t.Errorf("NewAdapter(%q) error: %v", typ, err)
 		}
@@ -29,16 +29,21 @@ func TestNewAdapter_ValidTypes(t *testing.T) {
 }
 
 func TestAdapter_Health(t *testing.T) {
-	// Mock agent that returns healthy.
+	// IronClaw health probes /v1/chat/completions (no dedicated health endpoint).
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/health" || r.URL.Path == "/health" {
-			w.WriteHeader(http.StatusOK)
+		if r.URL.Path == "/v1/chat/completions" && r.Method == http.MethodPost {
+			json.NewEncoder(w).Encode(map[string]any{
+				"choices": []map[string]any{
+					{"message": map[string]string{"role": "assistant", "content": "pong"}},
+				},
+			})
+		} else if r.URL.Path == "/health" {
 			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		}
 	}))
 	defer agent.Close()
 
-	adapter, err := NewAdapter("ironclaw", agent.URL, "")
+	adapter, err := NewAdapter("ironclaw", agent.URL, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +69,7 @@ func TestAdapter_Health(t *testing.T) {
 }
 
 func TestAdapter_StatusIdle(t *testing.T) {
-	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "")
+	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +92,7 @@ func TestAdapter_StatusIdle(t *testing.T) {
 }
 
 func TestAdapter_CampaignMethodNotAllowed(t *testing.T) {
-	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "")
+	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +107,7 @@ func TestAdapter_CampaignMethodNotAllowed(t *testing.T) {
 }
 
 func TestAdapter_CampaignInvalidBody(t *testing.T) {
-	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "")
+	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,21 +122,24 @@ func TestAdapter_CampaignInvalidBody(t *testing.T) {
 }
 
 func TestAdapter_CampaignAccepted(t *testing.T) {
-	// Mock agent that accepts and completes.
+	// Mock IronClaw /v1/responses endpoint.
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/health":
-			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-		case "/api/chat":
+		case "/v1/chat/completions":
 			json.NewEncoder(w).Encode(map[string]any{
-				"message":    map[string]string{"content": "done"},
-				"tool_calls": []any{},
+				"choices": []map[string]any{
+					{"message": map[string]string{"content": "pong"}},
+				},
+			})
+		case "/v1/responses":
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": "resp_1", "status": "completed", "output": []any{},
 			})
 		}
 	}))
 	defer agent.Close()
 
-	adapter, err := NewAdapter("ironclaw", agent.URL, "")
+	adapter, err := NewAdapter("ironclaw", agent.URL, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +165,7 @@ func TestAdapter_CampaignAccepted(t *testing.T) {
 }
 
 func TestAdapter_CampaignConflict(t *testing.T) {
-	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "")
+	adapter, err := NewAdapter("ironclaw", "http://localhost:1234", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
