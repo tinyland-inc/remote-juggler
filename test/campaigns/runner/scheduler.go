@@ -15,6 +15,7 @@ type Scheduler struct {
 	dispatcher *Dispatcher
 	collector  *Collector
 	feedback   *FeedbackHandler
+	publisher  *Publisher
 
 	// completedRuns tracks successfully completed campaign IDs within the
 	// current scheduler cycle. Used for dependsOn evaluation.
@@ -38,6 +39,11 @@ func NewScheduler(registry map[string]*Campaign, dispatcher *Dispatcher, collect
 // SetFeedback configures the feedback handler for issue creation/closure.
 func (s *Scheduler) SetFeedback(handler *FeedbackHandler) {
 	s.feedback = handler
+}
+
+// SetPublisher configures the publisher for Discussion creation.
+func (s *Scheduler) SetPublisher(pub *Publisher) {
+	s.publisher = pub
 }
 
 // RunDue evaluates all campaigns and runs those whose triggers are satisfied.
@@ -148,7 +154,7 @@ func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
 }
 
 // storeResult persists the campaign result via the collector, processes
-// feedback (issue creation/closure), and notifies observers.
+// feedback (issue creation/closure), publishes to Discussions, and notifies observers.
 func (s *Scheduler) storeResult(ctx context.Context, campaign *Campaign, result *CampaignResult) {
 	if s.collector != nil {
 		if err := s.collector.StoreResult(ctx, campaign, result); err != nil {
@@ -158,6 +164,20 @@ func (s *Scheduler) storeResult(ctx context.Context, campaign *Campaign, result 
 	if s.feedback != nil && len(result.Findings) > 0 {
 		if err := s.feedback.ProcessFindings(ctx, campaign, result.Findings, nil); err != nil {
 			log.Printf("campaign %s: feedback error: %v", campaign.ID, err)
+		}
+	}
+	if s.publisher != nil {
+		url, err := s.publisher.Publish(ctx, campaign, result)
+		if err != nil {
+			log.Printf("campaign %s: publish error: %v", campaign.ID, err)
+		} else {
+			result.DiscussionURL = url
+			// Update Setec with the Discussion URL.
+			if s.collector != nil {
+				if err := s.collector.StoreResult(ctx, campaign, result); err != nil {
+					log.Printf("campaign %s: failed to update result with discussion URL: %v", campaign.ID, err)
+				}
+			}
 		}
 	}
 	if s.OnResult != nil {

@@ -72,17 +72,18 @@ type Metrics struct {
 
 // CampaignResult captures the outcome of a campaign run.
 type CampaignResult struct {
-	CampaignID string         `json:"campaign_id"`
-	RunID      string         `json:"run_id"`
-	Status     string         `json:"status"` // "success", "failure", "timeout", "error"
-	StartedAt  string         `json:"started_at"`
-	FinishedAt string         `json:"finished_at"`
-	Agent      string         `json:"agent"`
-	KPIs       map[string]any `json:"kpis,omitempty"`
-	Error      string         `json:"error,omitempty"`
-	ToolCalls  int            `json:"tool_calls"`
-	Phases     []PhaseResult  `json:"phases,omitempty"`
-	Findings   []Finding      `json:"findings,omitempty"`
+	CampaignID    string         `json:"campaign_id"`
+	RunID         string         `json:"run_id"`
+	Status        string         `json:"status"` // "success", "failure", "timeout", "error"
+	StartedAt     string         `json:"started_at"`
+	FinishedAt    string         `json:"finished_at"`
+	Agent         string         `json:"agent"`
+	KPIs          map[string]any `json:"kpis,omitempty"`
+	Error         string         `json:"error,omitempty"`
+	ToolCalls     int            `json:"tool_calls"`
+	Phases        []PhaseResult  `json:"phases,omitempty"`
+	Findings      []Finding      `json:"findings,omitempty"`
+	DiscussionURL string         `json:"discussion_url,omitempty"`
 }
 
 // PhaseResult captures the outcome of a single phase in a multi-phase campaign.

@@ -1,0 +1,56 @@
+name: Project Board Sync
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, labeled]
+
+permissions:
+  issues: read
+  pull-requests: read
+  repository-projects: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'campaign') || contains(github.event.pull_request.labels.*.name, 'campaign')
+    steps:
+      - name: Add to project board
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the project ID for the Agent Ecosystem board.
+          PROJECT_ID=$(gh api graphql -f query='
+            query($owner: String!) {
+              organization(login: $owner) {
+                projectsV2(first: 10, query: "Agent Ecosystem") {
+                  nodes { id title }
+                }
+              }
+            }
+          ' -f owner="${{ github.repository_owner }}" \
+            --jq '.data.organization.projectsV2.nodes[0].id' 2>/dev/null || true)
+
+          if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
+            echo "Project board not found, skipping"
+            exit 0
+          fi
+
+          # Determine the content ID (issue or PR).
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            CONTENT_ID="${{ github.event.issue.node_id }}"
+          else
+            CONTENT_ID="${{ github.event.pull_request.node_id }}"
+          fi
+
+          # Add item to project.
+          gh api graphql -f query='
+            mutation($projectId: ID!, $contentId: ID!) {
+              addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                item { id }
+              }
+            }
+          ' -f projectId="$PROJECT_ID" -f contentId="$CONTENT_ID"
+
+          echo "Added to project board"

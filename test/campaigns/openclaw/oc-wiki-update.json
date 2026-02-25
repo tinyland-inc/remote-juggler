@@ -1,0 +1,59 @@
+{
+  "id": "oc-wiki-update",
+  "name": "Wiki Architecture Update",
+  "description": "Reads current source structure and campaign definitions, then updates the GitHub Wiki Architecture page to reflect the latest state. The only write-enabled campaign -- requires rj-agent-bot App identity.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 6 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_campaign_status",
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_aperture_usage"
+  ],
+  "process": [
+    "Fetch the repository file tree via github_fetch to understand current source structure",
+    "Fetch all campaign definitions from test/campaigns/ to document the campaign catalog",
+    "Fetch current Wiki content (if exists) via github_fetch to identify stale sections",
+    "Generate an updated Architecture wiki page covering: module structure (Chapel, Go gateway, Rust GUI), agent plane (OpenClaw, HexStrike, Campaign Runner), MCP tool catalog (43 tools), campaign catalog (all enabled campaigns), and deployment topology",
+    "Clone the wiki repo, update Architecture.md, commit with rj-agent-bot identity, push",
+    "Return JSON with KPIs: sections_updated, pages_modified, stale_sections_found"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-wiki-update",
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "20m",
+    "readOnly": false,
+    "allowedBranches": [],
+    "killSwitch": "remotejuggler/campaigns/global-kill",
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "Wiki Architecture page updated with current source structure",
+    "kpis": [
+      "sections_updated",
+      "pages_modified",
+      "stale_sections_found"
+    ]
+  }
+}

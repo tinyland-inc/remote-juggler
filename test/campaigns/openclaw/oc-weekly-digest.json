@@ -1,0 +1,61 @@
+{
+  "id": "oc-weekly-digest",
+  "name": "Weekly Agent Ecosystem Digest",
+  "description": "Aggregates campaign results, Aperture token usage, and audit highlights into a weekly summary Discussion. Provides ecosystem health overview for repo visitors.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 6 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_campaign_status",
+    "juggler_aperture_usage",
+    "juggler_audit_log",
+    "juggler_setec_list",
+    "github_fetch"
+  ],
+  "process": [
+    "Call juggler_campaign_status to get all campaign results from the past 7 days",
+    "Call juggler_aperture_usage to get token usage per agent and model",
+    "Call juggler_audit_log to get audit event counts and top callers",
+    "Call juggler_setec_list to count total managed secrets",
+    "Compile a structured digest with: campaigns run, pass/fail rates, total tokens consumed, top agents by activity, notable findings, and upcoming scheduled campaigns",
+    "Format as markdown with tables and summary statistics",
+    "Return the digest as a structured JSON result with KPIs: campaigns_run, pass_rate, total_tokens, findings_count, agents_active"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-weekly-digest",
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "15m",
+    "readOnly": true,
+    "killSwitch": "remotejuggler/campaigns/global-kill",
+    "aiApiBudget": {
+      "maxTokens": 30000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "Digest compiled with data from at least 3 campaigns",
+    "kpis": [
+      "campaigns_run",
+      "pass_rate",
+      "total_tokens",
+      "findings_count",
+      "agents_active"
+    ]
+  }
+}

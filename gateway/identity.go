@@ -118,6 +118,21 @@ func (a *AuditLog) Log(entry AuditEntry) {
 	a.mu.Unlock()
 }
 
+// Drain returns all entries added since the given index. Used by the S3
+// exporter for incremental export without removing entries from the buffer.
+func (a *AuditLog) Drain(since int) []AuditEntry {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	total := len(a.entries)
+	if since >= total {
+		return nil
+	}
+	result := make([]AuditEntry, total-since)
+	copy(result, a.entries[since:])
+	return result
+}
+
 // Recent returns the last n audit entries, newest first.
 func (a *AuditLog) Recent(n int) []AuditEntry {
 	a.mu.Lock()

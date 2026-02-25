@@ -108,6 +108,20 @@ func main() {
 		defer stopS3()
 	}
 
+	// Start audit S3 exporter if the S3 bucket is configured.
+	// Reuses the same S3 bucket as Aperture but writes to a separate prefix.
+	auditInterval := 5 * time.Minute
+	if cfg.AuditS3Interval != "" {
+		if d, err := time.ParseDuration(cfg.AuditS3Interval); err == nil {
+			auditInterval = d
+		}
+	}
+	auditExporter := NewAuditS3Exporter(cfg.ApertureS3, cfg.AuditS3Prefix, auditInterval, audit, nil)
+	if auditExporter.Configured() {
+		stopAudit := auditExporter.Start(context.Background())
+		defer stopAudit()
+	}
+
 	// Build handler chain.
 	mux := http.NewServeMux()
 	mux.HandleFunc("/mcp", proxy.HandleRPC)

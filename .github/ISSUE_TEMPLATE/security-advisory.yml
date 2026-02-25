@@ -1,0 +1,81 @@
+name: Security Advisory
+description: Security finding requiring attention (HexStrike or manual)
+labels: ["security", "campaign"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security advisory from agent scanning or manual triage.
+        **Sensitive details should be redacted** -- this is a public repository.
+
+  - type: input
+    id: cve_id
+    attributes:
+      label: CVE ID
+      description: CVE identifier if applicable
+      placeholder: CVE-2026-XXXX
+    validations:
+      required: false
+
+  - type: input
+    id: affected_component
+    attributes:
+      label: Affected Component
+      description: Package, module, or file affected
+      placeholder: gateway/aperture_s3.go
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+
+  - type: input
+    id: cvss_score
+    attributes:
+      label: CVSS Score
+      description: CVSS v3.1 base score if available
+      placeholder: "7.5"
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What was found and why it matters
+    validations:
+      required: true
+
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Remediation
+      description: Steps to fix the vulnerability
+    validations:
+      required: true
+
+  - type: input
+    id: campaign_id
+    attributes:
+      label: Campaign ID
+      description: The campaign that discovered this (if agent-reported)
+      placeholder: hs-cve-monitor
+    validations:
+      required: false
+
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Fingerprint
+      description: Deduplication key
+    validations:
+      required: false

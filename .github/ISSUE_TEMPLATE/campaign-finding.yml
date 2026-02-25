@@ -1,0 +1,74 @@
+name: Campaign Finding
+description: Automated finding from an agent campaign run
+labels: ["campaign"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is used by agent campaigns to report findings.
+        **Do not use this template for manual issue reports** -- use a blank issue instead.
+
+  - type: input
+    id: campaign_id
+    attributes:
+      label: Campaign ID
+      description: The campaign that generated this finding
+      placeholder: oc-dep-audit
+    validations:
+      required: true
+
+  - type: input
+    id: run_id
+    attributes:
+      label: Run ID
+      description: Unique identifier for the campaign run
+      placeholder: oc-dep-audit-1740456000
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - critical
+        - high
+        - medium
+        - low
+        - info
+    validations:
+      required: true
+
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      description: Which agent produced this finding
+      placeholder: openclaw
+    validations:
+      required: true
+
+  - type: textarea
+    id: finding
+    attributes:
+      label: Finding Details
+      description: Detailed description of the finding
+    validations:
+      required: true
+
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Fingerprint
+      description: Deduplication key for this finding (used to detect duplicates and track resolution)
+      placeholder: sha256:abc123...
+    validations:
+      required: true
+
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Suggested Remediation
+      description: Steps to resolve this finding (if applicable)
+    validations:
+      required: false

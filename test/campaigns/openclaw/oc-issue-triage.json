@@ -1,0 +1,58 @@
+{
+  "id": "oc-issue-triage",
+  "name": "Issue Triage",
+  "description": "Fetches untriaged GitHub issues, classifies them (bug/feature/question), detects duplicates, and generates a triage report. Read-only -- does not modify issues directly.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 8 * * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_setec_list",
+    "juggler_audit_log",
+    "juggler_campaign_status"
+  ],
+  "process": [
+    "Fetch all open issues without a triage label using github_fetch (GET /repos/tinyland-inc/remote-juggler/issues?labels=&state=open)",
+    "For each untriaged issue, analyze title and body to classify as: bug, feature, question, or campaign-finding",
+    "Check for duplicate issues by comparing titles and fingerprints against existing labeled issues",
+    "Generate a structured triage report with classification counts and duplicate candidates",
+    "Return JSON with KPIs: issues_triaged, bugs_found, features_found, questions_found, duplicates_found"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-issue-triage",
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "10m",
+    "readOnly": true,
+    "killSwitch": "remotejuggler/campaigns/global-kill",
+    "aiApiBudget": {
+      "maxTokens": 40000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "All open issues classified with zero misses",
+    "kpis": [
+      "issues_triaged",
+      "bugs_found",
+      "features_found",
+      "questions_found",
+      "duplicates_found"
+    ]
+  }
+}

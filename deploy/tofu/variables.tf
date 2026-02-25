@@ -265,3 +265,9 @@ variable "aperture_s3_secret_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "github_app_id" {
+  description = "GitHub App ID for rj-agent-bot (used in noreply email for commit attribution)"
+  type        = string
+  default     = ""
+}

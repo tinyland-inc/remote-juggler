@@ -110,6 +110,10 @@ nav:
     - First-Time Setup: FIRST_TIME_SETUP.md
     - Trusted Workstation: TRUSTED_WORKSTATION_SETUP.md
     - Token Expiry Detection: token-expiry-detection.md
+  - Agent Ecosystem:
+    - agents/index.md
+    - Campaigns: agents/campaigns.md
+    - Aperture Integration: agents/aperture.md
   - Development:
     - development/index.md
     - Building from Source: development/building.md

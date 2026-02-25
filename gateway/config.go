@@ -21,6 +21,8 @@ type Config struct {
 	Precedence      []string        `json:"precedence"`
 	ApertureURL     string          `json:"aperture_url"`
 	ApertureS3      S3Config        `json:"aperture_s3"`
+	AuditS3Prefix   string          `json:"audit_s3_prefix"`
+	AuditS3Interval string          `json:"audit_s3_interval"`
 	WebhookSecret   string          `json:"webhook_secret"`
 	Tailscale       TailscaleConfig `json:"tailscale"`
 }
@@ -104,6 +106,12 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if v := os.Getenv("RJ_GATEWAY_WEBHOOK_SECRET"); v != "" {
 		cfg.WebhookSecret = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_AUDIT_S3_PREFIX"); v != "" {
+		cfg.AuditS3Prefix = v
+	}
+	if v := os.Getenv("RJ_GATEWAY_AUDIT_S3_INTERVAL"); v != "" {
+		cfg.AuditS3Interval = v
 	}
 
 	return cfg, nil

@@ -1,0 +1,62 @@
+{
+  "id": "oc-prompt-audit",
+  "name": "Prompt Quality Audit",
+  "description": "Analyzes all campaign JSON definitions for process step clarity, tool coverage, guardrail completeness, and metric quality. Scores each campaign 1-5 and suggests improvements.",
+  "agent": "openclaw",
+  "trigger": {
+    "schedule": "0 6 1 * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_campaign_status",
+    "juggler_setec_list",
+    "juggler_audit_log"
+  ],
+  "process": [
+    "Fetch all campaign JSON files from test/campaigns/ via github_fetch",
+    "For each campaign definition, evaluate: (1) process step clarity and specificity, (2) tool coverage vs tools listed, (3) guardrail completeness (maxDuration, readOnly, killSwitch, budget), (4) metric KPI relevance, (5) target coverage",
+    "Score each campaign 1-5 on: clarity (are steps actionable?), coverage (do tools match process?), safety (are guardrails comprehensive?), observability (do KPIs capture success?)",
+    "Generate improvement suggestions for campaigns scoring below 4",
+    "Compile a summary report with average quality score and top improvement opportunities",
+    "Return JSON with KPIs: campaigns_analyzed, avg_quality_score, improvements_suggested, campaigns_below_threshold"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-prompt-audit",
+    "issueLabels": [
+      "campaign",
+      "improvement"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "15m",
+    "readOnly": true,
+    "killSwitch": "remotejuggler/campaigns/global-kill",
+    "aiApiBudget": {
+      "maxTokens": 50000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "All campaigns analyzed and scored",
+    "kpis": [
+      "campaigns_analyzed",
+      "avg_quality_score",
+      "improvements_suggested",
+      "campaigns_below_threshold"
+    ]
+  }
+}

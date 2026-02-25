@@ -128,6 +128,23 @@ Full checksums file: [SHA256SUMS.txt](https://github.com/tinyland-inc/remote-jug
 > **Note:** macOS binaries from GitHub are unsigned. For signed/notarized macOS builds, see [GitLab Releases](https://gitlab.com/tinyland/projects/remote-juggler/-/releases).
 <!-- ARTIFACT-TABLE:END -->
 
+<!-- AGENT-STATUS:START -->
+### Agent Ecosystem Status
+
+Last updated: --
+
+| Campaign | Agent | Last Run | Status | Key Metric |
+|----------|-------|----------|--------|------------|
+| Gateway Health | claude-code | -- | -- | -- |
+| Dependency Audit | openclaw | -- | -- | -- |
+| Credential Scan | hexstrike | -- | -- | -- |
+| Gateway Smoketest | openclaw | -- | -- | -- |
+| MCP Regression | claude-code | -- | -- | -- |
+| Audit Completeness | cross-agent | -- | -- | -- |
+
+*View all reports in [Discussions](https://github.com/tinyland-inc/remote-juggler/discussions)*
+<!-- AGENT-STATUS:END -->
+
 ## Configuration
 
 ### 1. Configure SSH Hosts

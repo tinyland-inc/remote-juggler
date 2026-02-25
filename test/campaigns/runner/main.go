@@ -80,10 +80,26 @@ func main() {
 	collector := NewCollector(*gatewayURL)
 	scheduler := NewScheduler(registry, dispatcher, collector)
 
+	// Resolve GitHub token: prefer App installation token, fall back to PAT.
+	ghToken := resolveGitHubToken()
+
 	// Wire feedback handler if a GitHub token is available.
-	if ghToken := os.Getenv("GITHUB_TOKEN"); ghToken != "" {
+	if ghToken != "" {
 		scheduler.SetFeedback(NewFeedbackHandler(ghToken))
 		log.Printf("feedback handler enabled (issue creation/closure)")
+	}
+
+	// Wire publisher for Discussion creation.
+	if ghToken != "" {
+		repoOwner := envOrDefault("GITHUB_REPO_OWNER", "tinyland-inc")
+		repoName := envOrDefault("GITHUB_REPO_NAME", "remote-juggler")
+		pub := NewPublisher(ghToken, repoOwner, repoName)
+		if err := pub.Init(context.Background()); err != nil {
+			log.Printf("publisher init failed (discussions disabled): %v", err)
+		} else {
+			scheduler.SetPublisher(pub)
+			log.Printf("publisher enabled (discussions to %s/%s)", repoOwner, repoName)
+		}
 	}
 
 	// Run a specific campaign and exit.
@@ -182,6 +198,22 @@ type CampaignEntry struct {
 	Enabled    bool    `json:"enabled"`
 	LastRun    *string `json:"lastRun"`
 	LastResult *string `json:"lastResult"`
+}
+
+// resolveGitHubToken returns a GitHub token, preferring App installation tokens.
+// Checks GITHUB_APP_TOKEN first (pre-resolved by init container or entrypoint),
+// then falls back to GITHUB_TOKEN (PAT).
+func resolveGitHubToken() string {
+	// Pre-resolved App installation token (highest priority).
+	if t := os.Getenv("GITHUB_APP_TOKEN"); t != "" {
+		log.Printf("using pre-resolved GitHub App installation token")
+		return t
+	}
+	// Standard PAT.
+	if t := os.Getenv("GITHUB_TOKEN"); t != "" {
+		return t
+	}
+	return ""
 }
 
 // LoadIndex loads the campaign index from a JSON file.

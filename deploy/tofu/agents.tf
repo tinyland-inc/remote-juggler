@@ -91,22 +91,24 @@ resource "kubernetes_deployment" "openclaw" {
             value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080"
           }
 
-          # Git identity for attributable commits/PRs
+          # Git identity for attributable commits/PRs.
+          # Uses GitHub App bot noreply email for proper attribution when
+          # rj-agent-bot GitHub App is installed. Format: {APP_ID}+rj-agent-bot[bot]@users.noreply.github.com
           env {
             name  = "GIT_AUTHOR_NAME"
-            value = "OpenClaw Agent"
+            value = "rj-agent-bot[bot]"
           }
           env {
             name  = "GIT_AUTHOR_EMAIL"
-            value = "openclaw@fuzzy-dev.tinyland.dev"
+            value = var.github_app_id != "" ? "${var.github_app_id}+rj-agent-bot[bot]@users.noreply.github.com" : "openclaw@fuzzy-dev.tinyland.dev"
           }
           env {
             name  = "GIT_COMMITTER_NAME"
-            value = "OpenClaw Agent"
+            value = "rj-agent-bot[bot]"
           }
           env {
             name  = "GIT_COMMITTER_EMAIL"
-            value = "openclaw@fuzzy-dev.tinyland.dev"
+            value = var.github_app_id != "" ? "${var.github_app_id}+rj-agent-bot[bot]@users.noreply.github.com" : "openclaw@fuzzy-dev.tinyland.dev"
           }
           env {
             name  = "GIT_SSH_COMMAND"
@@ -157,6 +159,29 @@ resource "kubernetes_deployment" "openclaw" {
               "--interval=60s",
               "--api-port=8081",
             ]
+
+            # GitHub token for feedback handler (issue creation) and publisher (Discussions).
+            # Resolved from Setec via apply.sh.
+            env {
+              name = "GITHUB_TOKEN"
+              value_from {
+                secret_key_ref {
+                  name     = kubernetes_secret.agent_api_keys.metadata[0].name
+                  key      = "GITHUB_TOKEN"
+                  optional = true
+                }
+              }
+            }
+
+            env {
+              name  = "GITHUB_REPO_OWNER"
+              value = "tinyland-inc"
+            }
+
+            env {
+              name  = "GITHUB_REPO_NAME"
+              value = "remote-juggler"
+            }
 
             port {
               container_port = 8081
@@ -322,22 +347,23 @@ resource "kubernetes_deployment" "hexstrike" {
             value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080/mcp"
           }
 
-          # Git identity for attributable commits/PRs
+          # Git identity for attributable commits/PRs.
+          # Uses GitHub App bot noreply email for proper attribution.
           env {
             name  = "GIT_AUTHOR_NAME"
-            value = "HexStrike Agent"
+            value = "rj-agent-bot[bot]"
           }
           env {
             name  = "GIT_AUTHOR_EMAIL"
-            value = "hexstrike@fuzzy-dev.tinyland.dev"
+            value = var.github_app_id != "" ? "${var.github_app_id}+rj-agent-bot[bot]@users.noreply.github.com" : "hexstrike@fuzzy-dev.tinyland.dev"
           }
           env {
             name  = "GIT_COMMITTER_NAME"
-            value = "HexStrike Agent"
+            value = "rj-agent-bot[bot]"
           }
           env {
             name  = "GIT_COMMITTER_EMAIL"
-            value = "hexstrike@fuzzy-dev.tinyland.dev"
+            value = var.github_app_id != "" ? "${var.github_app_id}+rj-agent-bot[bot]@users.noreply.github.com" : "hexstrike@fuzzy-dev.tinyland.dev"
           }
           env {
             name  = "GIT_SSH_COMMAND"

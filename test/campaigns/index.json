@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "RemoteJuggler campaign registry. Managed by campaign-runner sidecar.",
   "campaigns": {
     "cc-mcp-regression": {
@@ -46,19 +46,19 @@
     },
     "oc-coverage-gaps": {
       "file": "openclaw/oc-coverage-gaps.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "oc-docs-freshness": {
       "file": "openclaw/oc-docs-freshness.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "oc-license-scan": {
       "file": "openclaw/oc-license-scan.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
@@ -80,6 +80,24 @@
       "lastRun": null,
       "lastResult": null
     },
+    "oc-weekly-digest": {
+      "file": "openclaw/oc-weekly-digest.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-issue-triage": {
+      "file": "openclaw/oc-issue-triage.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-prompt-audit": {
+      "file": "openclaw/oc-prompt-audit.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
     "hs-cred-exposure": {
       "file": "hexstrike/hs-cred-exposure.json",
       "enabled": true,
@@ -88,7 +106,13 @@
     },
     "hs-dep-vuln": {
       "file": "hexstrike/hs-dep-vuln.json",
-      "enabled": false,
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "hs-cve-monitor": {
+      "file": "hexstrike/hs-cve-monitor.json",
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
@@ -113,6 +137,12 @@
     "hs-container-vuln": {
       "file": "hexstrike/hs-container-vuln.json",
       "enabled": false,
+      "lastRun": null,
+      "lastResult": null
+    },
+    "oc-wiki-update": {
+      "file": "openclaw/oc-wiki-update.json",
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
