@@ -133,6 +133,7 @@ func (s *Scheduler) RunCampaign(ctx context.Context, campaign *Campaign) error {
 
 	result.ToolCalls = dispatchResult.ToolCalls
 	result.KPIs = dispatchResult.KPIs
+	result.ToolTrace = dispatchResult.ToolTrace
 
 	if ctx.Err() != nil {
 		result.Status = "timeout"

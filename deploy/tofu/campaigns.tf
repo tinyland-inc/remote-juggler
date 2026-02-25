@@ -26,6 +26,7 @@ resource "kubernetes_config_map" "campaign_definitions" {
     "oc-docs-freshness.json"     = file("${path.module}/../../test/campaigns/openclaw/oc-docs-freshness.json")
     "oc-coverage-gaps.json"      = file("${path.module}/../../test/campaigns/openclaw/oc-coverage-gaps.json")
     "oc-license-scan.json"       = file("${path.module}/../../test/campaigns/openclaw/oc-license-scan.json")
+    "oc-codeql-fix.json"         = file("${path.module}/../../test/campaigns/openclaw/oc-codeql-fix.json")
     "oc-wiki-update.json"        = file("${path.module}/../../test/campaigns/openclaw/oc-wiki-update.json")
     "hs-cred-exposure.json"      = file("${path.module}/../../test/campaigns/hexstrike/hs-cred-exposure.json")
     "hs-cve-monitor.json"        = file("${path.module}/../../test/campaigns/hexstrike/hs-cve-monitor.json")

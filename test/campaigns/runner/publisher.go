@@ -222,6 +222,24 @@ func (p *Publisher) formatBody(campaign *Campaign, result *CampaignResult) strin
 		b.WriteString("\n")
 	}
 
+	// Tool trace (collapsible).
+	if len(result.ToolTrace) > 0 {
+		b.WriteString(fmt.Sprintf("<details>\n<summary>%d tool calls — expand trace</summary>\n\n", len(result.ToolTrace)))
+		b.WriteString("| Time | Tool | Summary |\n|------|------|---------|\n")
+		for _, entry := range result.ToolTrace {
+			ts := entry.Timestamp
+			if t, err := time.Parse(time.RFC3339, ts); err == nil {
+				ts = t.Format("15:04:05")
+			}
+			summary := sanitizeString(entry.Summary)
+			if entry.IsError {
+				summary = "**ERROR**: " + summary
+			}
+			b.WriteString(fmt.Sprintf("| %s | `%s` | %s |\n", ts, entry.Tool, summary))
+		}
+		b.WriteString("\n</details>\n\n")
+	}
+
 	// Findings summary (without sensitive details).
 	if len(result.Findings) > 0 {
 		b.WriteString(fmt.Sprintf("### Findings (%d)\n", len(result.Findings)))

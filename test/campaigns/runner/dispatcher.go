@@ -23,6 +23,7 @@ type Dispatcher struct {
 type DispatchResult struct {
 	ToolCalls int
 	KPIs      map[string]any
+	ToolTrace []ToolTraceEntry
 	Error     string
 }
 
@@ -135,10 +136,11 @@ func (d *Dispatcher) pollAgentStatus(ctx context.Context, campaign *Campaign, ag
 			var status struct {
 				Status     string `json:"status"`
 				LastResult *struct {
-					Status    string         `json:"status"`
-					ToolCalls int            `json:"tool_calls"`
-					KPIs      map[string]any `json:"kpis"`
-					Error     string         `json:"error"`
+					Status    string           `json:"status"`
+					ToolCalls int              `json:"tool_calls"`
+					KPIs      map[string]any   `json:"kpis"`
+					ToolTrace []ToolTraceEntry `json:"tool_trace"`
+					Error     string           `json:"error"`
 				} `json:"last_result"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
@@ -156,6 +158,7 @@ func (d *Dispatcher) pollAgentStatus(ctx context.Context, campaign *Campaign, ag
 			if status.LastResult != nil {
 				result.ToolCalls = status.LastResult.ToolCalls
 				result.KPIs = status.LastResult.KPIs
+				result.ToolTrace = status.LastResult.ToolTrace
 				result.Error = status.LastResult.Error
 			}
 			return result, nil

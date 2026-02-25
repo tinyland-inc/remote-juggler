@@ -192,6 +192,90 @@ func TestFormatBody_SanitizesSecrets(t *testing.T) {
 	}
 }
 
+func TestFormatBody_ToolTrace(t *testing.T) {
+	p := &Publisher{repoOwner: "tinyland-inc", repoName: "remote-juggler"}
+	campaign := &Campaign{
+		ID:   "oc-codeql-fix",
+		Name: "CodeQL Alert Auto-Fix",
+	}
+	result := &CampaignResult{
+		RunID:      "oc-codeql-fix-1740456000",
+		Agent:      "openclaw",
+		Status:     "success",
+		StartedAt:  "2026-02-25T06:00:00Z",
+		FinishedAt: "2026-02-25T06:05:00Z",
+		ToolCalls:  5,
+		KPIs:       map[string]any{"alerts_fixed": 3.0},
+		ToolTrace: []ToolTraceEntry{
+			{Timestamp: "2026-02-25T06:00:01Z", Tool: "juggler_resolve_composite", Summary: "query=github-token, source=setec"},
+			{Timestamp: "2026-02-25T06:00:03Z", Tool: "github_list_alerts", Summary: "25 open alerts"},
+			{Timestamp: "2026-02-25T06:00:10Z", Tool: "github_update_file", Summary: "commit fix", IsError: false},
+			{Timestamp: "2026-02-25T06:00:15Z", Tool: "github_create_pr", Summary: "failed: rate limit", IsError: true},
+		},
+	}
+
+	body := p.formatBody(campaign, result)
+
+	checks := []string{
+		"<details>",
+		"4 tool calls",
+		"expand trace",
+		"| Time | Tool | Summary |",
+		"`juggler_resolve_composite`",
+		"`github_list_alerts`",
+		"25 open alerts",
+		"**ERROR**: failed: rate limit",
+		"</details>",
+	}
+	for _, check := range checks {
+		if !strings.Contains(body, check) {
+			t.Errorf("expected body to contain %q", check)
+		}
+	}
+}
+
+func TestFormatBody_NoToolTrace(t *testing.T) {
+	p := &Publisher{repoOwner: "test", repoName: "test"}
+	campaign := &Campaign{ID: "test", Name: "Test"}
+	result := &CampaignResult{
+		RunID:      "test-1",
+		Agent:      "test",
+		Status:     "success",
+		StartedAt:  "2026-01-01T00:00:00Z",
+		FinishedAt: "2026-01-01T00:01:00Z",
+	}
+
+	body := p.formatBody(campaign, result)
+
+	if strings.Contains(body, "<details>") {
+		t.Error("body should not contain tool trace details when ToolTrace is empty")
+	}
+}
+
+func TestFormatBody_ToolTraceSanitizesSecrets(t *testing.T) {
+	p := &Publisher{repoOwner: "test", repoName: "test"}
+	campaign := &Campaign{ID: "test", Name: "Test"}
+	result := &CampaignResult{
+		RunID:      "test-1",
+		Agent:      "test",
+		Status:     "success",
+		StartedAt:  "2026-01-01T00:00:00Z",
+		FinishedAt: "2026-01-01T00:01:00Z",
+		ToolTrace: []ToolTraceEntry{
+			{Timestamp: "2026-01-01T00:00:01Z", Tool: "juggler_resolve_composite", Summary: "resolved ghp_secret123 at rj-gateway.fuzzy-dev.svc.cluster.local:8080"},
+		},
+	}
+
+	body := p.formatBody(campaign, result)
+
+	if strings.Contains(body, "ghp_") {
+		t.Error("tool trace should not contain ghp_ token prefix")
+	}
+	if strings.Contains(body, ".svc.cluster.local") {
+		t.Error("tool trace should not contain internal URLs")
+	}
+}
+
 func TestCategoryForCampaign(t *testing.T) {
 	p := &Publisher{}
 

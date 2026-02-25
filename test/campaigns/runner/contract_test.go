@@ -82,6 +82,48 @@ func TestCampaignResultContractMatchesPythonError(t *testing.T) {
 	}
 }
 
+// TestCampaignResultContractToolTrace verifies tool_trace field round-trips
+// between Python agent output and Go struct.
+func TestCampaignResultContractToolTrace(t *testing.T) {
+	pythonOutput := `{
+		"campaign_id": "oc-codeql-fix",
+		"run_id": "run-trace",
+		"status": "success",
+		"started_at": "2026-02-25T06:00:00Z",
+		"finished_at": "2026-02-25T06:05:00Z",
+		"agent": "openclaw",
+		"kpis": {"alerts_fixed": 5},
+		"error": "",
+		"tool_calls": 12,
+		"tool_trace": [
+			{"timestamp": "2026-02-25T06:00:01Z", "tool": "juggler_resolve_composite", "summary": "query=github-token, source=setec"},
+			{"timestamp": "2026-02-25T06:00:03Z", "tool": "github_list_alerts", "summary": "25 open alerts"},
+			{"timestamp": "2026-02-25T06:00:10Z", "tool": "github_update_file", "summary": "failed: 409 conflict", "is_error": true}
+		]
+	}`
+
+	var result CampaignResult
+	if err := json.Unmarshal([]byte(pythonOutput), &result); err != nil {
+		t.Fatalf("failed to unmarshal Python output with tool_trace: %v", err)
+	}
+
+	if len(result.ToolTrace) != 3 {
+		t.Fatalf("ToolTrace length = %d, want 3", len(result.ToolTrace))
+	}
+	if result.ToolTrace[0].Tool != "juggler_resolve_composite" {
+		t.Errorf("ToolTrace[0].Tool = %q, want 'juggler_resolve_composite'", result.ToolTrace[0].Tool)
+	}
+	if result.ToolTrace[0].Summary != "query=github-token, source=setec" {
+		t.Errorf("ToolTrace[0].Summary = %q", result.ToolTrace[0].Summary)
+	}
+	if result.ToolTrace[2].IsError != true {
+		t.Error("ToolTrace[2].IsError should be true")
+	}
+	if result.ToolTrace[1].IsError != false {
+		t.Error("ToolTrace[1].IsError should be false")
+	}
+}
+
 // TestCampaignResultRoundTrip verifies Go -> JSON -> Go roundtrip.
 func TestCampaignResultRoundTrip(t *testing.T) {
 	original := CampaignResult{

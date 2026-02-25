@@ -140,6 +140,12 @@
       "lastRun": null,
       "lastResult": null
     },
+    "oc-codeql-fix": {
+      "file": "openclaw/oc-codeql-fix.json",
+      "enabled": true,
+      "lastRun": null,
+      "lastResult": null
+    },
     "oc-wiki-update": {
       "file": "openclaw/oc-wiki-update.json",
       "enabled": true,

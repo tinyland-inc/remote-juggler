@@ -11,6 +11,8 @@ type Campaign struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Agent       string          `json:"agent"`
+	Model       string          `json:"model,omitempty"`
+	Mode        string          `json:"mode,omitempty"` // "schema" or "autonomous"
 	Trigger     CampaignTrigger `json:"trigger"`
 	Targets     []Target        `json:"targets"`
 	Tools       []string        `json:"tools"`
@@ -70,20 +72,29 @@ type Metrics struct {
 	KPIs            []string `json:"kpis"`
 }
 
+// ToolTraceEntry records a single tool invocation during campaign execution.
+type ToolTraceEntry struct {
+	Timestamp string `json:"timestamp"`
+	Tool      string `json:"tool"`
+	Summary   string `json:"summary"`
+	IsError   bool   `json:"is_error,omitempty"`
+}
+
 // CampaignResult captures the outcome of a campaign run.
 type CampaignResult struct {
-	CampaignID    string         `json:"campaign_id"`
-	RunID         string         `json:"run_id"`
-	Status        string         `json:"status"` // "success", "failure", "timeout", "error"
-	StartedAt     string         `json:"started_at"`
-	FinishedAt    string         `json:"finished_at"`
-	Agent         string         `json:"agent"`
-	KPIs          map[string]any `json:"kpis,omitempty"`
-	Error         string         `json:"error,omitempty"`
-	ToolCalls     int            `json:"tool_calls"`
-	Phases        []PhaseResult  `json:"phases,omitempty"`
-	Findings      []Finding      `json:"findings,omitempty"`
-	DiscussionURL string         `json:"discussion_url,omitempty"`
+	CampaignID    string           `json:"campaign_id"`
+	RunID         string           `json:"run_id"`
+	Status        string           `json:"status"` // "success", "failure", "timeout", "error"
+	StartedAt     string           `json:"started_at"`
+	FinishedAt    string           `json:"finished_at"`
+	Agent         string           `json:"agent"`
+	KPIs          map[string]any   `json:"kpis,omitempty"`
+	Error         string           `json:"error,omitempty"`
+	ToolCalls     int              `json:"tool_calls"`
+	Phases        []PhaseResult    `json:"phases,omitempty"`
+	Findings      []Finding        `json:"findings,omitempty"`
+	ToolTrace     []ToolTraceEntry `json:"tool_trace,omitempty"`
+	DiscussionURL string           `json:"discussion_url,omitempty"`
 }
 
 // PhaseResult captures the outcome of a single phase in a multi-phase campaign.

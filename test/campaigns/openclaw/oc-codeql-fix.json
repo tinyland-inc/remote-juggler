@@ -1,0 +1,72 @@
+{
+  "id": "oc-codeql-fix",
+  "name": "CodeQL Alert Auto-Fix",
+  "description": "Autonomous agent campaign that examines open CodeQL alerts, creates fix branches with minimal-permissions YAML changes, and opens PRs. Demonstrates RemoteJuggler credential resolution, identity management, and GitHub write operations.",
+  "agent": "openclaw",
+  "model": "claude-sonnet-4-20250514",
+  "mode": "autonomous",
+  "trigger": {
+    "schedule": "0 4 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "juggler_resolve_composite",
+    "juggler_audit_log",
+    "juggler_setec_put",
+    "juggler_campaign_status",
+    "github_fetch",
+    "github_list_alerts",
+    "github_get_alert",
+    "github_create_branch",
+    "github_update_file",
+    "github_create_pr"
+  ],
+  "process": [
+    "Resolve GitHub token via juggler_resolve_composite",
+    "List open CodeQL alerts. Prioritize actions/missing-workflow-permissions (low-risk YAML fixes)",
+    "For each fixable alert: fetch the file, understand the needed permissions, create a fix branch, commit the fix, open a PR",
+    "Track: alerts_examined, alerts_fixed, prs_created, alerts_skipped"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-codeql-fix",
+    "issueLabels": [
+      "agent:openclaw",
+      "codeql"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler",
+    "prBranchPrefix": "sid/codeql-fix-"
+  },
+  "guardrails": {
+    "maxDuration": "30m",
+    "readOnly": false,
+    "allowedBranches": [
+      "sid/codeql-fix-*"
+    ],
+    "requireApproval": true,
+    "aiApiBudget": {
+      "maxTokens": 200000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": true,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "At least one CodeQL alert fixed with a valid PR opened",
+    "kpis": [
+      "alerts_examined",
+      "alerts_fixed",
+      "prs_created",
+      "alerts_skipped"
+    ]
+  }
+}

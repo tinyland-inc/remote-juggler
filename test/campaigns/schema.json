@@ -35,6 +35,17 @@
       ],
       "description": "Which agent executes this campaign"
     },
+    "model": {
+      "type": "string",
+      "description": "Override the default model for this campaign (e.g. 'claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001')"
+    },
+    "mode": {
+      "enum": [
+        "schema",
+        "autonomous"
+      ],
+      "description": "Execution mode: 'schema' follows process steps linearly, 'autonomous' allows free reasoning and adaptation. Defaults to schema for readOnly campaigns, autonomous for writable."
+    },
     "trigger": {
       "type": "object",
       "properties": {
