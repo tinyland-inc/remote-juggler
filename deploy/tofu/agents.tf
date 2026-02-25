@@ -44,6 +44,11 @@ resource "kubernetes_deployment" "openclaw" {
           name = kubernetes_secret.ghcr_pull.metadata[0].name
         }
 
+        # Ensure secret volume files are readable by the agent user (UID/GID 10000)
+        security_context {
+          fs_group = 10000
+        }
+
         # OpenClaw agent container
         container {
           name  = "openclaw"
@@ -69,6 +74,12 @@ resource "kubernetes_deployment" "openclaw" {
             value = local.aperture_cluster_url
           }
 
+          # Model selection (Aperture must grant access to the requested model)
+          env {
+            name  = "OPENCLAW_MODEL"
+            value = var.openclaw_model
+          }
+
           env {
             name  = "MCP_SERVERS"
             value = jsonencode({ "rj-gateway" = { url = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080/mcp", transport = "http" } })
@@ -80,6 +91,28 @@ resource "kubernetes_deployment" "openclaw" {
             value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080"
           }
 
+          # Git identity for attributable commits/PRs
+          env {
+            name  = "GIT_AUTHOR_NAME"
+            value = "OpenClaw Agent"
+          }
+          env {
+            name  = "GIT_AUTHOR_EMAIL"
+            value = "openclaw@fuzzy-dev.tinyland.dev"
+          }
+          env {
+            name  = "GIT_COMMITTER_NAME"
+            value = "OpenClaw Agent"
+          }
+          env {
+            name  = "GIT_COMMITTER_EMAIL"
+            value = "openclaw@fuzzy-dev.tinyland.dev"
+          }
+          env {
+            name  = "GIT_SSH_COMMAND"
+            value = "ssh -i /home/agent/.ssh/id_ed25519 -o StrictHostKeyChecking=no"
+          }
+
           port {
             container_port = 8080
             name           = "agent"
@@ -88,6 +121,13 @@ resource "kubernetes_deployment" "openclaw" {
           volume_mount {
             name       = "workspace"
             mount_path = "/workspace"
+          }
+
+          volume_mount {
+            name       = "ssh-keys"
+            mount_path = "/home/agent/.ssh/id_ed25519"
+            sub_path   = "openclaw-id-ed25519"
+            read_only  = true
           }
 
           resources {
@@ -153,6 +193,16 @@ resource "kubernetes_deployment" "openclaw" {
           config_map {
             name     = kubernetes_config_map.campaign_definitions.metadata[0].name
             optional = true
+          }
+        }
+
+        # Agent SSH identity keys (for git clone/push operations)
+        volume {
+          name = "ssh-keys"
+          secret {
+            secret_name  = kubernetes_secret.agent_ssh_keys.metadata[0].name
+            default_mode = "0600"
+            optional     = true
           }
         }
       }
@@ -229,6 +279,11 @@ resource "kubernetes_deployment" "hexstrike" {
           name = kubernetes_secret.ghcr_pull.metadata[0].name
         }
 
+        # Ensure secret volume files are readable by the agent user (UID/GID 10000)
+        security_context {
+          fs_group = 10000
+        }
+
         container {
           name  = "hexstrike"
           image = var.hexstrike_image
@@ -250,6 +305,12 @@ resource "kubernetes_deployment" "hexstrike" {
             value = local.aperture_cluster_url
           }
 
+          # Model selection (Aperture must grant access to the requested model)
+          env {
+            name  = "HEXSTRIKE_MODEL"
+            value = var.hexstrike_model
+          }
+
           # In-cluster gateway URL (HTTP, no TLS needed inside the cluster).
           env {
             name  = "RJ_GATEWAY_URL"
@@ -261,6 +322,28 @@ resource "kubernetes_deployment" "hexstrike" {
             value = "http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080/mcp"
           }
 
+          # Git identity for attributable commits/PRs
+          env {
+            name  = "GIT_AUTHOR_NAME"
+            value = "HexStrike Agent"
+          }
+          env {
+            name  = "GIT_AUTHOR_EMAIL"
+            value = "hexstrike@fuzzy-dev.tinyland.dev"
+          }
+          env {
+            name  = "GIT_COMMITTER_NAME"
+            value = "HexStrike Agent"
+          }
+          env {
+            name  = "GIT_COMMITTER_EMAIL"
+            value = "hexstrike@fuzzy-dev.tinyland.dev"
+          }
+          env {
+            name  = "GIT_SSH_COMMAND"
+            value = "ssh -i /home/agent/.ssh/id_ed25519 -o StrictHostKeyChecking=no"
+          }
+
           volume_mount {
             name       = "workspace"
             mount_path = "/workspace"
@@ -269,6 +352,13 @@ resource "kubernetes_deployment" "hexstrike" {
           volume_mount {
             name       = "results"
             mount_path = "/results"
+          }
+
+          volume_mount {
+            name       = "ssh-keys"
+            mount_path = "/home/agent/.ssh/id_ed25519"
+            sub_path   = "hexstrike-id-ed25519"
+            read_only  = true
           }
 
           resources {
@@ -298,6 +388,16 @@ resource "kubernetes_deployment" "hexstrike" {
           name = "results"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.hexstrike_results.metadata[0].name
+          }
+        }
+
+        # Agent SSH identity keys (for git clone/push operations)
+        volume {
+          name = "ssh-keys"
+          secret {
+            secret_name  = kubernetes_secret.agent_ssh_keys.metadata[0].name
+            default_mode = "0600"
+            optional     = true
           }
         }
       }

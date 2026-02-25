@@ -52,6 +52,10 @@ export TF_VAR_gitlab_token=$(resolve "gitlab-token" 2>/dev/null || echo "")
 export TF_VAR_anthropic_api_key=$(resolve "anthropic-api-key" 2>/dev/null || echo "")
 export TF_VAR_ghcr_token=$(resolve "ghcr-token")
 
+# Agent SSH identity keys (optional — empty string if not yet provisioned)
+export TF_VAR_openclaw_ssh_private_key=$(resolve "agents/openclaw/ssh-private-key" 2>/dev/null || echo "")
+export TF_VAR_hexstrike_ssh_private_key=$(resolve "agents/hexstrike/ssh-private-key" 2>/dev/null || echo "")
+
 echo "Secrets resolved. Running: tofu $*"
 
 cd "$(dirname "$0")"

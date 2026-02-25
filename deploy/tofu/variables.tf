@@ -52,6 +52,40 @@ variable "anthropic_api_key" {
 }
 
 # =============================================================================
+# Agent SSH identity (ed25519 keypairs stored in Setec)
+# =============================================================================
+
+variable "openclaw_ssh_private_key" {
+  description = "OpenClaw agent SSH private key (ed25519)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "hexstrike_ssh_private_key" {
+  description = "HexStrike agent SSH private key (ed25519)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# =============================================================================
+# Agent model selection (routed through Aperture)
+# =============================================================================
+
+variable "openclaw_model" {
+  description = "Claude model for OpenClaw agent campaigns"
+  type        = string
+  default     = "claude-sonnet-4-20250514"
+}
+
+variable "hexstrike_model" {
+  description = "Claude model for HexStrike security campaigns"
+  type        = string
+  default     = "claude-sonnet-4-20250514"
+}
+
+# =============================================================================
 # Container registry (GHCR - all images private)
 # =============================================================================
 
