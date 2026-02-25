@@ -143,11 +143,11 @@ resource "kubernetes_deployment" "ironclaw" {
           resources {
             requests = {
               cpu    = "200m"
-              memory = "512Mi"
+              memory = "768Mi"
             }
             limits = {
               cpu    = "1"
-              memory = "1Gi"
+              memory = "2Gi"
             }
           }
         }

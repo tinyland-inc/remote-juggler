@@ -10,6 +10,9 @@
           "enabled": true
         }
       }
+    },
+    "controlUi": {
+      "dangerouslyAllowHostHeaderOriginFallback": true
     }
   }
 }
