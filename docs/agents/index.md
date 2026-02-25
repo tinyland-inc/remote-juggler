@@ -57,7 +57,20 @@ The campaign runner is a Go sidecar in the OpenClaw pod that orchestrates all ca
 ## Live Status
 
 <!-- AGENT-STATUS:START -->
-*Status updates are injected automatically by the agent-status workflow every 6 hours.*
+### Agent Ecosystem Status
+
+Last updated: 2026-02-25 06:17 UTC
+
+| Campaign | Agent | Last Run | Status | Key Metric |
+|----------|-------|----------|--------|------------|
+| Gateway Health | claude-code | -- | -- | -- |
+| Dependency Audit | openclaw | -- | -- | -- |
+| Credential Scan | hexstrike | -- | -- | -- |
+| Gateway Smoketest | openclaw | -- | -- | -- |
+| MCP Regression | claude-code | -- | -- | -- |
+| Audit Completeness | cross-agent | -- | -- | -- |
+
+*View all reports in [Discussions](https://github.com/tinyland-inc/remote-juggler/discussions)*
 <!-- AGENT-STATUS:END -->
 
 ## Security Model
