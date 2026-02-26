@@ -1,0 +1,72 @@
+{
+  "id": "oc-self-evolve",
+  "name": "IronClaw Self-Evolution",
+  "description": "Review own campaign results, update workspace files, improve capabilities. Consolidates learnings from all IronClaw campaigns into persistent memory.",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 2 * * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_audit_log",
+    "juggler_campaign_status",
+    "juggler_setec_get",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Review recent campaign results from MEMORY.md and daily memory logs in /workspace/memory/",
+    "Query juggler_campaign_status() and juggler_audit_log() for recent activity",
+    "Identify recurring patterns: frequent false positives, missed findings, tool failures, timeout issues",
+    "Update /workspace/memory/MEMORY.md with consolidated learnings (keep concise, remove duplicates)",
+    "If TOOLS.md needs updating (tool behavior changed, new tools available, gotchas discovered), update it",
+    "If AGENTS.md instructions are stale or incomplete, note proposed improvements as findings",
+    "Check openclaw/openclaw reference project for new features that could enhance capabilities",
+    "Store evolution summary in Setec via juggler_setec_put",
+    "Report findings summarizing what was learned and what was updated"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-self-evolve",
+    "issueLabels": [
+      "campaign",
+      "self-evolution",
+      "ironclaw"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": false,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "Memory reviewed and updated, patterns consolidated, workspace files current",
+    "kpis": [
+      "memory_entries_added",
+      "memory_entries_pruned",
+      "patterns_identified",
+      "workspace_files_updated"
+    ]
+  }
+}

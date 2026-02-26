@@ -1,0 +1,35 @@
+{
+  "id": "oc-identity-audit",
+  "name": "IronClaw Identity Audit",
+  "description": "Agent queries and validates its own git identity, SSH connectivity, and token freshness using RemoteJuggler tools",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 8 * * 1",
+    "event": "manual"
+  },
+  "process": [
+    "Query current identity with juggler_status()",
+    "List all available identities with juggler_list_identities(provider='all')",
+    "Validate SSH connectivity for bot identity with juggler_validate(identity='rj-agent-bot')",
+    "Verify token validity with juggler_token_verify()",
+    "Check GPG/signing status with juggler_gpg_status()",
+    "Query credential access audit with juggler_audit_log(count=20)",
+    "Compare current state against IDENTITY.md",
+    "Report findings: identity drift, expired tokens, signing issues"
+  ],
+  "tools": [
+    "juggler_status",
+    "juggler_list_identities",
+    "juggler_validate",
+    "juggler_token_verify",
+    "juggler_gpg_status",
+    "juggler_audit_log"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw"
+    }
+  ]
+}

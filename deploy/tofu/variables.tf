@@ -51,6 +51,13 @@ variable "anthropic_api_key" {
   default     = ""
 }
 
+variable "brave_api_key" {
+  description = "Brave Search API key for IronClaw web search (seeded into Setec as brave-api-key)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "openclaw_gateway_token" {
   description = "Bearer token for IronClaw (OpenClaw) gateway HTTP endpoints auth"
   type        = string
@@ -154,7 +161,7 @@ variable "gateway_image" {
 }
 
 variable "ironclaw_image" {
-  description = "IronClaw agent container image (OpenClaw fork)"
+  description = "IronClaw agent container image (OpenClaw-based)"
   type        = string
   default     = "ghcr.io/tinyland-inc/ironclaw:latest" # renovate: image
 }

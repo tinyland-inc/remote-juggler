@@ -1,0 +1,27 @@
+{
+  "id": "xa-provision-agent",
+  "name": "Agent Provisioning",
+  "description": "IronClaw provisions a new agent repo: creates standalone repo with workspace, Dockerfile, and workflows",
+  "agent": "ironclaw",
+  "trigger": {
+    "event": "manual"
+  },
+  "process": [
+    "Receive reference project URL and agent name via campaign parameters",
+    "Create new repo in tinyland-inc org (or use existing)",
+    "Push Dockerfile with RemoteJuggler customizations",
+    "Push workspace bootstrap files (AGENT.md, IDENTITY.md, SOUL.md, HEARTBEAT.md, TOOLS.md, memory/MEMORY.md)",
+    "Push GHCR build workflow and reference-sync workflow",
+    "Create adapter sidecar configuration",
+    "Register initial campaigns for the new agent",
+    "Report: new agent provisioned, GHCR build URL, next steps for Terraform config"
+  ],
+  "tools": [
+    "github_fetch",
+    "github_create_branch",
+    "github_update_file",
+    "github_create_pr",
+    "juggler_setec_put",
+    "juggler_campaign_status"
+  ]
+}

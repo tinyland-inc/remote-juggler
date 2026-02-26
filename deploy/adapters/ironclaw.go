@@ -98,6 +98,7 @@ func (b *IronclawBackend) Dispatch(campaign json.RawMessage, runID string) (*Las
 	if len(c.Tools) > 0 {
 		prompt += fmt.Sprintf("\nAvailable MCP tools: %v\n", c.Tools)
 	}
+	prompt += findingsInstruction
 
 	// Build /v1/responses request.
 	input := []map[string]any{
@@ -203,10 +204,13 @@ func (b *IronclawBackend) Dispatch(campaign json.RawMessage, runID string) (*Las
 		}
 	}
 
+	findings := extractFindings(textContent, c.ID, runID)
+
 	return &LastResult{
 		Status:    "success",
 		ToolCalls: len(trace),
 		ToolTrace: trace,
+		Findings:  findings,
 	}, nil
 }
 

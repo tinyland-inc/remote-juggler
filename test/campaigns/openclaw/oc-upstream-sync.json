@@ -1,0 +1,76 @@
+{
+  "id": "oc-upstream-sync",
+  "name": "IronClaw Reference Sync",
+  "description": "Monitor openclaw/openclaw for useful changes, security fixes, and new features. Evaluate and selectively adopt changes into tinyland-inc/ironclaw via annotated PRs.",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 6 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "openclaw",
+      "repo": "openclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "github_list_alerts",
+    "github_create_branch",
+    "github_update_file",
+    "github_create_pr",
+    "juggler_audit_log",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Use github_fetch to read the latest changes on openclaw/openclaw main (check package.json version, CHANGELOG, recent commit messages)",
+    "Compare key files with tinyland-inc/ironclaw main using github_fetch",
+    "Identify useful changes: security fixes, new features, config schema updates, dependency bumps",
+    "Categorize: worth-adopting (security, useful features), monitor-only (interesting but not needed), skip (not relevant)",
+    "For worth-adopting changes: create branch reference-sync-YYYY-MM-DD on tinyland-inc/ironclaw using github_create_branch",
+    "Use github_update_file to apply adopted changes to the sync branch",
+    "Create PR targeting main with detailed analysis using github_create_pr",
+    "For monitor-only changes: note in UPSTREAM.md for future reference",
+    "Store sync summary in Setec via juggler_setec_put for cross-campaign reference",
+    "Report findings with severity based on change importance"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-upstream-sync",
+    "issueLabels": [
+      "campaign",
+      "reference-sync",
+      "ironclaw"
+    ],
+    "issueRepo": "tinyland-inc/ironclaw"
+  },
+  "guardrails": {
+    "maxDuration": "10m",
+    "readOnly": false,
+    "aiApiBudget": {
+      "maxTokens": 150000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": true,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "Reference project checked, changes categorized, adoption PR created if needed",
+    "kpis": [
+      "reference_changes_found",
+      "changes_worth_adopting",
+      "changes_skipped",
+      "pr_created",
+      "issues_created"
+    ]
+  }
+}

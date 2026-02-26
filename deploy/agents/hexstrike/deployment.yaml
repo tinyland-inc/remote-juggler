@@ -3,8 +3,8 @@
 # This is a REFERENCE file — the authoritative deployment is managed by
 # deploy/tofu/hexstrike.tf via OpenTofu.
 #
-# HexStrike-AI is a fork of hexstrike-ai (0x4m4/hexstrike-ai) at
-# tinyland-inc/hexstrike-ai. It exposes security tools via a Flask REST API.
+# HexStrike-AI is a security agent at tinyland-inc/hexstrike-ai (standalone repo,
+# based on 0x4m4/hexstrike-ai). It exposes security tools via a Flask REST API.
 # The adapter sidecar bridges the campaign runner protocol to HexStrike's
 # Flask /api/command endpoint.
 #

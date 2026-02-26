@@ -1,0 +1,74 @@
+{
+  "id": "oc-fork-review",
+  "name": "IronClaw Reference Review",
+  "description": "Monitor openclaw/openclaw issues, PRs, and releases. Evaluate relevance to our standalone deployment and flag items needing attention.",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 8 * * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "openclaw",
+      "repo": "openclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "github_list_alerts",
+    "juggler_audit_log",
+    "juggler_setec_get",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Check openclaw/openclaw for new issues, PRs, and releases since last review (stored in Setec)",
+    "Fetch reference project CHANGELOG.md and package.json to detect version bumps",
+    "Evaluate each new item for relevance to our standalone deployment",
+    "For relevant issues: assess if our repo is affected and note in findings",
+    "For new releases: determine if any changes are worth adopting, note breaking changes",
+    "If critical security fix found: flag as high-severity finding requiring immediate action",
+    "Check for reference project CodeQL alerts using github_list_alerts that may apply to us",
+    "Update MEMORY.md with reference project activity summary",
+    "Store review timestamp in Setec for next run reference",
+    "Report findings with items that need attention"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/oc-fork-review",
+    "issueLabels": [
+      "campaign",
+      "reference-review",
+      "ironclaw"
+    ],
+    "issueRepo": "tinyland-inc/ironclaw"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "Reference project activity reviewed, relevant items flagged, memory updated",
+    "kpis": [
+      "reference_issues_reviewed",
+      "reference_prs_reviewed",
+      "reference_releases_checked",
+      "security_alerts_found",
+      "items_flagged_for_attention"
+    ]
+  }
+}

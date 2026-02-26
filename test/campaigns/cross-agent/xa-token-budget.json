@@ -1,0 +1,28 @@
+{
+  "id": "xa-token-budget",
+  "name": "Cross-Agent Token Budget",
+  "description": "Org-wide token budget: aggregate all agents' Aperture usage and report to Discussion",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 0 * * 1",
+    "event": "manual"
+  },
+  "dependsOn": [
+    "oc-token-budget"
+  ],
+  "process": [
+    "Query aggregate Aperture usage: juggler_aperture_usage()",
+    "Query per-agent usage: ironclaw, picoclaw, hexstrike-ai",
+    "Calculate org-wide token totals (input/output)",
+    "Compute per-campaign breakdown and cost estimates",
+    "Compare against previous week (retrieve from Setec)",
+    "Store org-wide usage snapshot in Setec",
+    "Report: total tokens, per-agent breakdown, cost estimate, trend vs previous week"
+  ],
+  "tools": [
+    "juggler_aperture_usage",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_campaign_status"
+  ]
+}

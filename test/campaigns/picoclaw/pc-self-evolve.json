@@ -1,0 +1,64 @@
+{
+  "id": "pc-self-evolve",
+  "name": "PicoClaw Self-Evolution",
+  "description": "Review own campaign results, update workspace, improve scan accuracy. Maintains PicoClaw's persistent memory and false-positive tracking.",
+  "agent": "picoclaw",
+  "trigger": {
+    "schedule": "0 3 * * *",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "picoclaw",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_campaign_status",
+    "juggler_setec_get",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Review recent scan results from /workspace/memory/MEMORY.md",
+    "Query juggler_campaign_status() for recent PicoClaw campaign activity",
+    "Identify false positives and update MEMORY.md known-false-positives section to skip them in future",
+    "Check sipeed/picoclaw reference project for new skills or patterns worth adopting via github_fetch",
+    "Verify tool connectivity and report any degradation",
+    "Compact memory: remove duplicate entries, prune old observations",
+    "Store evolution summary in Setec",
+    "Report findings"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/pc-self-evolve",
+    "issueLabels": [
+      "campaign",
+      "self-evolution",
+      "picoclaw"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "3m",
+    "readOnly": false,
+    "aiApiBudget": {
+      "maxTokens": 50000
+    }
+  },
+  "feedback": {
+    "createIssues": false,
+    "createPRs": false,
+    "closeResolvedIssues": false
+  },
+  "metrics": {
+    "successCriteria": "Memory reviewed and compacted, false positives tracked, tools verified",
+    "kpis": [
+      "memory_entries_added",
+      "memory_entries_pruned",
+      "false_positives_identified",
+      "tools_verified"
+    ]
+  }
+}

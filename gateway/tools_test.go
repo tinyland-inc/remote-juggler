@@ -7,8 +7,8 @@ import (
 
 func TestGatewayToolsCount(t *testing.T) {
 	tools := gatewayTools()
-	if len(tools) != 7 {
-		t.Errorf("gatewayTools() returned %d tools, want 7", len(tools))
+	if len(tools) != 15 {
+		t.Errorf("gatewayTools() returned %d tools, want 15", len(tools))
 	}
 }
 
@@ -21,6 +21,14 @@ func TestGatewayToolNames(t *testing.T) {
 		"juggler_audit_log":         true,
 		"juggler_campaign_status":   true,
 		"juggler_aperture_usage":    true,
+		"github_fetch":              true,
+		"github_list_alerts":        true,
+		"github_get_alert":          true,
+		"github_create_branch":      true,
+		"github_update_file":        true,
+		"github_create_pr":          true,
+		"github_create_issue":       true,
+		"juggler_request_secret":    true,
 	}
 
 	tools := gatewayTools()
@@ -92,9 +100,9 @@ func TestInjectGatewayTools(t *testing.T) {
 		t.Fatalf("failed to unmarshal modified response: %v", err)
 	}
 
-	// Should have 2 Chapel tools + 7 gateway tools = 9.
-	if len(msg.Result.Tools) != 9 {
-		t.Errorf("injected response has %d tools, want 9", len(msg.Result.Tools))
+	// Should have 2 Chapel tools + 15 gateway tools = 17.
+	if len(msg.Result.Tools) != 17 {
+		t.Errorf("injected response has %d tools, want 17", len(msg.Result.Tools))
 	}
 }
 

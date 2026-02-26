@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,12 +28,25 @@ type StatusResponse struct {
 	LastResult *LastResult `json:"last_result,omitempty"`
 }
 
+// Finding represents a single actionable finding from agent output.
+// JSON-aligned with feedback.go:Finding in the campaign runner module.
+type Finding struct {
+	Title       string   `json:"title"`
+	Body        string   `json:"body"`
+	Severity    string   `json:"severity"` // "critical", "high", "medium", "low"
+	Labels      []string `json:"labels"`
+	CampaignID  string   `json:"campaign_id"`
+	RunID       string   `json:"run_id"`
+	Fingerprint string   `json:"fingerprint"` // Dedupe key.
+}
+
 // LastResult captures the outcome of the most recent campaign execution.
 type LastResult struct {
 	Status    string         `json:"status"` // "success", "failure", "error"
 	ToolCalls int            `json:"tool_calls"`
 	KPIs      map[string]any `json:"kpis,omitempty"`
 	ToolTrace []ToolTrace    `json:"tool_trace,omitempty"`
+	Findings  []Finding      `json:"findings,omitempty"`
 	Error     string         `json:"error,omitempty"`
 }
 
@@ -191,4 +205,49 @@ func (a *Adapter) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// findingsInstruction is appended to agent prompts so agents know how to
+// emit structured findings that the adapter can extract.
+const findingsInstruction = `
+
+When you complete your analysis, if you have actionable findings to report, output them as a JSON block delimited by markers:
+__findings__[{"title":"...","body":"...","severity":"critical|high|medium|low","labels":["label1"],"fingerprint":"unique-key"}]__end_findings__
+Each finding should have a unique fingerprint for deduplication. Omit the block entirely if there are no findings.`
+
+// extractFindings parses a __findings__[...]__end_findings__ delimited JSON
+// block from agent text output. It stamps campaign_id and run_id onto each
+// finding. Returns nil if no findings block is found.
+func extractFindings(text, campaignID, runID string) []Finding {
+	const startMarker = "__findings__"
+	const endMarker = "__end_findings__"
+
+	startIdx := strings.Index(text, startMarker)
+	if startIdx < 0 {
+		return nil
+	}
+	startIdx += len(startMarker)
+
+	endIdx := strings.Index(text[startIdx:], endMarker)
+	if endIdx < 0 {
+		return nil
+	}
+
+	jsonBlock := strings.TrimSpace(text[startIdx : startIdx+endIdx])
+	if jsonBlock == "" {
+		return nil
+	}
+
+	var findings []Finding
+	if err := json.Unmarshal([]byte(jsonBlock), &findings); err != nil {
+		log.Printf("extractFindings: failed to parse findings JSON: %v", err)
+		return nil
+	}
+
+	for i := range findings {
+		findings[i].CampaignID = campaignID
+		findings[i].RunID = runID
+	}
+
+	return findings
 }

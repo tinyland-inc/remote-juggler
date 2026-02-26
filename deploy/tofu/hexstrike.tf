@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # 2-container pod:
-#   1. hexstrike-ai — real HexStrike-AI fork (ghcr.io/tinyland-inc/hexstrike-ai)
+#   1. hexstrike-ai — HexStrike-AI-based agent (ghcr.io/tinyland-inc/hexstrike-ai)
 #   2. adapter      — campaign protocol bridge (Flask REST /api/command)
 #
 # HexStrike-AI exposes tools via a Flask REST API. The adapter dispatches
@@ -27,6 +27,25 @@ resource "kubernetes_persistent_volume_claim" "hexstrike_results" {
     resources {
       requests = {
         storage = var.hexstrike_results_storage_size
+      }
+    }
+  }
+}
+
+resource "kubernetes_persistent_volume_claim" "hexstrike_workspace" {
+  wait_until_bound = false
+
+  metadata {
+    name      = "hexstrike-workspace"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "hexstrike-ai-agent" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "1Gi"
       }
     }
   }
@@ -76,7 +95,26 @@ resource "kubernetes_deployment" "hexstrike" {
           fs_group = 10000
         }
 
-        # HexStrike-AI agent container (real upstream fork)
+        # Workspace init: seed PVC from image defaults on first boot only.
+        init_container {
+          name  = "workspace-init"
+          image = var.hexstrike_ai_image
+          command = ["/bin/sh", "-c", <<-EOT
+            if [ ! -f /workspace/AGENT.md ]; then
+              cp -r /workspace-defaults/* /workspace/ 2>/dev/null || true
+              echo "Workspace initialized from defaults"
+            else
+              echo "Workspace already exists, preserving state"
+            fi
+          EOT
+          ]
+          volume_mount {
+            name       = "workspace"
+            mount_path = "/workspace"
+          }
+        }
+
+        # HexStrike-AI agent container (standalone, based on 0x4m4/hexstrike-ai)
         container {
           name  = "hexstrike-ai"
           image = var.hexstrike_ai_image
@@ -182,6 +220,7 @@ resource "kubernetes_deployment" "hexstrike" {
             "--agent-type=hexstrike-ai",
             "--agent-url=http://localhost:8888",
             "--listen-port=8080",
+            "--gateway-url=http://rj-gateway.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local:8080",
           ]
 
           port {
@@ -203,7 +242,9 @@ resource "kubernetes_deployment" "hexstrike" {
 
         volume {
           name = "workspace"
-          empty_dir {}
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.hexstrike_workspace.metadata[0].name
+          }
         }
 
         volume {

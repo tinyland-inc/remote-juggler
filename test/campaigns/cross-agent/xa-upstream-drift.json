@@ -1,0 +1,42 @@
+{
+  "id": "xa-upstream-drift",
+  "name": "Cross-Agent Reference Drift",
+  "description": "Reference project drift dashboard: track significant changes in original projects (openclaw/openclaw, sipeed/picoclaw, 0x4m4/hexstrike-ai) across all agent repos",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 10 * * 2,5",
+    "event": "manual"
+  },
+  "process": [
+    "Check openclaw/openclaw for changes since last review: github_fetch key files (package.json, CHANGELOG.md)",
+    "Check sipeed/picoclaw for changes: github_fetch key files (go.mod, README.md)",
+    "Check 0x4m4/hexstrike-ai for activity: github_fetch (likely dormant since Sep 2025)",
+    "For each reference project: identify security fixes, major releases, breaking changes",
+    "Cross-reference with our repos to assess adoption priority",
+    "Update UPSTREAM.md in each agent's workspace with drift status",
+    "Report findings: per-reference drift metrics, security patches needing adoption, new features worth evaluating"
+  ],
+  "tools": [
+    "github_fetch",
+    "github_list_alerts",
+    "juggler_campaign_status",
+    "juggler_setec_put"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "picoclaw"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "hexstrike-ai"
+    }
+  ]
+}

@@ -13,6 +13,98 @@
     },
     "controlUi": {
       "dangerouslyAllowHostHeaderOriginFallback": true
+    },
+    "reload": {
+      "mode": "hybrid",
+      "debounceMs": 2000
     }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/workspace",
+      "contextTokens": 200000,
+      "timeoutSeconds": 300,
+      "maxConcurrent": 2,
+      "bootstrapMaxChars": 30000,
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-20250514",
+        "fallbacks": [
+          "anthropic/claude-haiku-4-5-20251001"
+        ]
+      },
+      "heartbeat": {
+        "every": "2h",
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "target": "none",
+        "session": "main",
+        "prompt": "Review workspace health per HEARTBEAT.md. Report HEARTBEAT_OK if all checks pass.",
+        "activeHours": {
+          "start": "04:00",
+          "end": "23:00"
+        }
+      },
+      "memorySearch": {
+        "enabled": true,
+        "provider": "openai",
+        "remote": {
+          "baseUrl": "http://embeddings.fuzzy-dev.svc.cluster.local:8000/v1/"
+        },
+        "query": {
+          "hybrid": {
+            "enabled": true
+          }
+        }
+      },
+      "compaction": {
+        "memoryFlush": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "session": {
+    "reset": {
+      "mode": "daily",
+      "atHour": 4
+    },
+    "maintenance": {
+      "pruneAfter": "7d",
+      "maxEntries": 200,
+      "rotateBytes": "5mb"
+    }
+  },
+  "cron": {
+    "enabled": true,
+    "maxConcurrentRuns": 1,
+    "sessionRetention": "48h"
+  },
+  "tools": {
+    "profile": "full",
+    "deny": [
+      "message",
+      "canvas",
+      "nodes"
+    ],
+    "loopDetection": {
+      "enabled": true,
+      "warningThreshold": 8,
+      "criticalThreshold": 15
+    },
+    "web": {
+      "search": {},
+      "fetch": {
+        "maxChars": 50000
+      }
+    },
+    "subagents": {
+      "maxSpawnDepth": 2,
+      "maxChildrenPerAgent": 3,
+      "maxConcurrent": 4,
+      "model": "anthropic/claude-haiku-4-5-20251001"
+    }
+  },
+  "logging": {
+    "level": "info",
+    "redactSensitive": "tools"
   }
 }

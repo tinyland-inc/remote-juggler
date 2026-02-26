@@ -26,6 +26,7 @@ type DispatchResult struct {
 	ToolCalls int
 	KPIs      map[string]any
 	ToolTrace []ToolTraceEntry
+	Findings  []Finding
 	Error     string
 }
 
@@ -157,6 +158,7 @@ func (d *Dispatcher) pollAgentStatus(ctx context.Context, campaign *Campaign, ag
 					ToolCalls int              `json:"tool_calls"`
 					KPIs      map[string]any   `json:"kpis"`
 					ToolTrace []ToolTraceEntry `json:"tool_trace"`
+					Findings  []Finding        `json:"findings"`
 					Error     string           `json:"error"`
 				} `json:"last_result"`
 			}
@@ -176,6 +178,7 @@ func (d *Dispatcher) pollAgentStatus(ctx context.Context, campaign *Campaign, ag
 				result.ToolCalls = status.LastResult.ToolCalls
 				result.KPIs = status.LastResult.KPIs
 				result.ToolTrace = status.LastResult.ToolTrace
+				result.Findings = status.LastResult.Findings
 				result.Error = status.LastResult.Error
 			}
 			return result, nil

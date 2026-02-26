@@ -1,12 +1,12 @@
-# IronClaw (tinyland-inc/ironclaw) — tinyland branch Dockerfile
+# IronClaw (tinyland-inc/ironclaw) — standalone Dockerfile
 #
-# Extends the upstream OpenClaw Dockerfile with RemoteJuggler config:
+# Builds the OpenClaw-based agent with RemoteJuggler config:
 # - Enables /v1/responses and /v1/chat/completions HTTP endpoints
 # - Sets gateway to bind on LAN (0.0.0.0) for container networking
 # - Bakes in openclaw.json config for Aperture API routing
 #
-# Build context: repo root (same as upstream)
-# GHCR workflow builds from tinyland branch pushes.
+# Build context: repo root
+# GHCR workflow builds from main branch pushes.
 
 FROM node:22-bookworm@sha256:cd7bcd2e7a1e6f72052feb023c7f6b722205d3fcab7bbcbd2d1bfdab10b1e935
 
@@ -37,10 +37,14 @@ ENV NODE_ENV=production
 
 # --- tinyland customizations ---
 
-# Bake in RemoteJuggler config that enables HTTP endpoints.
+# Bake in RemoteJuggler config that enables HTTP endpoints + memory + heartbeat + cron.
 # Runtime env vars (ANTHROPIC_API_KEY, OPENCLAW_GATEWAY_TOKEN) are set
 # by the K8s deployment, not baked into the image.
 COPY --chown=node:node tinyland/openclaw.json /home/node/.openclaw/openclaw.json
+
+# Workspace bootstrap files — copied to /workspace-defaults/ so the K8s init
+# container can seed the PVC on first boot without overwriting evolved state.
+COPY --chown=node:node tinyland/workspace/ /workspace-defaults/
 
 USER node
 

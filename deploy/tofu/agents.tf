@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # Individual agent deployments are in their own files:
-#   - ironclaw.tf  (IronClaw — OpenClaw fork, replaces homegrown openclaw)
+#   - ironclaw.tf  (IronClaw — OpenClaw-based agent)
 #   - picoclaw.tf  (PicoClaw — lightweight agent for scan campaigns)
 #   - hexstrike.tf (HexStrike-AI — security testing agent)
 #

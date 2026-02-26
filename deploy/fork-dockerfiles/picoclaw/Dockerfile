@@ -1,12 +1,12 @@
-# PicoClaw (tinyland-inc/picoclaw) — tinyland branch Dockerfile
+# PicoClaw (tinyland-inc/picoclaw) — standalone Dockerfile
 #
-# Minimal additions to the upstream PicoClaw Dockerfile:
-# - Uses the same multi-stage Go build
+# Builds the PicoClaw-based agent with RemoteJuggler config:
+# - Multi-stage Go build
 # - Bakes in a config.json with Aperture API routing
 # - Health check on /health port 18790
 #
-# Build context: repo root (same as upstream)
-# GHCR workflow builds from tinyland branch pushes.
+# Build context: repo root
+# GHCR workflow builds from main branch pushes.
 
 # ============================================================
 # Stage 1: Build the picoclaw binary
@@ -52,6 +52,10 @@ RUN /usr/local/bin/picoclaw onboard
 # entrypoint.sh substitutes ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL at startup.
 COPY --chown=picoclaw:picoclaw tinyland/config.json /home/picoclaw/.picoclaw/config.json
 COPY --chown=picoclaw:picoclaw tinyland/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# Workspace bootstrap files — copied to /workspace-defaults/ so the K8s init
+# container can seed the PVC on first boot without overwriting evolved state.
+COPY --chown=picoclaw:picoclaw tinyland/workspace/ /workspace-defaults/
 
 ENTRYPOINT ["entrypoint.sh"]
 CMD ["gateway"]

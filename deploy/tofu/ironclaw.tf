@@ -3,7 +3,7 @@
 # =============================================================================
 #
 # 3-container pod:
-#   1. ironclaw    — real OpenClaw fork (ghcr.io/tinyland-inc/ironclaw)
+#   1. ironclaw    — OpenClaw-based agent (ghcr.io/tinyland-inc/ironclaw)
 #   2. adapter     — campaign protocol bridge (POST /campaign, GET /status)
 #   3. campaign-runner — scheduler sidecar (reads ConfigMap, dispatches work)
 #
@@ -50,7 +50,88 @@ resource "kubernetes_deployment" "ironclaw" {
           fs_group = 10000
         }
 
-        # IronClaw agent container (real OpenClaw fork)
+        # Workspace + state init: seed PVCs from image defaults on first boot only.
+        # The state PVC at /home/node/.openclaw shadows the baked-in openclaw.json,
+        # so we must copy the config into the PVC if it doesn't exist yet.
+        init_container {
+          name  = "workspace-init"
+          image = var.ironclaw_image
+          command = ["/bin/sh", "-c", <<-EOT
+            if [ ! -f /workspace/AGENTS.md ]; then
+              cp -r /workspace-defaults/* /workspace/ 2>/dev/null || true
+              echo "Workspace initialized from defaults"
+            else
+              echo "Workspace already exists, preserving state"
+            fi
+            if [ ! -f /state/openclaw.json ]; then
+              cp /home/node/.openclaw/openclaw.json /state/openclaw.json 2>/dev/null || true
+              echo "State initialized with openclaw.json"
+            else
+              echo "State already exists, preserving config"
+            fi
+          EOT
+          ]
+          volume_mount {
+            name       = "workspace"
+            mount_path = "/workspace"
+          }
+          volume_mount {
+            name       = "state"
+            mount_path = "/state"
+          }
+        }
+
+        # Cron job seed: populate cron/jobs.json on first boot only.
+        # OpenClaw cron jobs are stored in ~/.openclaw/cron/jobs.json, not in config.
+        init_container {
+          name  = "cron-seed"
+          image = var.ironclaw_image
+          command = ["/bin/sh", "-c", <<-EOT
+            CRON_DIR="/state/cron"
+            JOBS_FILE="$CRON_DIR/jobs.json"
+            if [ -f "$JOBS_FILE" ]; then
+              echo "Cron jobs already seeded, preserving"
+              exit 0
+            fi
+            mkdir -p "$CRON_DIR"
+            cat > "$JOBS_FILE" <<'SEED'
+            [
+              {
+                "jobId": "reference-check",
+                "name": "Reference Project Check",
+                "enabled": true,
+                "schedule": { "kind": "cron", "expr": "0 */6 * * *" },
+                "sessionTarget": "isolated",
+                "payload": { "kind": "systemEvent", "text": "Check openclaw/openclaw for new changes worth adopting. Compare key files with tinyland-inc/ironclaw main. Log findings to MEMORY.md." }
+              },
+              {
+                "jobId": "health-report",
+                "name": "Health Report",
+                "enabled": true,
+                "schedule": { "kind": "cron", "expr": "0 */4 * * *" },
+                "sessionTarget": "isolated",
+                "payload": { "kind": "systemEvent", "text": "Verify workspace files, check MEMORY.md staleness, test MCP tool connectivity. Log results to daily memory." }
+              },
+              {
+                "jobId": "memory-maintenance",
+                "name": "Memory Maintenance",
+                "enabled": true,
+                "schedule": { "kind": "cron", "expr": "0 1 * * *" },
+                "sessionTarget": "isolated",
+                "payload": { "kind": "systemEvent", "text": "Consolidate daily memory logs into MEMORY.md. Remove stale entries >14 days. Update TOOLS.md if tool behavior changed." }
+              }
+            ]
+            SEED
+            echo "Cron jobs seeded: reference-check (6h), health-report (4h), memory-maintenance (daily)"
+          EOT
+          ]
+          volume_mount {
+            name       = "state"
+            mount_path = "/state"
+          }
+        }
+
+        # IronClaw agent container (standalone, based on OpenClaw)
         container {
           name  = "ironclaw"
           image = var.ironclaw_image
@@ -108,6 +189,11 @@ resource "kubernetes_deployment" "ironclaw" {
           }
 
           env {
+            name  = "BRAVE_API_KEY"
+            value = var.brave_api_key
+          }
+
+          env {
             name = "OPENCLAW_GATEWAY_TOKEN"
             value_from {
               secret_key_ref {
@@ -131,6 +217,11 @@ resource "kubernetes_deployment" "ironclaw" {
           volume_mount {
             name       = "workspace"
             mount_path = "/workspace"
+          }
+
+          volume_mount {
+            name       = "state"
+            mount_path = "/home/node/.openclaw"
           }
 
           volume_mount {
@@ -274,7 +365,16 @@ resource "kubernetes_deployment" "ironclaw" {
 
         volume {
           name = "workspace"
-          empty_dir {}
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.ironclaw_workspace.metadata[0].name
+          }
+        }
+
+        volume {
+          name = "state"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.ironclaw_state.metadata[0].name
+          }
         }
 
         volume {
@@ -298,4 +398,44 @@ resource "kubernetes_deployment" "ironclaw" {
   }
 
   depends_on = [helm_release.tailscale_operator]
+}
+
+# --- PVCs for IronClaw persistent workspace and state ---
+
+resource "kubernetes_persistent_volume_claim" "ironclaw_workspace" {
+  wait_until_bound = false
+
+  metadata {
+    name      = "ironclaw-workspace"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "ironclaw-agent" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "2Gi"
+      }
+    }
+  }
+}
+
+resource "kubernetes_persistent_volume_claim" "ironclaw_state" {
+  wait_until_bound = false
+
+  metadata {
+    name      = "ironclaw-state"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "ironclaw-agent" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "2Gi"
+      }
+    }
+  }
 }

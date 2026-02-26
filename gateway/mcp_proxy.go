@@ -36,6 +36,7 @@ type MCPProxy struct {
 	audit      *AuditLog
 	aperture   *ApertureClient
 	meterStore *MeterStore
+	github     *GitHubToolHandler
 }
 
 // NewMCPProxy creates a proxy for the given Chapel binary.
@@ -213,6 +214,14 @@ var gatewayToolNames = map[string]bool{
 	"juggler_audit_log":         true,
 	"juggler_campaign_status":   true,
 	"juggler_aperture_usage":    true,
+	"github_fetch":              true,
+	"github_list_alerts":        true,
+	"github_get_alert":          true,
+	"github_create_branch":      true,
+	"github_update_file":        true,
+	"github_create_pr":          true,
+	"github_create_issue":       true,
+	"juggler_request_secret":    true,
 }
 
 // HandleRPC handles POST /mcp JSON-RPC requests.
@@ -403,6 +412,115 @@ func (p *MCPProxy) handleGatewayTool(id json.RawMessage, tool string, args json.
 
 	case "juggler_aperture_usage":
 		result, err = handleApertureUsageTool(p.aperture, args)
+
+	case "github_fetch":
+		result, err = p.github.Fetch(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo, Path string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_fetch",
+				Query:   fmt.Sprintf("%s/%s/%s", a.Owner, a.Repo, a.Path),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_list_alerts":
+		result, err = p.github.ListAlerts(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_list_alerts",
+				Query:   fmt.Sprintf("%s/%s", a.Owner, a.Repo),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_get_alert":
+		result, err = p.github.GetAlert(ctx, args)
+		if p.audit != nil {
+			var a struct {
+				Owner       string `json:"owner"`
+				Repo        string `json:"repo"`
+				AlertNumber int    `json:"alert_number"`
+			}
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_get_alert",
+				Query:   fmt.Sprintf("%s/%s/%d", a.Owner, a.Repo, a.AlertNumber),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_create_branch":
+		result, err = p.github.CreateBranch(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo, BranchName string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_create_branch",
+				Query:   fmt.Sprintf("%s/%s/%s", a.Owner, a.Repo, a.BranchName),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_update_file":
+		result, err = p.github.UpdateFile(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo, Path, Branch string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_update_file",
+				Query:   fmt.Sprintf("%s/%s/%s@%s", a.Owner, a.Repo, a.Path, a.Branch),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_create_pr":
+		result, err = p.github.CreatePR(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo, Head string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_create_pr",
+				Query:   fmt.Sprintf("%s/%s/%s", a.Owner, a.Repo, a.Head),
+				Allowed: err == nil,
+			})
+		}
+
+	case "github_create_issue":
+		result, err = p.github.CreateIssue(ctx, args)
+		if p.audit != nil {
+			var a struct{ Owner, Repo, Title string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "github_create_issue",
+				Query:   fmt.Sprintf("%s/%s: %s", a.Owner, a.Repo, a.Title),
+				Allowed: err == nil,
+			})
+		}
+
+	case "juggler_request_secret":
+		result, err = p.github.RequestSecret(ctx, args)
+		if p.audit != nil {
+			var a struct{ Name, Urgency string }
+			json.Unmarshal(args, &a)
+			p.audit.Log(AuditEntry{
+				Caller:  caller,
+				Action:  "juggler_request_secret",
+				Query:   a.Name,
+				Allowed: err == nil,
+				Reason:  "urgency=" + a.Urgency,
+			})
+		}
 
 	default:
 		err = fmt.Errorf("unknown gateway tool: %s", tool)

@@ -110,6 +110,233 @@ func gatewayTools() []json.RawMessage {
 		},
 	}
 
+	// GitHub tools for agent self-fix workflows.
+	githubTools := []map[string]any{
+		{
+			"name":        "github_fetch",
+			"description": "Fetch a file's contents from a GitHub repository via the Contents API.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "File path within the repository",
+					},
+					"ref": map[string]any{
+						"type":        "string",
+						"description": "Git ref (branch, tag, or SHA). Defaults to the default branch.",
+					},
+				},
+				"required": []string{"owner", "repo", "path"},
+			},
+		},
+		{
+			"name":        "github_list_alerts",
+			"description": "List code scanning (CodeQL) alerts for a repository.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"state": map[string]any{
+						"type":        "string",
+						"description": "Alert state filter: open, closed, dismissed, fixed. Defaults to open.",
+					},
+					"severity": map[string]any{
+						"type":        "string",
+						"description": "Severity filter: critical, high, medium, low, warning, note, error",
+					},
+				},
+				"required": []string{"owner", "repo"},
+			},
+		},
+		{
+			"name":        "github_get_alert",
+			"description": "Get details for a specific code scanning alert by number.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"alert_number": map[string]any{
+						"type":        "integer",
+						"description": "Alert number",
+					},
+				},
+				"required": []string{"owner", "repo", "alert_number"},
+			},
+		},
+		{
+			"name":        "github_create_branch",
+			"description": "Create a new branch in a GitHub repository from a base ref.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"branch_name": map[string]any{
+						"type":        "string",
+						"description": "Name for the new branch",
+					},
+					"base": map[string]any{
+						"type":        "string",
+						"description": "Base branch to create from (default: main)",
+					},
+				},
+				"required": []string{"owner", "repo", "branch_name"},
+			},
+		},
+		{
+			"name":        "github_update_file",
+			"description": "Create or update a file in a GitHub repository via the Contents API.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "File path within the repository",
+					},
+					"content": map[string]any{
+						"type":        "string",
+						"description": "New file content (plain text, will be base64-encoded)",
+					},
+					"message": map[string]any{
+						"type":        "string",
+						"description": "Commit message",
+					},
+					"branch": map[string]any{
+						"type":        "string",
+						"description": "Branch to commit to",
+					},
+				},
+				"required": []string{"owner", "repo", "path", "content", "message", "branch"},
+			},
+		},
+		{
+			"name":        "github_create_pr",
+			"description": "Create a pull request in a GitHub repository.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"title": map[string]any{
+						"type":        "string",
+						"description": "Pull request title",
+					},
+					"body": map[string]any{
+						"type":        "string",
+						"description": "Pull request description body",
+					},
+					"head": map[string]any{
+						"type":        "string",
+						"description": "Branch containing changes",
+					},
+					"base": map[string]any{
+						"type":        "string",
+						"description": "Branch to merge into (default: main)",
+					},
+				},
+				"required": []string{"owner", "repo", "title", "head"},
+			},
+		},
+		{
+			"name":        "github_create_issue",
+			"description": "Create an issue in a GitHub repository.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"owner": map[string]any{
+						"type":        "string",
+						"description": "Repository owner (user or org)",
+					},
+					"repo": map[string]any{
+						"type":        "string",
+						"description": "Repository name",
+					},
+					"title": map[string]any{
+						"type":        "string",
+						"description": "Issue title",
+					},
+					"body": map[string]any{
+						"type":        "string",
+						"description": "Issue description body (markdown)",
+					},
+					"labels": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": "Labels to apply to the issue",
+					},
+				},
+				"required": []string{"owner", "repo", "title"},
+			},
+		},
+		{
+			"name":        "juggler_request_secret",
+			"description": "Request provisioning of a new secret. Creates a labeled issue on tinyland-inc/remote-juggler for human review.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"name": map[string]any{
+						"type":        "string",
+						"description": "The secret name to request (e.g. 'brave-api-key')",
+					},
+					"reason": map[string]any{
+						"type":        "string",
+						"description": "Why the secret is needed",
+					},
+					"urgency": map[string]any{
+						"type":        "string",
+						"enum":        []string{"low", "medium", "high"},
+						"description": "Request urgency (default: medium)",
+					},
+				},
+				"required": []string{"name", "reason"},
+			},
+		},
+	}
+	tools = append(tools, githubTools...)
+
 	var raw []json.RawMessage
 	for _, t := range tools {
 		b, _ := json.Marshal(t)

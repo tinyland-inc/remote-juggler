@@ -3,12 +3,12 @@
 # =============================================================================
 #
 # 2-container pod:
-#   1. picoclaw — real PicoClaw fork (ghcr.io/tinyland-inc/picoclaw)
+#   1. picoclaw — PicoClaw-based agent (ghcr.io/tinyland-inc/picoclaw)
 #   2. adapter  — campaign protocol bridge with tool proxy (PicoClaw lacks MCP)
 #
 # The adapter registers rj-gateway's 43 MCP tools in PicoClaw's native
-# ToolRegistry format via the tools_proxy, bridging until upstream MCP
-# support lands (issue #290).
+# ToolRegistry format via the tools_proxy, bridging MCP tools into
+# PicoClaw's native format.
 # =============================================================================
 
 resource "kubernetes_deployment" "picoclaw" {
@@ -42,6 +42,41 @@ resource "kubernetes_deployment" "picoclaw" {
           name = kubernetes_secret.ghcr_pull.metadata[0].name
         }
 
+        security_context {
+          fs_group = 1000
+        }
+
+        # Workspace + state init: seed PVCs from image defaults on first boot only.
+        # The state PVC at /home/picoclaw/.picoclaw shadows the baked-in config.json,
+        # so we must copy the config into the PVC if it doesn't exist yet.
+        init_container {
+          name  = "workspace-init"
+          image = var.picoclaw_image
+          command = ["/bin/sh", "-c", <<-EOT
+            if [ ! -f /workspace/AGENT.md ]; then
+              cp -r /workspace-defaults/* /workspace/ 2>/dev/null || true
+              echo "Workspace initialized from defaults"
+            else
+              echo "Workspace already exists, preserving state"
+            fi
+            if [ ! -f /state/config.json ]; then
+              cp /home/picoclaw/.picoclaw/config.json /state/config.json 2>/dev/null || true
+              echo "State initialized with config.json"
+            else
+              echo "State already exists, preserving config"
+            fi
+          EOT
+          ]
+          volume_mount {
+            name       = "workspace"
+            mount_path = "/workspace"
+          }
+          volume_mount {
+            name       = "state"
+            mount_path = "/state"
+          }
+        }
+
         # PicoClaw agent container
         container {
           name  = "picoclaw"
@@ -66,6 +101,16 @@ resource "kubernetes_deployment" "picoclaw" {
           port {
             container_port = 18790
             name           = "agent"
+          }
+
+          volume_mount {
+            name       = "workspace"
+            mount_path = "/workspace"
+          }
+
+          volume_mount {
+            name       = "state"
+            mount_path = "/home/picoclaw/.picoclaw"
           }
 
           resources {
@@ -108,11 +153,64 @@ resource "kubernetes_deployment" "picoclaw" {
             }
           }
         }
+        volume {
+          name = "workspace"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.picoclaw_workspace.metadata[0].name
+          }
+        }
+
+        volume {
+          name = "state"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.picoclaw_state.metadata[0].name
+          }
+        }
       }
     }
   }
 
   depends_on = [helm_release.tailscale_operator]
+}
+
+# --- PVCs for PicoClaw persistent workspace and state ---
+
+resource "kubernetes_persistent_volume_claim" "picoclaw_workspace" {
+  wait_until_bound = false
+
+  metadata {
+    name      = "picoclaw-workspace"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "picoclaw-agent" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "2Gi"
+      }
+    }
+  }
+}
+
+resource "kubernetes_persistent_volume_claim" "picoclaw_state" {
+  wait_until_bound = false
+
+  metadata {
+    name      = "picoclaw-state"
+    namespace = kubernetes_namespace.main.metadata[0].name
+    labels    = merge(local.labels, { app = "picoclaw-agent" })
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "1Gi"
+      }
+    }
+  }
 }
 
 # ClusterIP Service for PicoClaw adapter (campaign runner dispatches here)

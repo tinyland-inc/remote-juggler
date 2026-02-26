@@ -58,6 +58,9 @@ export TF_VAR_openclaw_gateway_token=$(resolve "agents/ironclaw/gateway-token" 2
 # GitHub App private key for bot-attributed Discussions (issue #9)
 export TF_VAR_github_app_private_key=$(resolve "github-app-private-key" 2>/dev/null || echo "")
 
+# Web search API key for IronClaw (optional — empty string if not provisioned)
+export TF_VAR_brave_api_key=$(resolve "brave-api-key" 2>/dev/null || echo "")
+
 # Agent SSH identity keys (optional — empty string if not yet provisioned)
 export TF_VAR_ironclaw_ssh_private_key=$(resolve "agents/ironclaw/ssh-private-key" 2>/dev/null || resolve "agents/openclaw/ssh-private-key" 2>/dev/null || echo "")
 export TF_VAR_picoclaw_ssh_private_key=$(resolve "agents/picoclaw/ssh-private-key" 2>/dev/null || echo "")

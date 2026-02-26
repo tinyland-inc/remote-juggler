@@ -1,0 +1,25 @@
+{
+  "id": "oc-token-budget",
+  "name": "IronClaw Token Budget Review",
+  "description": "Agent monitors its own token consumption and self-regulates model selection based on budget thresholds",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 0 * * *",
+    "event": "manual"
+  },
+  "process": [
+    "Query token usage: juggler_aperture_usage(agent='ironclaw')",
+    "Calculate daily average token consumption",
+    "Compare against budget thresholds (defined in MEMORY.md)",
+    "If approaching budget: note recommendation to switch to haiku-only",
+    "If under budget: confirm current model allocation is optimal",
+    "Store usage snapshot in Setec for trend analysis",
+    "Report findings: consumption rate, budget status, model recommendation"
+  ],
+  "tools": [
+    "juggler_aperture_usage",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_campaign_status"
+  ]
+}

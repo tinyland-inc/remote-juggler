@@ -1,0 +1,31 @@
+{
+  "id": "oc-ts-package-audit",
+  "name": "TypeScript Package Audit",
+  "description": "IronClaw scans tinyland-inc TypeScript packages for outdated dependencies, missing CI, license issues, and security vulnerabilities",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 2 * * 0",
+    "event": "manual"
+  },
+  "process": [
+    "List tinyland-inc repos with TypeScript/JavaScript as primary language",
+    "For each package: fetch package.json to check dependency freshness",
+    "Check for missing CI workflows (.github/workflows/)",
+    "Check for license file and SPDX compliance",
+    "Check for known security vulnerabilities via github_list_alerts()",
+    "Batch results by severity: critical (security), high (missing CI), medium (outdated deps), low (license)",
+    "Report findings with per-package breakdown and prioritized recommendations"
+  ],
+  "tools": [
+    "github_fetch",
+    "github_list_alerts",
+    "juggler_campaign_status"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "scope": "typescript-packages"
+    }
+  ]
+}

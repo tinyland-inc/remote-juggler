@@ -1,4 +1,4 @@
-# HexStrike-AI (tinyland-inc/hexstrike-ai) — tinyland branch Dockerfile
+# HexStrike-AI (tinyland-inc/hexstrike-ai) — standalone Dockerfile
 #
 # No upstream Dockerfile exists. This builds from the Python source:
 # - Flask REST API server on port 8888
@@ -8,7 +8,7 @@
 # - Common security CLI tools installed from Alpine packages
 #
 # Build context: repo root
-# GHCR workflow builds from tinyland branch pushes.
+# GHCR workflow builds from main branch pushes.
 
 FROM python:3.12-alpine
 
@@ -58,6 +58,17 @@ RUN addgroup -g 1000 hexstrike && \
     chown -R hexstrike:hexstrike /app /workspace /results
 
 USER hexstrike
+
+# --- tinyland customizations ---
+
+# Flask REST API server — bridges adapter sidecar to security tools.
+# This file lives in deploy/fork-dockerfiles/hexstrike-ai/ in RemoteJuggler
+# and is pushed to the repo via push-to-forks.sh.
+COPY --chown=hexstrike:hexstrike hexstrike_server.py /app/hexstrike_server.py
+
+# Workspace bootstrap files -- copied to /workspace-defaults/ so the K8s init
+# container can seed the PVC on first boot without overwriting evolved state.
+COPY --chown=hexstrike:hexstrike tinyland/workspace/ /workspace-defaults/
 
 EXPOSE 8888
 

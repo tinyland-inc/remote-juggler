@@ -62,6 +62,7 @@ func (b *PicoclawBackend) Dispatch(campaign json.RawMessage, runID string) (*Las
 	for i, step := range c.Process {
 		prompt += fmt.Sprintf("%d. %s\n", i+1, step)
 	}
+	prompt += findingsInstruction
 
 	// PicoClaw uses OpenAI-compatible chat completions API.
 	payload := map[string]any{
@@ -134,7 +135,9 @@ func (b *PicoclawBackend) Dispatch(campaign json.RawMessage, runID string) (*Las
 
 	toolCalls := 0
 	var trace []ToolTrace
+	var messageContent string
 	for _, choice := range chatResp.Choices {
+		messageContent += choice.Message.Content
 		for _, tc := range choice.Message.ToolCalls {
 			toolCalls++
 			trace = append(trace, ToolTrace{
@@ -145,10 +148,13 @@ func (b *PicoclawBackend) Dispatch(campaign json.RawMessage, runID string) (*Las
 		}
 	}
 
+	findings := extractFindings(messageContent, c.ID, runID)
+
 	return &LastResult{
 		Status:    "success",
 		ToolCalls: toolCalls,
 		ToolTrace: trace,
+		Findings:  findings,
 		KPIs: map[string]any{
 			"total_tokens": chatResp.Usage.TotalTokens,
 		},

@@ -185,3 +185,71 @@ func TestAdapter_CampaignConflict(t *testing.T) {
 		t.Fatalf("expected 409, got %d", w.Code)
 	}
 }
+
+func TestExtractFindings(t *testing.T) {
+	text := `Here is my analysis.
+__findings__[{"title":"SQL injection in login","body":"The login handler concatenates user input into SQL","severity":"critical","labels":["security"],"fingerprint":"sql-inject-login-001"}]__end_findings__
+That's all.`
+
+	findings := extractFindings(text, "campaign-1", "run-1")
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	f := findings[0]
+	if f.Title != "SQL injection in login" {
+		t.Errorf("unexpected title: %s", f.Title)
+	}
+	if f.Severity != "critical" {
+		t.Errorf("unexpected severity: %s", f.Severity)
+	}
+	if f.CampaignID != "campaign-1" {
+		t.Errorf("expected campaign_id=campaign-1, got %s", f.CampaignID)
+	}
+	if f.RunID != "run-1" {
+		t.Errorf("expected run_id=run-1, got %s", f.RunID)
+	}
+	if f.Fingerprint != "sql-inject-login-001" {
+		t.Errorf("unexpected fingerprint: %s", f.Fingerprint)
+	}
+	if len(f.Labels) != 1 || f.Labels[0] != "security" {
+		t.Errorf("unexpected labels: %v", f.Labels)
+	}
+}
+
+func TestExtractFindingsEmpty(t *testing.T) {
+	// No findings markers at all.
+	findings := extractFindings("No findings here.", "c1", "r1")
+	if findings != nil {
+		t.Errorf("expected nil, got %d findings", len(findings))
+	}
+}
+
+func TestExtractFindingsInvalid(t *testing.T) {
+	// Malformed JSON between markers.
+	text := "__findings__this is not json__end_findings__"
+	findings := extractFindings(text, "c1", "r1")
+	if findings != nil {
+		t.Errorf("expected nil for invalid JSON, got %d findings", len(findings))
+	}
+}
+
+func TestExtractFindingsMultiple(t *testing.T) {
+	text := `__findings__[
+		{"title":"A","body":"a","severity":"high","labels":[],"fingerprint":"fp-a"},
+		{"title":"B","body":"b","severity":"low","labels":["docs"],"fingerprint":"fp-b"}
+	]__end_findings__`
+
+	findings := extractFindings(text, "c2", "r2")
+	if len(findings) != 2 {
+		t.Fatalf("expected 2 findings, got %d", len(findings))
+	}
+	if findings[0].Title != "A" || findings[1].Title != "B" {
+		t.Errorf("unexpected titles: %s, %s", findings[0].Title, findings[1].Title)
+	}
+	// All should have campaign/run stamped.
+	for _, f := range findings {
+		if f.CampaignID != "c2" || f.RunID != "r2" {
+			t.Errorf("expected campaign_id=c2, run_id=r2, got %s, %s", f.CampaignID, f.RunID)
+		}
+	}
+}

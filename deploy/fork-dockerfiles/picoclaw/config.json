@@ -2,11 +2,12 @@
   "agents": {
     "defaults": {
       "workspace": "/workspace",
-      "restrict_to_workspace": false,
+      "restrict_to_workspace": true,
       "model_name": "claude-haiku",
       "max_tokens": 8192,
       "temperature": 0.3,
-      "max_tool_iterations": 30
+      "max_tool_iterations": 30,
+      "timeout_seconds": 180
     }
   },
   "model_list": [
@@ -26,5 +27,31 @@
   "gateway": {
     "host": "0.0.0.0",
     "port": 18790
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval_minutes": 120,
+    "active_hours": {
+      "start": 6,
+      "end": 22
+    }
+  },
+  "web_search": {
+    "provider": "duckduckgo"
+  },
+  "skills": {
+    "enabled": [
+      "github",
+      "summarize",
+      "rj-platform",
+      "identity-mgmt"
+    ]
+  },
+  "session": {
+    "max_entries": 100,
+    "prune_after_days": 7
+  },
+  "logging": {
+    "level": "info"
   }
 }

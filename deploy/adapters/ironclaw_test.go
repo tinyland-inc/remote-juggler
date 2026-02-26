@@ -123,6 +123,51 @@ func TestIronclawBackend_DispatchError(t *testing.T) {
 	}
 }
 
+func TestIronclawBackend_DispatchWithFindings(t *testing.T) {
+	findingsJSON := `__findings__[{"title":"XSS in template","body":"Unescaped output","severity":"high","labels":["security"],"fingerprint":"xss-tpl-001"}]__end_findings__`
+
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/responses" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"id":     "resp_f1",
+				"status": "completed",
+				"output": []map[string]any{
+					{
+						"type":    "message",
+						"role":    "assistant",
+						"content": "Analysis complete.\n" + findingsJSON,
+					},
+				},
+			})
+		}
+	}))
+	defer agent.Close()
+
+	b := NewIronclawBackend(agent.URL)
+	campaign := json.RawMessage(`{"id":"oc-codeql-fix","name":"CodeQL Fix","process":["scan"],"tools":[]}`)
+
+	result, err := b.Dispatch(campaign, "run-f1")
+	if err != nil {
+		t.Fatalf("dispatch error: %v", err)
+	}
+	if result.Status != "success" {
+		t.Errorf("expected success, got %s", result.Status)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(result.Findings))
+	}
+	f := result.Findings[0]
+	if f.Title != "XSS in template" {
+		t.Errorf("unexpected title: %s", f.Title)
+	}
+	if f.CampaignID != "oc-codeql-fix" {
+		t.Errorf("expected campaign_id=oc-codeql-fix, got %s", f.CampaignID)
+	}
+	if f.RunID != "run-f1" {
+		t.Errorf("expected run_id=run-f1, got %s", f.RunID)
+	}
+}
+
 func TestIronclawBackend_DispatchAuth(t *testing.T) {
 	var gotAuth string
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

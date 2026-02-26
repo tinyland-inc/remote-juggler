@@ -3,7 +3,7 @@
 # This is a REFERENCE file — the authoritative deployment is managed by
 # deploy/tofu/ironclaw.tf via OpenTofu.
 #
-# IronClaw is a fork of OpenClaw (openclaw/openclaw) at tinyland-inc/ironclaw.
+# IronClaw is an OpenClaw-based agent at tinyland-inc/ironclaw (standalone repo).
 # It runs behind the adapter sidecar which bridges the campaign runner's
 # dispatch protocol to IronClaw's native conversation API.
 #

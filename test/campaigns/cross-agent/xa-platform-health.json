@@ -1,0 +1,28 @@
+{
+  "id": "xa-platform-health",
+  "name": "Cross-Agent Platform Health",
+  "description": "Comprehensive platform health check: all agents verify all tools, secrets, and endpoints",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 16 * * 5",
+    "event": "manual"
+  },
+  "process": [
+    "Verify rj-gateway /health endpoint responds",
+    "Test MCP tool connectivity via juggler_campaign_status()",
+    "Verify Setec access via juggler_setec_list()",
+    "Test credential resolution via juggler_resolve_composite(query='github-token')",
+    "Check Aperture metering via juggler_aperture_usage()",
+    "Query audit trail for anomalies via juggler_audit_log(count=50)",
+    "Verify all agent adapter /health endpoints respond",
+    "Check PVC disk usage across all agents",
+    "Report comprehensive platform health: tools, secrets, endpoints, agents"
+  ],
+  "tools": [
+    "juggler_campaign_status",
+    "juggler_setec_list",
+    "juggler_resolve_composite",
+    "juggler_aperture_usage",
+    "juggler_audit_log"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "oc-infra-review",
+  "name": "Infrastructure Review",
+  "description": "Review tinyland-inc infrastructure repositories for drift, stale configs, and security issues",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 6 * * 3",
+    "event": "manual"
+  },
+  "process": [
+    "Fetch and review GloriousFlywheel repo for stale Terraform configs",
+    "Fetch and review tinyland-infra repo for drift from live state",
+    "Fetch and review outbot-ci repo for outdated CI templates",
+    "Check each repo for security alerts via github_list_alerts()",
+    "Check for stale dependencies (Renovate/Dependabot status)",
+    "Report findings: infrastructure drift, stale configs, security issues, dependency freshness"
+  ],
+  "tools": [
+    "github_fetch",
+    "github_list_alerts",
+    "juggler_campaign_status"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "GloriousFlywheel"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "tinyland-infra"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "outbot-ci"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "pc-identity-audit",
+  "name": "PicoClaw Identity Audit",
+  "description": "PicoClaw verifies its own identity state and bot credential configuration",
+  "agent": "picoclaw",
+  "trigger": {
+    "schedule": "0 8 * * 1",
+    "event": "manual"
+  },
+  "process": [
+    "Query current identity with juggler_status()",
+    "List available identities with juggler_list_identities(provider='all')",
+    "Verify bot identity configuration against IDENTITY.md",
+    "Report findings: identity drift, configuration issues"
+  ],
+  "tools": [
+    "juggler_status",
+    "juggler_list_identities",
+    "juggler_campaign_status"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "picoclaw"
+    }
+  ]
+}

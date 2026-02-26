@@ -80,11 +80,15 @@ func main() {
 	// Wire gateway tool handlers into the proxy for MCP tool interception.
 	aperture := NewApertureClient(cfg.ApertureURL)
 	aperture.SetMeterStore(meterStore)
+	githubTools := NewGitHubToolHandler(func(ctx context.Context) (string, error) {
+		return setec.Get(ctx, "github-token")
+	})
 	proxy.resolver = resolver
 	proxy.setec = setec
 	proxy.audit = audit
 	proxy.aperture = aperture
 	proxy.meterStore = meterStore
+	proxy.github = githubTools
 
 	// Start background polling for configured secrets.
 	if setec.Configured() && len(cfg.SetecSecrets) > 0 {

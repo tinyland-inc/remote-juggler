@@ -1,0 +1,73 @@
+{
+  "id": "pc-upstream-sync",
+  "name": "PicoClaw Reference Sync",
+  "description": "Monitor sipeed/picoclaw for useful changes and selectively adopt them into tinyland-inc/picoclaw via annotated PRs.",
+  "agent": "picoclaw",
+  "trigger": {
+    "schedule": "0 7 * * 1",
+    "event": "manual"
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "sipeed",
+      "repo": "picoclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "picoclaw",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "github_create_branch",
+    "github_update_file",
+    "github_create_pr",
+    "juggler_setec_put"
+  ],
+  "process": [
+    "Use github_fetch to check latest changes on sipeed/picoclaw main (README, go.mod, CHANGELOG)",
+    "Compare key files with tinyland-inc/picoclaw main using github_fetch",
+    "Analyze changes for relevance: provider changes, tool additions, config schema updates, Go module bumps",
+    "Categorize: worth-adopting, monitor-only, skip",
+    "For worth-adopting changes: create branch reference-sync-YYYY-MM-DD on tinyland-inc/picoclaw using github_create_branch",
+    "Apply changes via github_update_file to the sync branch",
+    "Create sync PR on tinyland-inc/picoclaw targeting main with detailed analysis",
+    "For breaking changes: create tracking issue with migration notes",
+    "Store sync summary in Setec",
+    "Report findings"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/pc-upstream-sync",
+    "issueLabels": [
+      "campaign",
+      "reference-sync",
+      "picoclaw"
+    ],
+    "issueRepo": "tinyland-inc/picoclaw"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": false,
+    "aiApiBudget": {
+      "maxTokens": 80000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": true,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "Reference project checked, changes categorized, adoption PR created if needed",
+    "kpis": [
+      "reference_changes_found",
+      "changes_worth_adopting",
+      "breaking_changes_count",
+      "pr_created"
+    ]
+  }
+}

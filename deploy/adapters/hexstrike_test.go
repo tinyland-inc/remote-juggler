@@ -65,6 +65,51 @@ func TestHexstrikeBackend_Dispatch(t *testing.T) {
 	}
 }
 
+func TestHexstrikeBackend_DispatchWithFindings(t *testing.T) {
+	findingsJSON := `__findings__[{"title":"Exposed AWS key","body":"Found hardcoded credential","severity":"critical","labels":["security","credentials"],"fingerprint":"aws-key-main-001"}]__end_findings__`
+
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/command" && r.Method == http.MethodPost {
+			json.NewEncoder(w).Encode(map[string]any{
+				"success": true,
+				"stdout":  "Scan results:\n" + findingsJSON,
+				"stderr":  "",
+			})
+		}
+	}))
+	defer agent.Close()
+
+	b := NewHexstrikeBackend(agent.URL)
+	campaign := json.RawMessage(`{
+		"id": "hs-cred-exposure",
+		"name": "Credential Exposure Scan",
+		"process": ["scan repos"],
+		"tools": ["credential_scan"],
+		"targets": [{"forge":"github","org":"tinyland-inc","repo":"remote-juggler"}]
+	}`)
+
+	result, err := b.Dispatch(campaign, "run-h1")
+	if err != nil {
+		t.Fatalf("dispatch error: %v", err)
+	}
+	if result.Status != "success" {
+		t.Errorf("expected success, got %s: %s", result.Status, result.Error)
+	}
+	if len(result.Findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(result.Findings))
+	}
+	f := result.Findings[0]
+	if f.Title != "Exposed AWS key" {
+		t.Errorf("unexpected title: %s", f.Title)
+	}
+	if f.Severity != "critical" {
+		t.Errorf("unexpected severity: %s", f.Severity)
+	}
+	if f.CampaignID != "hs-cred-exposure" {
+		t.Errorf("expected campaign_id=hs-cred-exposure, got %s", f.CampaignID)
+	}
+}
+
 func TestHexstrikeBackend_DispatchCommandError(t *testing.T) {
 	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/command" {

@@ -71,6 +71,7 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 
 	var trace []ToolTrace
 	var lastErr string
+	var accumulatedOutput strings.Builder
 
 	// For each tool in the campaign, dispatch via the appropriate REST endpoint.
 	for _, toolName := range c.Tools {
@@ -92,6 +93,8 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 		summary := "ok"
 		if s, ok := result["stdout"].(string); ok && s != "" {
 			summary = truncate(s, 200)
+			accumulatedOutput.WriteString(s)
+			accumulatedOutput.WriteString("\n")
 		} else if s, ok := result["status"].(string); ok {
 			summary = s
 		}
@@ -108,10 +111,13 @@ func (b *HexstrikeBackend) Dispatch(campaign json.RawMessage, runID string) (*La
 		status = "failure"
 	}
 
+	findings := extractFindings(accumulatedOutput.String(), c.ID, runID)
+
 	return &LastResult{
 		Status:    status,
 		ToolCalls: len(trace),
 		ToolTrace: trace,
+		Findings:  findings,
 		Error:     lastErr,
 	}, nil
 }

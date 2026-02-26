@@ -1,0 +1,88 @@
+{
+  "id": "xa-fork-health",
+  "name": "Agent Repository Health Dashboard",
+  "description": "Cross-agent weekly health check: verify repo state, reference project drift, CI status, and workspace consistency across all agent repositories.",
+  "agent": "ironclaw",
+  "trigger": {
+    "schedule": "0 10 * * 5",
+    "event": "manual",
+    "dependsOn": [
+      "oc-upstream-sync",
+      "pc-upstream-sync"
+    ]
+  },
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "remote-juggler",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "ironclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "picoclaw",
+      "branch": "main"
+    },
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "repo": "hexstrike-ai",
+      "branch": "main"
+    }
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_campaign_status",
+    "juggler_setec_get",
+    "juggler_setec_put",
+    "juggler_audit_log"
+  ],
+  "process": [
+    "Retrieve reference sync results from Setec: campaigns/oc-upstream-sync, campaigns/pc-upstream-sync",
+    "For each agent repo (ironclaw, picoclaw, hexstrike-ai): check main branch health using github_fetch (Dockerfile, config, workspace files exist)",
+    "Compare reference projects for significant drift: new security fixes, breaking changes, major releases",
+    "Check GHCR build status: verify latest images are building successfully",
+    "Verify workspace file consistency: IDENTITY.md, AGENT.md/AGENTS.md, SOUL.md, TOOLS.md, HEARTBEAT.md all present",
+    "Generate a weekly repo health summary with per-repo status table",
+    "Store aggregated results in Setec",
+    "Report findings: high-severity for broken builds or missing security fixes, info for healthy repos"
+  ],
+  "outputs": {
+    "setecKey": "remotejuggler/campaigns/xa-fork-health",
+    "issueLabels": [
+      "campaign",
+      "repo-health",
+      "cross-agent"
+    ],
+    "issueRepo": "tinyland-inc/remote-juggler"
+  },
+  "guardrails": {
+    "maxDuration": "5m",
+    "readOnly": true,
+    "aiApiBudget": {
+      "maxTokens": 100000
+    }
+  },
+  "feedback": {
+    "createIssues": true,
+    "createPRs": false,
+    "closeResolvedIssues": true
+  },
+  "metrics": {
+    "successCriteria": "All repos assessed, health metrics calculated, summary generated",
+    "kpis": [
+      "repos_assessed",
+      "repos_healthy",
+      "repos_with_issues",
+      "security_patches_pending",
+      "build_failures"
+    ]
+  }
+}

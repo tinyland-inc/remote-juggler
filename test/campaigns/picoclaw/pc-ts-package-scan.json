@@ -1,0 +1,29 @@
+{
+  "id": "pc-ts-package-scan",
+  "name": "PicoClaw TS Package Scan",
+  "description": "PicoClaw lightweight scan of tinyland-inc TypeScript packages for broken imports, missing types, and dead exports",
+  "agent": "picoclaw",
+  "trigger": {
+    "schedule": "0 3 * * 0",
+    "event": "manual"
+  },
+  "process": [
+    "List tinyland-inc repos with TypeScript as primary language",
+    "For each package: fetch tsconfig.json and check compiler options",
+    "Check for missing type declarations (*.d.ts files)",
+    "Scan for dead exports (exported but never imported by other packages)",
+    "Check for broken import paths referencing non-existent modules",
+    "Report findings with per-package breakdown"
+  ],
+  "tools": [
+    "github_fetch",
+    "juggler_campaign_status"
+  ],
+  "targets": [
+    {
+      "forge": "github",
+      "org": "tinyland-inc",
+      "scope": "typescript-packages"
+    }
+  ]
+}

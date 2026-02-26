@@ -3,7 +3,7 @@
 # This is a REFERENCE file — the authoritative deployment is managed by
 # deploy/tofu/picoclaw.tf via OpenTofu.
 #
-# PicoClaw is a fork of picoclaw (sipeed/picoclaw) at tinyland-inc/picoclaw.
+# PicoClaw is a PicoClaw-based agent at tinyland-inc/picoclaw (standalone repo).
 # It handles lightweight scan campaigns (dead code, TypeScript strictness, a11y).
 # The adapter sidecar bridges campaign protocol to PicoClaw's OpenAI-compatible API
 # and proxies rj-gateway MCP tools as native PicoClaw functions (PicoClaw lacks
