@@ -118,25 +118,25 @@
     },
     "hs-network-posture": {
       "file": "hexstrike/hs-network-posture.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "hs-gateway-pentest": {
       "file": "hexstrike/hs-gateway-pentest.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "hs-sops-rotation": {
       "file": "hexstrike/hs-sops-rotation.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "hs-container-vuln": {
       "file": "hexstrike/hs-container-vuln.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
@@ -160,13 +160,13 @@
     },
     "xa-cred-lifecycle": {
       "file": "cross-agent/xa-cred-lifecycle.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },
     "xa-acl-enforcement": {
       "file": "cross-agent/xa-acl-enforcement.json",
-      "enabled": false,
+      "enabled": true,
       "lastRun": null,
       "lastResult": null
     },

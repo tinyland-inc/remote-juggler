@@ -149,7 +149,7 @@ resource "kubernetes_deployment" "ironclaw" {
 
           env {
             name  = "ANTHROPIC_BASE_URL"
-            value = local.aperture_cluster_url
+            value = local.anthropic_direct_url
           }
 
           env {

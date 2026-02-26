@@ -61,6 +61,11 @@ locals {
   aperture_url         = "http://${var.aperture_hostname}"
   aperture_cluster_url = "http://aperture.${kubernetes_namespace.main.metadata[0].name}.svc.cluster.local"
 
+  # Direct Anthropic API -- bypass Aperture until grants are configured.
+  # Aperture uses Tailscale WhoIs for auth, but K8s egress proxy strips identity.
+  # TODO: restore aperture_cluster_url once Aperture grants are added to tailnet ACL.
+  anthropic_direct_url = "https://api.anthropic.com"
+
   # Gateway config JSON (mounted as secret)
   gateway_config = jsonencode({
     listen            = ":443"

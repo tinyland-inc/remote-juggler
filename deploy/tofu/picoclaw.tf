@@ -95,7 +95,7 @@ resource "kubernetes_deployment" "picoclaw" {
 
           env {
             name  = "ANTHROPIC_BASE_URL"
-            value = local.aperture_cluster_url
+            value = local.anthropic_direct_url
           }
 
           port {
